@@ -1,0 +1,246 @@
+version: "3.9"
+
+# =====================================================================
+#  Projet : Mangadvisor (stack ambitieuse)
+#  But    : Démo d’une reco de mangas “quasi-produit”
+#           (API, UI, DB+vecteurs, cache, embeddings, ingestion, search, métriques)
+#  Conventions :
+#   - Tous les services/containers commencent par "mangadvisor-"
+#   - Variables d’env en .env (Docker Compose les substitue automatiquement)
+#   - Defaults avec la syntaxe ${VAR:-defaut} → pratique pour lancer “out of the box”
+#
+#  Tips (Windows/PowerShell) :
+#   - Lancement :    docker compose --env-file .env up -d --build
+#   - Logs live :    docker compose logs -f mangadvisor-api
+#   - Arrêt propre : docker compose down
+#   - Reset volumes: docker compose down -v   (⚠ supprime les données locales)
+# =====================================================================
+
+services:
+
+  # -------------------------------------------------------------------
+  # PostgreSQL + pgvector
+  #  - Stocke les entités (mangas, utilisateurs, interactions)
+  #  - Extension pgvector pour la similarité/semantique (k-NN)
+  #  - Démarre des scripts init (./db/init) au premier run
+  # -------------------------------------------------------------------
+  mangadvisor-db:
+    image: pgvector/pgvector:pg16
+    container_name: mangadvisor-db
+    environment:
+      # Base, user, password : override via .env pour la prod
+      POSTGRES_DB: ${POSTGRES_DB:-reco}
+      POSTGRES_USER: ${POSTGRES_USER:-reco}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reco}
+    ports:
+      # Expose le port Postgres côté hôte pour debug/BI : 5432 par défaut
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Données persistantes (évite de tout perdre à chaque restart)
+      - mangadvisor-pgdata:/var/lib/postgresql/data
+      # Scripts SQL init (création schéma, extensions, seeds…)
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      # Attend que Postgres réponde avant de lancer les services dépendants
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reco} -d ${POSTGRES_DB:-reco}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # -------------------------------------------------------------------
+  # Redis
+  #  - Cache clés/valeurs ultra rapide
+  #  - Sessions, throttling anti-spam, dédup, features flags light, queues simples
+  # -------------------------------------------------------------------
+  mangadvisor-redis:
+    image: redis:7-alpine
+    container_name: mangadvisor-redis
+    ports:
+      # Expose pour debug local (CLI ou GUI) ; en prod, laisser interne
+      - "${REDIS_PORT:-6379}:6379"
+
+  # -------------------------------------------------------------------
+  # Ollama
+  #  - Héberge localement des LLM/embeddings (e.g. 'nomic-embed-text')
+  #  - Évite la dépendance externe pendant la démo
+  #  - Volume pour persister les modèles téléchargés
+  # -------------------------------------------------------------------
+  mangadvisor-ollama:
+    image: ollama/ollama:latest
+    container_name: mangadvisor-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - mangadvisor-ollama:/root/.ollama
+    healthcheck:
+      # Vérifie l’API Ollama (liste des modèles) avant de débloquer l’API/engine
+      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:11434/api/tags >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # -------------------------------------------------------------------
+  # Meilisearch (facettes & full-text)
+  #  - Idéal pour recherche titre/auteur/genre avec latence faible
+  #  - Master key configurable via .env (mettez une vraie valeur hors démo)
+  # -------------------------------------------------------------------
+  mangadvisor-meilisearch:
+    image: getmeili/meilisearch:v1.9
+    container_name: mangadvisor-meilisearch
+    environment:
+      MEILI_NO_ANALYTICS: "true"       # Pas de télémétrie vers Meili
+      MEILI_ENV: "production"          # Optimisations prod (même en démo)
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-changeme-meili}
+    ports:
+      - "${MEILI_PORT:-7700}:7700"
+    volumes:
+      - mangadvisor-meili:/meili_data  # Index persistants
+
+  # -------------------------------------------------------------------
+  # MinIO (S3-compatible) — optionnel
+  #  - Stockage objets : images proxy, captures, exports, backups…
+  #  - Console d’admin sur 9001, API S3 sur 9000
+  # -------------------------------------------------------------------
+  mangadvisor-minio:
+    image: minio/minio:latest
+    container_name: mangadvisor-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"       # S3 API
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"   # Console web
+    volumes:
+      - mangadvisor-minio:/data
+    healthcheck:
+      # Teste la liveness de MinIO (fallback silencieux si mc absent)
+      test: ["CMD", "bash", "-lc", "mc --help >/dev/null 2>&1 || true; curl -sf http://localhost:9000/minio/health/live >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+ 
+  # -------------------------------------------------------------------
+  # API (FastAPI) — cœur métier
+  #  - Endpoints : /recommend, /health, /feedback, /search…
+  #  - Parle à Postgres, Redis, Ollama, Meilisearch, MinIO
+  #  - Montée de code via volume pour DX rapide en dev
+  # -------------------------------------------------------------------
+  mangadvisor-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: mangadvisor-api
+    environment:
+      # Connexions internes par noms de service (Docker DNS)
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://reco:reco@mangadvisor-db:5432/reco}
+      REDIS_URL: ${REDIS_URL:-redis://mangadvisor-redis:6379/0}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://mangadvisor-ollama:11434}
+      MEILI_URL: ${MEILI_URL:-http://mangadvisor-meilisearch:7700}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://mangadvisor-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      # Ordonne le boot : d’abord DB/Redis, et Ollama prêt
+      mangadvisor-db:
+        condition: service_healthy
+      mangadvisor-redis:
+        condition: service_started
+      mangadvisor-ollama:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"  # Expose pour la UI et tests locaux
+    volumes:
+      - ./api:/app               # Hot-reload/dev rapide (⚠ pas en prod)
+
+  # -------------------------------------------------------------------
+  # Engine (optionnel)
+  #  - Service séparé pour la logique de reco (batch, jobs, queues…)
+  #  - Peut rester interne sans port exposé ; l’API peut l’appeler en HTTP
+  # -------------------------------------------------------------------
+  mangadvisor-engine:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    container_name: mangadvisor-engine
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://reco:reco@mangadvisor-db:5432/reco}
+      REDIS_URL: ${REDIS_URL:-redis://mangadvisor-redis:6379/0}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://mangadvisor-ollama:11434}
+    depends_on:
+      mangadvisor-db:
+        condition: service_healthy
+      mangadvisor-redis:
+        condition: service_started
+      mangadvisor-ollama:
+        condition: service_healthy
+    # ports:
+    #   - "8010:8010"  # Décommente si tu exposes une API d’engine dédiée
+
+  # -------------------------------------------------------------------
+  # UI Streamlit (démo/admin)
+  #  - Dev front minimaliste pour piloter l’API et visualiser les résultats
+  #  - Montée de code via volume pour itérer vite
+  # -------------------------------------------------------------------
+  mangadvisor-ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: mangadvisor-ui
+    environment:
+      API_URL: ${API_URL:-http://mangadvisor-api:8000}  # URL interne Docker
+    depends_on:
+      mangadvisor-api:
+        condition: service_started
+    ports:
+      - "${UI_PORT:-8501}:8501"   # http://localhost:8501 en local
+    volumes:
+      - ./ui:/app                 # Dev only (⚠ pas en prod)
+
+  # -------------------------------------------------------------------
+  # Prometheus (métriques)
+  #  - Scrape des endpoints /metrics (API, engine…)
+  #  - Config dans ./metrics/prometheus.yml
+  # -------------------------------------------------------------------
+  mangadvisor-prometheus:
+    image: prom/prometheus:latest
+    container_name: mangadvisor-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./metrics/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - mangadvisor-prometheus:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"  # UI : http://localhost:9090
+
+  # -------------------------------------------------------------------
+  # Grafana (dashboards)
+  #  - Provisioning de datasources/dashboards dans ./metrics/provisioning
+  #  - Admin user/pass via .env (⚠ à renforcer hors démo)
+  # -------------------------------------------------------------------
+  mangadvisor-grafana:
+    image: grafana/grafana-oss:latest
+    container_name: mangadvisor-grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"   # UI : http://localhost:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - mangadvisor-grafana:/var/lib/grafana
+      - ./metrics/provisioning:/etc/grafana/provisioning
+    depends_on:
+      mangadvisor-prometheus:
+        condition: service_started
+
+# =====================================================================
+# Volumes persistants (créés/attachés automatiquement)
+#  - Nommés pour lisibilité ; supprimés par `docker compose down -v`
+# =====================================================================
+volumes:
+  mangadvisor-pgdata:
+  mangadvisor-meili:
+  mangadvisor-ollama:
+  mangadvisor-minio:
+  mangadvisor-prometheus:
+  mangadvisor-grafana:

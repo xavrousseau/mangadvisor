@@ -1,0 +1,32 @@
+{
+  "title": "Mangadvisor — API",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Requêtes /s par endpoint",
+      "targets": [
+        {
+          "expr": "sum by (endpoint) (rate(mangadvisor_requests_total[1m]))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "datasource": "Prometheus",
+      "id": 1
+    },
+    {
+      "type": "graph",
+      "title": "Latence p95 (s) par endpoint",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(mangadvisor_request_latency_seconds_bucket[5m])))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "datasource": "Prometheus",
+      "id": 2
+    }
+  ],
+  "schemaVersion": 36,
+  "version": 1,
+  "timezone": "browser"
+}
