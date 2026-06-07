@@ -1,0 +1,108 @@
+# ==========================================
+# 📂 GITIGNORE — Projet Pipeline Hybride
+# ==========================================
+
+# 🔒 Fichiers sensibles
+.env
+
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# 📁 Exports locaux (données générées)
+old/
+logs/
+__pycache__/
+jars/
+old_*
+tests/
+bat/
+old_version/
+
+# 📦 Fichiers d’archives
+*.zip
+*.tar.gz
+*.rar
+
+# 🐳 Docker
+*.pid
+*.tar
+
+# 📑 Éditeurs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 🪟 Windows
+Thumbs.db
+desktop.ini
+
+# 🖼️ Images générées
+graphique_*.png
+résumé_*.csv
+
+# 💻 Exécutables
+*.exe
+*.bat
+*.sh
+
+
+# === Python / venv / caches ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+.mypy_cache/
+.pytype/
+.pytest_cache/
+
+# === OS / IDE ===
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# === Streamlit ===
+.streamlit/secrets.toml
+.streamlit/*.log
+
+# === Data lourdes / temporaires ===
+data/raw/
+data/tmp/
+*.parquet
+*.feather
+*.h5
+*.db
+*.sqlite
+*.csv
+*.xlsx
+
+# Autoriser des échantillons légers:
+!data/samples/**
+!examples/**
+
+# === Logs / exports ===
+logs/
+exports/
+*.log
+*.zip
+
+# === Node/Front (si présent) ===
+node_modules/
+dist/
+build/
+
+# === archive ===
+legacy/

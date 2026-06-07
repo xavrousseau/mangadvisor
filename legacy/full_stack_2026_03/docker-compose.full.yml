@@ -1,0 +1,350 @@
+# =============================================================================
+# Mangadvisor — STACK COMPLÈTE (sans profils)
+#
+# Idée directrice :
+#  - Un unique fichier Compose qui DÉMARRE ENTIER d’un coup (sans profiles).
+#  - Images "pinnées" pour la reproductibilité (évite latest).
+#  - Healthchecks uniquement sur nos images Python (API/UI) et Postgres
+#    → on contrôle l’outil disponible (python & pg_isready).
+#  - ZÉRO montage de fichiers locaux "à venir" (nginx.conf, prometheus.yml, etc.)
+#    → rien ne casse le démarrage aujourd’hui ; on ajoutera plus tard via override.
+#
+# Ports par défaut (adaptables via .env) :
+#  - Postgres 5432     - API 8000         - UI 8080
+#  - Meilisearch 7700  - LibreTranslate 5000
+#  - MinIO 9000 (API)  - MinIO Console 9001
+#  - Ollama 11434      - Redis 6379
+#  - Prometheus 9090   - Grafana 3001
+#  - Nginx 8081        - Postgres Exporter 9187
+# =============================================================================
+
+name: mangadvisor
+
+# --------- Ancres réutilisables ------------------------------------------------
+x-common-env: &common_env
+  TZ: ${TZ:-Europe/Paris}
+  PYTHONUNBUFFERED: "1"   # ▶ logs Python flushés (utile pour debug en conteneur)
+
+# ▶ Healthcheck Postgres via utilitaire natif "pg_isready"
+x-health-pg: &health_pg
+  test: ["CMD-SHELL", "pg_isready -U \"${POSTGRES_USER:-manga}\" -d \"${POSTGRES_DB:-mangadvisor}\" -h 127.0.0.1 -p 5432"]
+  interval: 10s
+  timeout: 5s
+  retries: 30
+  start_period: 20s
+
+# ▶ Healthchecks TCP génériques pour API/UI (on sait que python est dispo)
+x-health-tcp-8000: &health_tcp_8000
+  test: ["CMD-SHELL", "python - <<'PY'\nimport socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8000)); s.close()\nPY"]
+  interval: 10s
+  timeout: 5s
+  retries: 20
+  start_period: 20s
+
+x-health-tcp-8080: &health_tcp_8080
+  test: ["CMD-SHELL", "python - <<'PY'\nimport socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8080)); s.close()\nPY"]
+  interval: 10s
+  timeout: 5s
+  retries: 20
+  start_period: 20s
+
+# --------- Réseau & Volumes ---------------------------------------------------
+networks:
+  mangadvisor-net: {}   # ▶ Réseau unique → DNS interne “service-name” simplifié
+
+volumes:
+  mangadvisor-pgdata: {}       # ▶ Données Postgres (persistance locale)
+  mangadvisor-meili: {}        # ▶ Index Meilisearch (réindex + rapide si conservé)
+  mangadvisor-ollama: {}       # ▶ Cache modèles/weights Ollama
+  mangadvisor-minio: {}        # ▶ Buckets MinIO (S3 local)
+  mangadvisor-prometheus: {}   # ▶ Base de séries temporelles Prometheus
+  mangadvisor-grafana: {}      # ▶ Données Grafana (sqlite, plugins)
+
+# --------- Services -----------------------------------------------------------
+services:
+
+  # ============================== DATA LAYER ==================================
+  mangadvisor-postgres:
+    # ▶ Base relationnelle + extension pgvector (similitudes embeddings).
+    #   Cœur de la stack (API/engine/dbt/exporters s'y connectent).
+    image: pgvector/pgvector:pg16
+    container_name: mangadvisor-postgres
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      POSTGRES_DB: ${POSTGRES_DB:-mangadvisor}
+      POSTGRES_USER: ${POSTGRES_USER:-manga}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manga_pw}  # ⚠ changer en prod
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"  # ▶ accès client local (psql, DBeaver…)
+    volumes:
+      - mangadvisor-pgdata:/var/lib/postgresql/data
+      # ⚠ Pas de scripts d’init pour l’instant → aucun “fichier manquant” ne casse le boot.
+      #    On ajoutera via compose.override ou au “Gate SQL”.
+    healthcheck:
+      <<: *health_pg
+    networks: [mangadvisor-net]
+
+  # ============================== APP LAYER ===================================
+  mangadvisor-api:
+    # ▶ Backend FastAPI : /search, /similar/{id}, /explain, /metrics, etc.
+    #   Démarre sans dépendre d’Ollama/Meili/Redis (features optionnelles).
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    image: mangadvisor-api:dev
+    container_name: mangadvisor-api
+    restart: unless-stopped
+    depends_on:
+      mangadvisor-postgres:
+        condition: service_healthy     # ▶ API s’ouvre seulement si la DB répond
+    environment:
+      <<: *common_env
+      # Connexion DB (forme variables + URI ; choisis côté code ce que tu lis)
+      POSTGRES_HOST: mangadvisor-postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-mangadvisor}
+      POSTGRES_USER: ${POSTGRES_USER:-manga}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manga_pw}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-manga}:${POSTGRES_PASSWORD:-manga_pw}@mangadvisor-postgres:5432/${POSTGRES_DB:-mangadvisor}
+      # Intégrations optionnelles (branchées mais pas obligatoires)
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://mangadvisor-ollama:11434}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-mxbai-embed-large}
+      MEILI_URL: ${MEILI_URL:-http://mangadvisor-meilisearch:7700}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_master_key}
+      REDIS_URL: ${REDIS_URL:-redis://mangadvisor-redis:6379/0}
+      LIBRETRANSLATE_URL: ${LIBRETRANSLATE_URL:-http://mangadvisor-libretranslate:5000}
+      # Paramètres runtime API
+      API_HOST: ${API_HOST:-0.0.0.0}
+      API_PORT: ${API_PORT:-8000}
+      API_LOG_LEVEL: ${API_LOG_LEVEL:-info}
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}  # ▶ /metrics pour Prometheus
+    ports:
+      - "${API_PORT_PUBLISHED:-8000}:${API_PORT:-8000}"
+    healthcheck:
+      <<: *health_tcp_8000            # ▶ TCP → ne dépend pas d’un /healthz codé
+    networks: [mangadvisor-net]
+
+  mangadvisor-ui:
+    # ▶ Front NiceGUI : démo E2E (recherche, similarités, explications).
+    #   Consomme l’API par le DNS interne (ne pas utiliser localhost).
+    build:
+      context: ./services/ui
+      dockerfile: Dockerfile
+    image: mangadvisor-ui:dev
+    container_name: mangadvisor-ui
+    restart: unless-stopped
+    depends_on:
+      mangadvisor-api:
+        condition: service_started     # ▶ UI visible dès que l’API écoute
+    environment:
+      <<: *common_env
+      API_BASE_URL: ${API_BASE_URL:-http://mangadvisor-api:8000}  # ⚠ pas de 127.0.0.1 ici
+      UI_HOST: ${UI_HOST:-0.0.0.0}
+      UI_PORT: ${UI_PORT:-8080}
+    ports:
+      - "${UI_PORT_PUBLISHED:-8080}:${UI_PORT:-8080}"
+    healthcheck:
+      <<: *health_tcp_8080
+    networks: [mangadvisor-net]
+
+  # ============================== UTILITAIRES & SERVICES ANNEXES ==============
+  mangadvisor-meilisearch:
+    # ▶ Moteur de recherche full-text (typo-tolerant) pour titres/tags.
+    #   Utile pour autocomplete & filtres ; l’API peut s’en passer.
+    image: getmeili/meilisearch:v1.11.0
+    container_name: mangadvisor-meilisearch
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_ENV: "production"
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_master_key}  # ⚠ secret en prod
+    command: ["meilisearch", "--db-path", "/meili_data", "--http-addr", "0.0.0.0:7700"]
+    ports:
+      - "${MEILI_PORT_PUBLISHED:-7700}:7700"
+    volumes:
+      - mangadvisor-meili:/meili_data
+    networks: [mangadvisor-net]
+
+  mangadvisor-libretranslate:
+    # ▶ Service de traduction FR/EN auto-hébergé (normalisation de contenus).
+    image: libretranslate/libretranslate:v1.7.3
+    container_name: mangadvisor-libretranslate
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      LT_LOAD_ONLY: ${LT_LOAD_ONLY:-en,fr}   # ▶ charge uniquement les langues utiles → RAM moindre
+    ports:
+      - "${LT_PORT_PUBLISHED:-5000}:5000"
+    networks: [mangadvisor-net]
+
+  mangadvisor-ollama:
+    # ▶ Runtime LLM : héberge les modèles d’embeddings (et plus tard des LLM de génération).
+    image: ollama/ollama:0.3.14
+    container_name: mangadvisor-ollama
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      OLLAMA_KEEP_ALIVE: "24h"   # ▶ évite les re-loads trop fréquents
+      OLLAMA_HOST: "0.0.0.0"
+    ports:
+      - "${OLLAMA_PORT_PUBLISHED:-11434}:11434"
+    volumes:
+      - mangadvisor-ollama:/root/.ollama
+    networks: [mangadvisor-net]
+
+  mangadvisor-redis:
+    # ▶ Cache & petit bus de messages (jobs courts, throttling, sessions).
+    image: redis:7.4-alpine
+    container_name: mangadvisor-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # ▶ dev : pas de persistance
+    ports:
+      - "${REDIS_PORT_PUBLISHED:-6379}:6379"
+    networks: [mangadvisor-net]
+
+  mangadvisor-minio:
+    # ▶ S3 local (objets : covers, exports parquet/csv, artefacts).
+    image: minio/minio:RELEASE.2024-09-22T00-33-43Z
+    container_name: mangadvisor-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      <<: *common_env
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_pw}  # ⚠ changer en prod
+    ports:
+      - "${MINIO_API_PORT_PUBLISHED:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT_PUBLISHED:-9001}:9001"
+    volumes:
+      - mangadvisor-minio:/data
+    networks: [mangadvisor-net]
+
+  mangadvisor-minio-mc:
+    # ▶ Client MinIO (“mc”) pour administrer buckets/policies. Démarre idle.
+    image: minio/mc:RELEASE.2024-09-16T17-43-14Z
+    container_name: mangadvisor-minio-mc
+    entrypoint: ["bash", "-lc", "sleep infinity"]
+    depends_on:
+      - mangadvisor-minio
+    networks: [mangadvisor-net]
+
+  mangadvisor-pgadmin:
+    # ▶ GUI Postgres pour requêtes/maintenance/démo. À utiliser ponctuellement.
+    image: dpage/pgadmin4:8    
+    container_name: mangadvisor-pgadmin
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@manga.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}  # ⚠ secret en prod
+    ports:
+      - "${PGADMIN_PORT_PUBLISHED:-5050}:80"
+    depends_on:
+      - mangadvisor-postgres
+    networks: [mangadvisor-net]
+
+  mangadvisor-prometheus:
+    # ▶ Monitoring : démarre avec la conf par défaut (s’autoscrape).
+    #   On branchera un prometheus.yml via override quand prêt.
+    image: prom/prometheus:v2.54.1
+    container_name: mangadvisor-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROM_PORT_PUBLISHED:-9090}:9090"
+    volumes:
+      - mangadvisor-prometheus:/prometheus
+    networks: [mangadvisor-net]
+
+  mangadvisor-grafana:
+    # ▶ Dashboards : datasource Prometheus + provisioning ultérieur (override).
+    image: grafana/grafana:11.2.0
+    container_name: mangadvisor-grafana
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    ports:
+      - "${GRAFANA_PORT_PUBLISHED:-3001}:3000"
+    volumes:
+      - mangadvisor-grafana:/var/lib/grafana
+    depends_on:
+      - mangadvisor-prometheus
+    networks: [mangadvisor-net]
+
+  mangadvisor-postgres-exporter:
+    # ▶ Exporte les métriques Postgres → scrape par Prometheus.
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: mangadvisor-postgres-exporter
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      # NB: cette image attend typiquement DATA_SOURCE_NAME (DSN postgres)
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-manga}:${POSTGRES_PASSWORD:-manga_pw}@mangadvisor-postgres:5432/${POSTGRES_DB:-mangadvisor}?sslmode=disable"
+    ports:
+      - "${PG_EXPORTER_PORT_PUBLISHED:-9187}:9187"
+    depends_on:
+      - mangadvisor-postgres
+    networks: [mangadvisor-net]
+
+  mangadvisor-engine:
+    # ▶ Pod batch/ETL : ingestion, nettoyage, génération embeddings, index Meili…
+    #   Démarre “idle” → on `docker exec -it` pour lancer les commandes au besoin.
+    build:
+      context: ./services/engine
+      dockerfile: Dockerfile
+    image: mangadvisor-engine:dev
+    container_name: mangadvisor-engine
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-manga}:${POSTGRES_PASSWORD:-manga_pw}@mangadvisor-postgres:5432/${POSTGRES_DB:-mangadvisor}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://mangadvisor-ollama:11434}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-mxbai-embed-large}
+      LOG_LEVEL: ${ENGINE_LOG_LEVEL:-info}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-mangadvisor-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_pw}
+      MEILI_URL: ${MEILI_URL:-http://mangadvisor-meilisearch:7700}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_master_key}
+    volumes:
+      - ./data:/app/data                 # ▶ jeux de données locaux (raw/processed)
+      - ./services/engine/scripts:/app/scripts  # ▶ dev hot-reload des scripts
+    command: ["bash", "-lc", "sleep infinity"]
+    depends_on:
+      - mangadvisor-postgres
+    networks: [mangadvisor-net]
+
+  mangadvisor-scheduler:
+    # ▶ Planificateur (cron-like/workers). À scripter plus tard (RQ/Celery/APS…).
+    #   Démarre idle lui aussi pour ne pas bloquer le boot.
+    build:
+      context: ./services/scheduler
+      dockerfile: Dockerfile
+    image: mangadvisor-scheduler:dev
+    container_name: mangadvisor-scheduler
+    restart: unless-stopped
+    environment:
+      <<: *common_env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-manga}:${POSTGRES_PASSWORD:-manga_pw}@mangadvisor-postgres:5432/${POSTGRES_DB:-mangadvisor}
+      REDIS_URL: ${REDIS_URL:-redis://mangadvisor-redis:6379/0}
+    command: ["bash", "-lc", "sleep infinity"]
+    depends_on:
+      - mangadvisor-engine
+      - mangadvisor-redis
+    networks: [mangadvisor-net]
+
+  mangadvisor-nginx:
+    # ▶ Reverse-proxy (optionnel pour unifier /, /api, /grafana…).
+    #   Ici, Nginx sert juste sa page par défaut (aucun bind de conf).
+    image: nginx:1.27.2-alpine
+    container_name: mangadvisor-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT_PUBLISHED:-8081}:80"
+    depends_on:
+      - mangadvisor-ui
+      - mangadvisor-api
+    networks: [mangadvisor-net]

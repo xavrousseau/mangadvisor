@@ -1,0 +1,17 @@
+# =============================================================================
+# Mangadvisor — Override DEV
+# - Expose les ports internes pour debug (DBeaver, curl, etc.)
+# =============================================================================
+
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT_PUBLISHED:-5432}:5432"
+
+  meilisearch:
+    ports:
+      - "${MEILI_PORT_PUBLISHED:-7700}:7700"
+
+  redis:
+    ports:
+      - "${REDIS_PORT_PUBLISHED:-6379}:6379"

@@ -1,0 +1,5 @@
+title,library_status,user_score,is_favorite,owned_volumes,read_volumes,notes
+Naruto,READ,8.5,true,72,72,Très bon shonen
+Bleach,READ,8,false,74,74,
+One Piece,WANT_TO_READ,,false,,,
+Fairy Tail,NOT_INTERESTED,,false,,,

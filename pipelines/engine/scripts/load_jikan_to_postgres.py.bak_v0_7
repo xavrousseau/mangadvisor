@@ -1,0 +1,173 @@
+"""
+Script : load_jikan_to_postgres.py
+
+Rôle :
+    Lire les fichiers JSON bruts extraits depuis Jikan
+    et charger les mangas dans PostgreSQL.
+
+Entrée :
+    data/raw/jikan/manga_page_*.json
+
+Sortie :
+    table PostgreSQL jikan_manga_source
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+sys.path.append(str(SRC))
+
+from load.postgres_loader import get_postgres_connection, upsert_jikan_manga_batch  # noqa: E402
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+RAW_JIKAN_DIR = PROJECT_ROOT / "data" / "raw" / "jikan"
+
+
+def parse_published_date(value: Any) -> str | None:
+    """
+    Convertit une date ISO Jikan en chaîne compatible PostgreSQL.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
+def transform_jikan_item(item: dict[str, Any]) -> dict[str, Any] | None:
+    """
+    Transforme un manga Jikan brut en ligne prête à charger.
+    Retourne None si l'enregistrement est invalide.
+    """
+    mal_id = item.get("mal_id")
+    if mal_id is None:
+        return None
+
+    published = item.get("published") or {}
+
+    return {
+        "mal_id": mal_id,
+        "title": item.get("title"),
+        "title_english": item.get("title_english"),
+        "title_japanese": item.get("title_japanese"),
+        "synopsis": item.get("synopsis"),
+        "status": item.get("status"),
+        "chapters": item.get("chapters"),
+        "volumes": item.get("volumes"),
+        "score": item.get("score"),
+        "popularity": item.get("popularity"),
+        "rank": item.get("rank"),
+        "members": item.get("members"),
+        "favorites": item.get("favorites"),
+        "published_from": parse_published_date(published.get("from")),
+        "published_to": parse_published_date(published.get("to")),
+        "manga_type": item.get("type"),
+        "genres_json": json.dumps(item.get("genres", []), ensure_ascii=False),
+        "themes_json": json.dumps(item.get("themes", []), ensure_ascii=False),
+        "demographics_json": json.dumps(item.get("demographics", []), ensure_ascii=False),
+        "authors_json": json.dumps(item.get("authors", []), ensure_ascii=False),
+        "serializations_json": json.dumps(item.get("serializations", []), ensure_ascii=False),
+        "raw_json": json.dumps(item, ensure_ascii=False),
+    }
+
+
+def iter_jikan_json_files(raw_dir: Path) -> list[Path]:
+    """
+    Retourne la liste triée des fichiers JSON Jikan.
+    """
+    return sorted(raw_dir.glob("manga_page_*.json"))
+
+
+def load_json_file(file_path: Path) -> dict[str, Any]:
+    """
+    Charge un fichier JSON.
+    """
+    with file_path.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def main() -> None:
+    """
+    Point d'entrée principal.
+    """
+    print("==================================================")
+    print("Mangadvisor - Chargement Jikan vers PostgreSQL")
+    print("==================================================")
+    print(f"Dossier source : {RAW_JIKAN_DIR}")
+    print()
+
+    files = iter_jikan_json_files(RAW_JIKAN_DIR)
+
+    if not files:
+        print("Aucun fichier JSON trouvé dans data/raw/jikan.")
+        print("Lance d'abord l'extraction Jikan.")
+        return
+
+    print(f"Fichiers détectés : {len(files)}")
+    print()
+
+    total_rows_loaded = 0
+    total_rows_invalid = 0
+    total_files_in_error = 0
+
+    conn = get_postgres_connection()
+
+    try:
+        for file_path in files:
+            print(f"[load_jikan] lecture : {file_path.name}")
+
+            try:
+                payload = load_json_file(file_path)
+            except Exception as exc:
+                total_files_in_error += 1
+                print(f"[load_jikan] ERREUR lecture fichier {file_path.name}: {exc}")
+                print()
+                continue
+
+            items = payload.get("data", [])
+            rows = []
+            invalid_rows = 0
+
+            for item in items:
+                transformed = transform_jikan_item(item)
+                if transformed is None:
+                    invalid_rows += 1
+                    continue
+                rows.append(transformed)
+
+            try:
+                loaded = upsert_jikan_manga_batch(conn, rows)
+            except Exception as exc:
+                total_files_in_error += 1
+                print(f"[load_jikan] ERREUR chargement PostgreSQL {file_path.name}: {exc}")
+                print()
+                continue
+
+            total_rows_loaded += loaded
+            total_rows_invalid += invalid_rows
+
+            print(f"[load_jikan] lignes valides traitées : {loaded}")
+            print(f"[load_jikan] lignes invalides ignorées : {invalid_rows}")
+            print()
+
+    finally:
+        conn.close()
+
+    print("==================================================")
+    print("Chargement terminé")
+    print(f"Fichiers traités : {len(files)}")
+    print(f"Fichiers en erreur : {total_files_in_error}")
+    print(f"Total lignes valides traitées : {total_rows_loaded}")
+    print(f"Total lignes invalides ignorées : {total_rows_invalid}")
+    print("==================================================")
+
+
+if __name__ == "__main__":
+    main()

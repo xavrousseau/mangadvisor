@@ -1,0 +1,399 @@
+import os
+from typing import Any
+
+import requests
+import streamlit as st
+
+
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+
+st.set_page_config(
+    page_title="Mangadvisor",
+    page_icon="📚",
+    layout="wide",
+)
+
+
+def call_api_get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Appelle l'API Mangadvisor en GET.
+    """
+    url = f"{API_BASE_URL}{path}"
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as exc:
+        st.error(f"Erreur lors de l'appel API GET : {exc}")
+        st.stop()
+
+
+def call_api_post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Appelle l'API Mangadvisor en POST.
+    """
+    url = f"{API_BASE_URL}{path}"
+
+    try:
+        response = requests.post(url, json=payload, timeout=20)
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as exc:
+        st.error(f"Erreur lors de l'appel API POST : {exc}")
+        st.stop()
+
+
+def get_health() -> dict[str, Any]:
+    return call_api_get("/health")
+
+
+def get_mangas(search: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"limit": limit}
+
+    if search:
+        params["q"] = search
+
+    data = call_api_get("/mangas", params=params)
+    return data.get("items", [])
+
+
+def get_similar_recommendations(title: str, limit: int = 5) -> dict[str, Any]:
+    return call_api_get(
+        "/recommendations/similar",
+        params={
+            "title": title,
+            "limit": limit,
+        },
+    )
+
+
+def get_profile_recommendations(
+    liked_titles: list[str],
+    limit: int = 5,
+    min_score: float = 6.8,
+    only_finished: bool = False,
+    exclude_sensitive_mismatches: bool = False,
+) -> dict[str, Any]:
+    return call_api_post(
+        "/recommendations/profile",
+        payload={
+            "liked_titles": liked_titles,
+            "limit": limit,
+            "min_score": min_score,
+            "only_finished": only_finished,
+            "exclude_sensitive_mismatches": exclude_sensitive_mismatches,
+        },
+    )
+
+
+def format_list(values: list[str] | None, empty_label: str = "Non renseigné") -> str:
+    if not values:
+        return empty_label
+
+    return ", ".join(values)
+
+
+def format_number(value: Any, decimals: int = 1) -> str:
+    if value is None:
+        return "N/A"
+
+    try:
+        return f"{float(value):.{decimals}f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def proximity_label(score: Any) -> str:
+    if score is None:
+        return "N/A"
+
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return "N/A"
+
+    if value >= 100:
+        return "Très forte"
+    if value >= 80:
+        return "Forte"
+    if value >= 60:
+        return "Moyenne"
+    return "Faible"
+
+
+def display_recommendation_card(
+    recommendation: dict[str, Any],
+    index: int,
+) -> None:
+    """
+    Affiche une carte de recommandation.
+    """
+    with st.container(border=True):
+        st.markdown(f"### {index}. {recommendation.get('title')}")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            st.metric(
+                "Score reco",
+                format_number(recommendation.get("recommendation_score"), 1),
+            )
+
+        with c2:
+            st.metric(
+                "Proximité calculée",
+                proximity_label(recommendation.get("recommendation_score")),
+            )
+
+        with c3:
+            st.metric(
+                "Score manga",
+                format_number(recommendation.get("score"), 2),
+            )
+
+        with c4:
+            st.metric(
+                "Statut",
+                recommendation.get("status") or "N/A",
+            )
+
+        st.write("**Cible éditoriale commune :**")
+        st.write(
+            format_list(
+                recommendation.get("common_demographics"),
+                "Aucune cible commune renseignée",
+            )
+        )
+
+        st.write("**Thèmes communs :**")
+        st.write(
+            format_list(
+                recommendation.get("common_themes"),
+                "Aucun thème commun renseigné",
+            )
+        )
+
+        st.write("**Genres communs :**")
+        st.write(
+            format_list(
+                recommendation.get("common_genres"),
+                "Aucun genre commun renseigné",
+            )
+        )
+
+        sensitive_mismatches = recommendation.get("sensitive_mismatches") or []
+
+        if sensitive_mismatches:
+            st.warning(
+                "Éléments qui peuvent éloigner la recommandation : "
+                + ", ".join(sensitive_mismatches)
+            )
+
+        st.info(recommendation.get("reason", "Pas d'explication disponible."))
+
+
+st.title("📚 Mangadvisor")
+st.caption(
+    "Première version : recommandations manga par genres, thèmes, cible éditoriale, popularité et score."
+)
+
+with st.sidebar:
+    st.header("État de la stack")
+
+    health = get_health()
+
+    st.success("API disponible")
+    st.write(f"Base PostgreSQL : `{health.get('database', 'inconnue')}`")
+
+    st.divider()
+
+    recommendation_limit = st.slider(
+        "Nombre de recommandations",
+        min_value=3,
+        max_value=10,
+        value=5,
+    )
+
+    st.caption(
+        "Le moteur actuel utilise les genres, les thèmes, la cible éditoriale, le statut, la popularité et quelques malus simples."
+    )
+
+
+tab_single, tab_profile = st.tabs(
+    [
+        "🔎 Recommandation depuis un manga",
+        "🧠 Recommandation depuis mon profil",
+    ]
+)
+
+
+with tab_single:
+    st.subheader("1. Recherche un manga de référence")
+
+    search = st.text_input(
+        "Titre du manga",
+        value="Naruto",
+        help="Exemples : Naruto, One Piece, Berserk, Death Note...",
+        key="single_search",
+    )
+
+    mangas = get_mangas(search=search if search else None, limit=100)
+
+    if not mangas:
+        st.warning("Aucun manga trouvé avec cette recherche.")
+        st.stop()
+
+    manga_titles = [manga["title"] for manga in mangas]
+
+    selected_title = st.selectbox(
+        "Manga sélectionné",
+        options=manga_titles,
+        key="single_selected_title",
+    )
+
+    selected_manga = next(
+        manga for manga in mangas if manga["title"] == selected_title
+    )
+
+    st.subheader("2. Manga sélectionné")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Score manga", format_number(selected_manga.get("score"), 2))
+
+    with col2:
+        st.metric("Statut", selected_manga.get("status") or "N/A")
+
+    with col3:
+        st.metric("Volumes", selected_manga.get("volumes") or "N/A")
+
+    with col4:
+        st.metric("Popularité", selected_manga.get("popularity") or "N/A")
+
+    st.write("**Genres :**")
+    st.write(format_list(selected_manga.get("genres"), "Genres non renseignés"))
+
+    st.write("**Thèmes :**")
+    st.write(format_list(selected_manga.get("themes"), "Thèmes non renseignés"))
+
+    st.write("**Cible éditoriale :**")
+    st.write(
+        format_list(
+            selected_manga.get("demographics"),
+            "Cible éditoriale non renseignée",
+        )
+    )
+
+    st.divider()
+
+    st.subheader("3. Recommandations")
+
+    if st.button("Me recommander des mangas similaires", type="primary"):
+        result = get_similar_recommendations(
+            title=selected_title,
+            limit=recommendation_limit,
+        )
+
+        source = result.get("source", {})
+        recommendations = result.get("recommendations", [])
+
+        st.write(
+            f"Recommandations à partir de : **{source.get('title', selected_title)}**"
+        )
+
+        if not recommendations:
+            st.warning("Aucune recommandation trouvée.")
+            st.stop()
+
+        for index, recommendation in enumerate(recommendations, start=1):
+            display_recommendation_card(recommendation, index)
+
+    else:
+        st.info("Clique sur le bouton pour générer les recommandations.")
+
+
+with tab_profile:
+    st.subheader("1. Sélectionne plusieurs mangas que tu aimes")
+
+    all_mangas = get_mangas(limit=500)
+    all_titles = [manga["title"] for manga in all_mangas]
+
+    default_profile_titles = [
+        title
+        for title in ["Naruto", "Bleach", "Hunter x Hunter"]
+        if title in all_titles
+    ]
+
+    liked_titles = st.multiselect(
+        "Mangas aimés",
+        options=all_titles,
+        default=default_profile_titles,
+        help="Choisis entre 1 et 10 mangas que tu aimes.",
+    )
+
+    st.subheader("2. Préférences de lecture")
+
+    profile_min_score = st.slider(
+        "Score minimum du manga recommandé",
+        min_value=0.0,
+        max_value=10.0,
+        value=6.8,
+        step=0.1,
+        help="Augmente cette valeur pour éviter les recommandations trop faibles ou trop obscures.",
+    )
+
+    profile_only_finished = st.checkbox(
+        "Recommander uniquement des séries terminées",
+        value=False,
+        help="Pratique si tu veux éviter les séries encore en cours ou en pause.",
+    )
+
+    profile_exclude_sensitive = st.checkbox(
+        "Exclure les recommandations avec éléments éloignants",
+        value=False,
+        help="Exclut par exemple certains écarts comme Gore, Harem, Ecchi, Romance, School selon ton profil.",
+    )
+
+    st.divider()
+
+    st.subheader("3. Recommandations selon ton profil")
+
+    if st.button("Me recommander selon mon profil", type="primary"):
+        if not liked_titles:
+            st.warning("Sélectionne au moins un manga avant de lancer la recommandation.")
+            st.stop()
+
+        if len(liked_titles) > 10:
+            st.warning("Sélectionne au maximum 10 mangas pour cette première version.")
+            st.stop()
+
+        result = get_profile_recommendations(
+            liked_titles=liked_titles,
+            limit=recommendation_limit,
+            min_score=profile_min_score,
+            only_finished=profile_only_finished,
+            exclude_sensitive_mismatches=profile_exclude_sensitive,
+        )
+
+        sources = result.get("sources", [])
+        recommendations = result.get("recommendations", [])
+
+        source_titles = [source.get("title") for source in sources]
+
+        st.write("Profil reconnu par l’API :")
+        st.write(", ".join(source_titles))
+
+        if not recommendations:
+            st.warning("Aucune recommandation trouvée pour ce profil.")
+            st.stop()
+
+        for index, recommendation in enumerate(recommendations, start=1):
+            display_recommendation_card(recommendation, index)
+
+    else:
+        st.info("Clique sur le bouton pour générer des recommandations selon ton profil.")

@@ -1,0 +1,134 @@
+"""
+Script : extract_jikan.py
+
+Rôle :
+    Extraire des pages de mangas depuis l'API Jikan
+    et enregistrer les réponses JSON brutes dans data/raw/jikan.
+
+Sortie :
+    data/raw/jikan/manga_page_1.json
+    data/raw/jikan/manga_page_2.json
+    etc.
+
+Exemple d'utilisation :
+    python pipelines/engine/scripts/extract_jikan.py
+    python pipelines/engine/scripts/extract_jikan.py --start-page 1 --end-page 3
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+# Rend le dossier src importable
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+sys.path.append(str(SRC))
+
+from extract.jikan_client import fetch_manga_page_with_retry  # noqa: E402
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+RAW_JIKAN_DIR = PROJECT_ROOT / "data" / "raw" / "jikan"
+
+
+def save_json(data: dict, output_path: Path) -> None:
+    """
+    Enregistre un dictionnaire Python en JSON formaté.
+
+    Paramètres
+    ----------
+    data : dict
+        Données à sauvegarder.
+    output_path : Path
+        Chemin du fichier de sortie.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def parse_args() -> argparse.Namespace:
+    """
+    Parse les arguments de ligne de commande.
+
+    Retour
+    ------
+    argparse.Namespace
+        Arguments parsés.
+    """
+    parser = argparse.ArgumentParser(
+        description="Extraire des pages de mangas depuis l'API Jikan."
+    )
+    parser.add_argument(
+        "--start-page",
+        type=int,
+        default=1,
+        help="Première page à extraire.",
+    )
+    parser.add_argument(
+        "--end-page",
+        type=int,
+        default=1,
+        help="Dernière page à extraire.",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        help="Nombre de mangas par page.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    """
+    Point d'entrée principal du script.
+    """
+    args = parse_args()
+
+    if args.start_page < 1:
+        raise ValueError("start-page doit être >= 1")
+    if args.end_page < args.start_page:
+        raise ValueError("end-page doit être >= start-page")
+    if args.limit < 1:
+        raise ValueError("limit doit être >= 1")
+
+    RAW_JIKAN_DIR.mkdir(parents=True, exist_ok=True)
+
+    print("==================================================")
+    print("Mangadvisor - Extraction Jikan")
+    print("==================================================")
+    print(f"Dossier de sortie : {RAW_JIKAN_DIR}")
+    print(f"Pages : {args.start_page} à {args.end_page}")
+    print(f"Limit : {args.limit}")
+    print()
+
+    total_pages = 0
+
+    for page in range(args.start_page, args.end_page + 1):
+        print(f"[extract_jikan] récupération page {page}...")
+
+        payload = fetch_manga_page_with_retry(page=page, limit=args.limit)
+
+        output_file = RAW_JIKAN_DIR / f"manga_page_{page}.json"
+        save_json(payload, output_file)
+
+        nb_items = len(payload.get("data", []))
+        print(f"[extract_jikan] page {page} sauvegardée : {output_file}")
+        print(f"[extract_jikan] mangas récupérés : {nb_items}")
+        print()
+
+        total_pages += 1
+
+    print("==================================================")
+    print("Extraction terminée")
+    print(f"Nombre de pages extraites : {total_pages}")
+    print("==================================================")
+
+
+if __name__ == "__main__":
+    main()

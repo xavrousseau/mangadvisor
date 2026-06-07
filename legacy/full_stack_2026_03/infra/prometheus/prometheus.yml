@@ -1,0 +1,50 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # --------------------------------------------------------------------------
+  # 1) Auto-santé de Prometheus
+  # --------------------------------------------------------------------------
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - mangadvisor-prometheus:9090
+
+  # --------------------------------------------------------------------------
+  # 2) Postgres → via postgres-exporter (déjà dans ton docker-compose)
+  #    UI rapide: http://localhost:${PG_EXPORTER_PORT:-9187}/metrics
+  # --------------------------------------------------------------------------
+  - job_name: postgres-exporter
+    static_configs:
+      - targets:
+          - mangadvisor-postgres-exporter:9187
+
+  # --------------------------------------------------------------------------
+  # 3) API FastAPI (OPTIONNEL) — seulement si /metrics est exposé
+  #    → ajoute l’instrumentation (voir snippet plus bas), puis dé-commente.
+  # --------------------------------------------------------------------------
+  # - job_name: mangadvisor-api
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets:
+  #         - mangadvisor-api:8000
+
+  # --------------------------------------------------------------------------
+  # 4) MinIO (OPTIONNEL) — MinIO expose du Prometheus natif.
+  #    Endpoints possibles: /minio/v2/metrics/node ou .../cluster
+  #    Dé-commente si tu veux suivre MinIO.
+  # --------------------------------------------------------------------------
+  # - job_name: minio
+  #   metrics_path: /minio/v2/metrics/node
+  #   static_configs:
+  #     - targets:
+  #         - mangadvisor-minio:9000
+
+  # --------------------------------------------------------------------------
+  # 5) cAdvisor (OPTIONNEL) — si tu ajoutes le service cAdvisor plus tard.
+  # --------------------------------------------------------------------------
+  # - job_name: cadvisor
+  #   static_configs:
+  #     - targets:
+  #         - mangadvisor-cadvisor:8080

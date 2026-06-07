@@ -1,0 +1,40 @@
+services:
+  # Expose PostgreSQL en local pour debug ou connexion via un outil externe.
+  postgres:
+    ports:
+      - "${POSTGRES_PORT}:5432"
+
+  # Expose Meilisearch en local.
+  meilisearch:
+    ports:
+      - "${MEILI_PORT}:7700"
+
+  # Mode développement API :
+  # - code monté depuis le poste local
+  # - rechargement automatique
+  api:
+    ports:
+      - "${API_PORT}:8000"
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    command: ["uvicorn", "apps.api.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # Mode développement UI :
+  # - code monté depuis le poste local
+  # - Streamlit accessible depuis localhost
+  ui:
+    ports:
+      - "${UI_PORT}:8501"
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    command: ["streamlit", "run", "apps/ui/app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
+  # Mode développement engine :
+  # code monté pour permettre l'exécution des scripts pipeline depuis le conteneur
+  engine:
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    command: ["python", "--version"]

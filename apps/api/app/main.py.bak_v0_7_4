@@ -1,0 +1,1722 @@
+import os
+from typing import Any
+
+import psycopg
+from fastapi import FastAPI, HTTPException, Query
+from psycopg.rows import dict_row
+from pydantic import BaseModel, Field
+
+
+app = FastAPI(
+    title="Mangadvisor API",
+    version="0.7.0",
+    description="API de recommandation manga pour Mangadvisor.",
+)
+
+
+class ProfileRecommendationRequest(BaseModel):
+    liked_titles: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=10,
+        description="Liste des mangas aimés par l'utilisateur.",
+    )
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Nombre de recommandations à retourner.",
+    )
+    min_score: float = Field(
+        default=6.8,
+        ge=0,
+        le=10,
+        description="Score minimum du manga recommandé.",
+    )
+    only_finished: bool = Field(
+        default=False,
+        description="Si true, recommande uniquement des mangas terminés.",
+    )
+    exclude_sensitive_mismatches: bool = Field(
+        default=False,
+        description="Si true, exclut les mangas avec des éléments qui peuvent éloigner la recommandation.",
+    )
+
+
+def get_connection():
+    """
+    Ouvre une connexion PostgreSQL.
+
+    Dans Docker, les variables viennent normalement du docker-compose :
+    POSTGRES_HOST=postgres
+    POSTGRES_PORT=5432
+    POSTGRES_DB=mangadvisor
+    POSTGRES_USER=manga
+    POSTGRES_PASSWORD=...
+    """
+    return psycopg.connect(
+        host=os.getenv("POSTGRES_HOST", "postgres"),
+        port=os.getenv("POSTGRES_PORT", "5432"),
+        dbname=os.getenv("POSTGRES_DB", "mangadvisor"),
+        user=os.getenv("POSTGRES_USER", "manga"),
+        password=os.getenv("POSTGRES_PASSWORD", "changeme"),
+        row_factory=dict_row,
+    )
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "Mangadvisor API running"}
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    """
+    Vérifie que l'API répond et que PostgreSQL est accessible.
+    """
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT current_database() AS database_name;")
+                row = cur.fetchone()
+
+        return {
+            "status": "ok",
+            "database": row["database_name"],
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur de connexion PostgreSQL : {exc}",
+        )
+
+
+@app.get("/mangas")
+def list_mangas(
+    q: str | None = Query(
+        default=None,
+        description="Recherche optionnelle par titre. Exemple : naruto",
+    ),
+    limit: int = Query(default=20, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, Any]:
+    """
+    Liste les mangas du catalogue canonique.
+
+    Exemples :
+    /mangas
+    /mangas?q=naruto
+    /mangas?limit=100
+    """
+    params: dict[str, Any] = {
+        "limit": limit,
+        "offset": offset,
+    }
+
+    where_clause = ""
+
+    if q:
+        where_clause = """
+        WHERE
+            m.title ILIKE %(q)s
+            OR m.title_english ILIKE %(q)s
+            OR m.title_japanese ILIKE %(q)s
+        """
+        params["q"] = f"%{q}%"
+
+    sql = f"""
+        SELECT
+            m.id,
+            m.source_mal_id,
+            m.title,
+            m.title_english,
+            m.title_japanese,
+            m.status,
+            m.chapters,
+            m.volumes,
+            m.score::float AS score,
+            m.popularity,
+            m.rank,
+            m.members,
+            m.favorites,
+            m.manga_type,
+            m.published_from::text AS published_from,
+            m.published_to::text AS published_to,
+
+            COALESCE(
+                array_remove(array_agg(DISTINCT g.name ORDER BY g.name), NULL),
+                ARRAY[]::text[]
+            ) AS genres,
+
+            COALESCE(
+                array_remove(array_agg(DISTINCT t.name ORDER BY t.name), NULL),
+                ARRAY[]::text[]
+            ) AS themes,
+
+            COALESCE(
+                array_remove(array_agg(DISTINCT d.name ORDER BY d.name), NULL),
+                ARRAY[]::text[]
+            ) AS demographics
+
+        FROM manga m
+
+        LEFT JOIN manga_genre mg
+            ON mg.manga_id = m.id
+        LEFT JOIN genre g
+            ON g.id = mg.genre_id
+
+        LEFT JOIN manga_theme mt
+            ON mt.manga_id = m.id
+        LEFT JOIN theme t
+            ON t.id = mt.theme_id
+
+        LEFT JOIN manga_demographic md
+            ON md.manga_id = m.id
+        LEFT JOIN demographic d
+            ON d.id = md.demographic_id
+
+        {where_clause}
+
+        GROUP BY
+            m.id,
+            m.source_mal_id,
+            m.title,
+            m.title_english,
+            m.title_japanese,
+            m.status,
+            m.chapters,
+            m.volumes,
+            m.score,
+            m.popularity,
+            m.rank,
+            m.members,
+            m.favorites,
+            m.manga_type,
+            m.published_from,
+            m.published_to
+
+        ORDER BY
+            m.popularity ASC NULLS LAST,
+            CASE
+                WHEN m.manga_type = 'Manga' THEN 0
+                WHEN m.manga_type IN ('Manhwa', 'Manhua') THEN 1
+                WHEN m.manga_type = 'One-shot' THEN 2
+                WHEN m.manga_type = 'Light Novel' THEN 5
+                ELSE 9
+            END,
+            m.score DESC NULLS LAST,
+            m.title ASC
+
+        LIMIT %(limit)s
+        OFFSET %(offset)s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+    return {
+        "count": len(rows),
+        "limit": limit,
+        "offset": offset,
+        "items": rows,
+    }
+
+
+@app.get("/mangas/{manga_id}")
+def get_manga(manga_id: int) -> dict[str, Any]:
+    """
+    Récupère un manga par son identifiant interne Mangadvisor.
+    """
+    sql = """
+        SELECT
+            m.id,
+            m.source_mal_id,
+            m.title,
+            m.title_english,
+            m.title_japanese,
+            m.synopsis,
+            m.status,
+            m.chapters,
+            m.volumes,
+            m.score::float AS score,
+            m.popularity,
+            m.rank,
+            m.members,
+            m.favorites,
+            m.manga_type,
+            m.published_from::text AS published_from,
+            m.published_to::text AS published_to,
+
+            COALESCE(
+                array_remove(array_agg(DISTINCT g.name ORDER BY g.name), NULL),
+                ARRAY[]::text[]
+            ) AS genres,
+
+            COALESCE(
+                array_remove(array_agg(DISTINCT t.name ORDER BY t.name), NULL),
+                ARRAY[]::text[]
+            ) AS themes,
+
+            COALESCE(
+                array_remove(array_agg(DISTINCT d.name ORDER BY d.name), NULL),
+                ARRAY[]::text[]
+            ) AS demographics
+
+        FROM manga m
+
+        LEFT JOIN manga_genre mg
+            ON mg.manga_id = m.id
+        LEFT JOIN genre g
+            ON g.id = mg.genre_id
+
+        LEFT JOIN manga_theme mt
+            ON mt.manga_id = m.id
+        LEFT JOIN theme t
+            ON t.id = mt.theme_id
+
+        LEFT JOIN manga_demographic md
+            ON md.manga_id = m.id
+        LEFT JOIN demographic d
+            ON d.id = md.demographic_id
+
+        WHERE m.id = %(manga_id)s
+
+        GROUP BY
+            m.id,
+            m.source_mal_id,
+            m.title,
+            m.title_english,
+            m.title_japanese,
+            m.synopsis,
+            m.status,
+            m.chapters,
+            m.volumes,
+            m.score,
+            m.popularity,
+            m.rank,
+            m.members,
+            m.favorites,
+            m.manga_type,
+            m.published_from,
+            m.published_to;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"manga_id": manga_id})
+            row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Manga introuvable avec l'id {manga_id}.",
+        )
+
+    return row
+
+
+@app.get("/recommendations/similar")
+def recommend_similar(
+    title: str = Query(..., description="Titre du manga de référence. Exemple : Naruto"),
+    limit: int = Query(default=5, ge=1, le=20),
+) -> dict[str, Any]:
+    """
+    Recommandation depuis un seul manga.
+
+    Logique :
+    - genres communs ;
+    - thèmes communs ;
+    - cible éditoriale commune ;
+    - score et popularité ;
+    - statut ;
+    - malus sur les écarts sensibles.
+    """
+    source_sql = """
+        WITH matched_sources AS (
+            SELECT
+                id,
+                title,
+                score::float AS score,
+                status,
+                manga_type,
+                popularity,
+                ROW_NUMBER() OVER (
+                    PARTITION BY LOWER(title)
+                    ORDER BY
+                        CASE
+                            WHEN manga_type = 'Manga' THEN 0
+                            WHEN manga_type IN ('Manhwa', 'Manhua') THEN 1
+                            WHEN manga_type = 'One-shot' THEN 2
+                            WHEN manga_type = 'Light Novel' THEN 5
+                            ELSE 9
+                        END,
+                        popularity ASC NULLS LAST,
+                        score DESC NULLS LAST,
+                        id ASC
+                ) AS rn
+            FROM manga
+            WHERE
+                title ILIKE %(q)s
+                OR title_english ILIKE %(q)s
+                OR title_japanese ILIKE %(q)s
+        )
+        SELECT
+            id,
+            title,
+            score,
+            status
+        FROM matched_sources
+        WHERE rn = 1
+        ORDER BY
+            popularity ASC NULLS LAST,
+            title ASC
+        LIMIT 1;
+    """
+
+    recommendations_sql = """
+        WITH
+        source_manga AS (
+            SELECT id, status
+            FROM manga
+            WHERE id = %(source_id)s
+        ),
+
+        source_genres AS (
+            SELECT genre_id
+            FROM manga_genre
+            WHERE manga_id = %(source_id)s
+        ),
+
+        source_themes AS (
+            SELECT theme_id
+            FROM manga_theme
+            WHERE manga_id = %(source_id)s
+        ),
+
+        source_demographics AS (
+            SELECT demographic_id
+            FROM manga_demographic
+            WHERE manga_id = %(source_id)s
+        ),
+
+        source_attribute_names AS (
+            SELECT g.name
+            FROM manga_genre mg
+            JOIN genre g
+                ON g.id = mg.genre_id
+            WHERE mg.manga_id = %(source_id)s
+
+            UNION
+
+            SELECT t.name
+            FROM manga_theme mt
+            JOIN theme t
+                ON t.id = mt.theme_id
+            WHERE mt.manga_id = %(source_id)s
+        ),
+
+        candidate_genre_stats AS (
+            SELECT
+                mg.manga_id,
+                COUNT(DISTINCT g.id)::int AS common_genre_count,
+                ARRAY_AGG(DISTINCT g.name ORDER BY g.name) AS common_genres
+            FROM manga_genre mg
+            JOIN source_genres sg
+                ON sg.genre_id = mg.genre_id
+            JOIN genre g
+                ON g.id = mg.genre_id
+            GROUP BY mg.manga_id
+        ),
+
+        candidate_theme_stats AS (
+            SELECT
+                mt.manga_id,
+                COUNT(DISTINCT t.id)::int AS common_theme_count,
+                ARRAY_AGG(DISTINCT t.name ORDER BY t.name) AS common_themes,
+                SUM(
+                    CASE
+                        WHEN t.name = 'Psychological' THEN 90
+                        WHEN t.name IN ('Adult Cast', 'Gore') THEN 60
+                        WHEN t.name IN ('Historical', 'Military', 'Samurai', 'Urban Fantasy') THEN 40
+                        WHEN t.name IN ('Martial Arts', 'Super Power', 'Combat Sports') THEN 25
+                        WHEN t.name IN ('School', 'Music', 'Showbiz', 'Harem', 'Reverse Harem') THEN 15
+                        ELSE 25
+                    END
+                )::int AS common_theme_weight
+            FROM manga_theme mt
+            JOIN source_themes st
+                ON st.theme_id = mt.theme_id
+            JOIN theme t
+                ON t.id = mt.theme_id
+            GROUP BY mt.manga_id
+        ),
+
+        candidate_demographic_stats AS (
+            SELECT
+                md.manga_id,
+                COUNT(DISTINCT d.id)::int AS common_demographic_count,
+                ARRAY_AGG(DISTINCT d.name ORDER BY d.name) AS common_demographics
+            FROM manga_demographic md
+            JOIN source_demographics sd
+                ON sd.demographic_id = md.demographic_id
+            JOIN demographic d
+                ON d.id = md.demographic_id
+            GROUP BY md.manga_id
+        ),
+
+        candidate_sensitive_attributes AS (
+            SELECT DISTINCT
+                mg.manga_id,
+                g.name
+            FROM manga_genre mg
+            JOIN genre g
+                ON g.id = mg.genre_id
+            WHERE g.name IN (
+                'Ecchi',
+                'Harem',
+                'Reverse Harem',
+                'Romance',
+                'School',
+                'Slice of Life',
+                'Sports',
+                'Horror'
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM source_attribute_names s
+                WHERE s.name = g.name
+            )
+
+            UNION
+
+            SELECT DISTINCT
+                mt.manga_id,
+                t.name
+            FROM manga_theme mt
+            JOIN theme t
+                ON t.id = mt.theme_id
+            WHERE t.name IN (
+                'Ecchi',
+                'Harem',
+                'Reverse Harem',
+                'Romance',
+                'School',
+                'Slice of Life',
+                'Sports',
+                'Gore',
+                'Love Polygon',
+                'Music',
+                'Showbiz',
+                'Visual Arts'
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM source_attribute_names s
+                WHERE s.name = t.name
+            )
+        ),
+
+        candidate_penalty_stats AS (
+            SELECT
+                manga_id,
+                COUNT(*)::int AS sensitive_mismatch_count,
+                ARRAY_AGG(name ORDER BY name) AS sensitive_mismatches
+            FROM candidate_sensitive_attributes
+            GROUP BY manga_id
+        )
+
+        SELECT
+            m.id,
+            m.source_mal_id,
+            m.title,
+            m.title_english,
+            m.status,
+            m.score::float AS score,
+            m.popularity,
+
+            COALESCE(cgs.common_genre_count, 0)::int AS common_genre_count,
+            COALESCE(cts.common_theme_count, 0)::int AS common_theme_count,
+            COALESCE(cds.common_demographic_count, 0)::int AS common_demographic_count,
+
+            COALESCE(cgs.common_genres, ARRAY[]::text[]) AS common_genres,
+            COALESCE(cts.common_themes, ARRAY[]::text[]) AS common_themes,
+            COALESCE(cds.common_demographics, ARRAY[]::text[]) AS common_demographics,
+
+            COALESCE(cps.sensitive_mismatch_count, 0)::int AS sensitive_mismatch_count,
+            COALESCE(cps.sensitive_mismatches, ARRAY[]::text[]) AS sensitive_mismatches,
+
+            (
+                COALESCE(cts.common_theme_weight, 0)
+                + COALESCE(cgs.common_genre_count, 0) * 15
+                + COALESCE(cds.common_demographic_count, 0) * 12
+                + COALESCE(m.score, 0) * 2
+
+                + CASE
+                    WHEN m.popularity IS NOT NULL AND m.popularity <= 100 THEN 12
+                    WHEN m.popularity IS NOT NULL AND m.popularity <= 250 THEN 8
+                    WHEN m.popularity IS NOT NULL AND m.popularity <= 500 THEN 4
+                    ELSE 0
+                  END
+
+                + CASE
+                    WHEN sm.status = 'Finished' AND m.status = 'Finished' THEN 8
+                    ELSE 0
+                  END
+
+                - CASE
+                    WHEN m.status = 'On Hiatus' THEN 12
+                    ELSE 0
+                  END
+
+                - CASE
+                    WHEN COALESCE(cds.common_demographic_count, 0) = 0 THEN 10
+                    ELSE 0
+                  END
+
+                - CASE
+                    WHEN COALESCE(cts.common_theme_count, 0) = 1
+                     AND COALESCE(cgs.common_genre_count, 0) = 0
+                     AND COALESCE(cds.common_demographic_count, 0) = 0
+                    THEN 15
+                    ELSE 0
+                  END
+
+                - COALESCE(cps.sensitive_mismatch_count, 0) * 12
+
+                - CASE
+                    WHEN COALESCE(m.score, 0) < 7 THEN 20
+                    WHEN COALESCE(m.score, 0) < 7.5 THEN 8
+                    ELSE 0
+                  END
+            )::float AS recommendation_score
+
+        FROM manga m
+        CROSS JOIN source_manga sm
+
+        LEFT JOIN candidate_genre_stats cgs
+            ON cgs.manga_id = m.id
+
+        LEFT JOIN candidate_theme_stats cts
+            ON cts.manga_id = m.id
+
+        LEFT JOIN candidate_demographic_stats cds
+            ON cds.manga_id = m.id
+
+        LEFT JOIN candidate_penalty_stats cps
+            ON cps.manga_id = m.id
+
+        WHERE m.id <> %(source_id)s
+          AND COALESCE(m.score, 0) >= 6.8
+          AND (
+                COALESCE(cts.common_theme_count, 0) > 0
+                OR COALESCE(cgs.common_genre_count, 0) >= 2
+          )
+
+        ORDER BY
+            recommendation_score DESC,
+            COALESCE(cts.common_theme_count, 0) DESC,
+            COALESCE(cgs.common_genre_count, 0) DESC,
+            m.popularity ASC NULLS LAST,
+            m.title ASC
+
+        LIMIT %(limit)s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(source_sql, {"q": f"%{title}%"})
+            source = cur.fetchone()
+
+            if not source:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Aucun manga trouvé pour la recherche : {title}",
+                )
+
+            cur.execute(
+                recommendations_sql,
+                {
+                    "source_id": source["id"],
+                    "limit": limit,
+                },
+            )
+            rows = cur.fetchall()
+
+    recommendations = []
+
+    for row in rows:
+        common_genres = row.get("common_genres") or []
+        common_themes = row.get("common_themes") or []
+        common_demographics = row.get("common_demographics") or []
+        sensitive_mismatches = row.get("sensitive_mismatches") or []
+
+        reason_parts = []
+
+        if common_demographics:
+            reason_parts.append(
+                f"même cible éditoriale : {', '.join(common_demographics)}"
+            )
+
+        if common_themes:
+            reason_parts.append(
+                f"thèmes communs : {', '.join(common_themes)}"
+            )
+
+        if common_genres:
+            reason_parts.append(
+                f"genres communs : {', '.join(common_genres)}"
+            )
+
+        if reason_parts:
+            reason = (
+                f"Recommandé car ce manga partage avec {source['title']} "
+                + " ; ".join(reason_parts)
+                + "."
+            )
+        else:
+            reason = (
+                f"Recommandé car ce manga est proche de {source['title']} "
+                "selon les données disponibles."
+            )
+
+        if sensitive_mismatches:
+            reason += (
+                " Attention toutefois : certains éléments peuvent éloigner la recommandation "
+                f"({', '.join(sensitive_mismatches)})."
+            )
+
+        row["reason"] = reason
+        recommendations.append(row)
+
+    return {
+        "source": source,
+        "count": len(recommendations),
+        "recommendations": recommendations,
+    }
+@app.post("/recommendations/profile")
+def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, Any]:
+    """
+    Recommandation depuis plusieurs mangas aimés.
+
+    V0.7.2 :
+    - conserve le bonus communautaire Jikan ;
+    - pondère les genres/thèmes/démographies selon leur fréquence dans le profil ;
+    - dédoublonne les recommandations par titre ;
+    - évite de recommander des Light Novel par défaut ;
+    - ajoute une couche d'intention dominante :
+        * surnaturel / mystère ;
+        * tranche de vie / contemplatif ;
+        * sport ;
+        * romance ;
+        * sombre / mature.
+    """
+    liked_titles = [title.strip().lower() for title in payload.liked_titles if title.strip()]
+
+    if not liked_titles:
+        raise HTTPException(
+            status_code=400,
+            detail="La liste des mangas aimés est vide.",
+        )
+
+    source_sql = """
+        WITH matched_sources AS (
+            SELECT
+                id,
+                title,
+                score::float AS score,
+                status,
+                manga_type,
+                popularity,
+                ROW_NUMBER() OVER (
+                    PARTITION BY LOWER(title)
+                    ORDER BY
+                        CASE
+                            WHEN manga_type = 'Manga' THEN 0
+                            WHEN manga_type IN ('Manhwa', 'Manhua') THEN 1
+                            WHEN manga_type = 'One-shot' THEN 2
+                            WHEN manga_type = 'Light Novel' THEN 5
+                            ELSE 9
+                        END,
+                        popularity ASC NULLS LAST,
+                        score DESC NULLS LAST,
+                        id ASC
+                ) AS rn
+            FROM manga
+            WHERE LOWER(title) = ANY(%(titles)s)
+        )
+        SELECT
+            id,
+            title,
+            score,
+            status
+        FROM matched_sources
+        WHERE rn = 1
+        ORDER BY
+            popularity ASC NULLS LAST,
+            title ASC;
+    """
+
+    recommendations_sql = """
+        WITH
+        source_manga AS (
+            SELECT
+                id,
+                title,
+                status
+            FROM manga
+            WHERE id = ANY(%(source_ids)s)
+        ),
+
+        source_profile AS (
+            SELECT COUNT(*)::int AS profile_size
+            FROM source_manga
+        ),
+
+        source_attributes AS (
+            SELECT
+                mg.manga_id,
+                g.name
+            FROM manga_genre mg
+            JOIN source_manga sm
+                ON sm.id = mg.manga_id
+            JOIN genre g
+                ON g.id = mg.genre_id
+
+            UNION ALL
+
+            SELECT
+                mt.manga_id,
+                t.name
+            FROM manga_theme mt
+            JOIN source_manga sm
+                ON sm.id = mt.manga_id
+            JOIN theme t
+                ON t.id = mt.theme_id
+
+            UNION ALL
+
+            SELECT
+                md.manga_id,
+                d.name
+            FROM manga_demographic md
+            JOIN source_manga sm
+                ON sm.id = md.manga_id
+            JOIN demographic d
+                ON d.id = md.demographic_id
+        ),
+
+        source_intent_profile AS (
+            SELECT
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Supernatural',
+                        'Urban Fantasy',
+                        'Super Power'
+                    )
+                ))::int AS source_supernatural_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Action',
+                        'Adventure',
+                        'Super Power',
+                        'Martial Arts',
+                        'Urban Fantasy'
+                    )
+                ))::int AS source_action_adventure_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Shounen'
+                    )
+                ))::int AS source_shounen_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Mystery',
+                        'Suspense'
+                    )
+                ))::int AS source_mystery_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Psychological'
+                    )
+                ))::int AS source_psychological_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Slice of Life'
+                    )
+                ))::int AS source_slice_of_life_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Iyashikei'
+                    )
+                ))::int AS source_iyashikei_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Sports',
+                        'Team Sports',
+                        'Combat Sports'
+                    )
+                ))::int AS source_sports_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Romance',
+                        'Love Polygon',
+                        'Shoujo',
+                        'Josei'
+                    )
+                ))::int AS source_romance_count,
+
+                (COUNT(DISTINCT manga_id) FILTER (
+                    WHERE name IN (
+                        'Gore',
+                        'Horror',
+                        'Survival',
+                        'Psychological',
+                        'Seinen'
+                    )
+                ))::int AS source_dark_count
+            FROM source_attributes
+        ),
+
+        source_attribute_names AS (
+            SELECT DISTINCT name
+            FROM source_attributes
+        ),
+
+        source_genre_counts AS (
+            SELECT
+                mg.genre_id,
+                COUNT(DISTINCT mg.manga_id)::int AS source_count
+            FROM manga_genre mg
+            JOIN source_manga sm
+                ON sm.id = mg.manga_id
+            GROUP BY mg.genre_id
+        ),
+
+        source_theme_counts AS (
+            SELECT
+                mt.theme_id,
+                COUNT(DISTINCT mt.manga_id)::int AS source_count
+            FROM manga_theme mt
+            JOIN source_manga sm
+                ON sm.id = mt.manga_id
+            GROUP BY mt.theme_id
+        ),
+
+        source_demographic_counts AS (
+            SELECT
+                md.demographic_id,
+                COUNT(DISTINCT md.manga_id)::int AS source_count
+            FROM manga_demographic md
+            JOIN source_manga sm
+                ON sm.id = md.manga_id
+            GROUP BY md.demographic_id
+        ),
+
+        candidate_attributes AS (
+            SELECT
+                mg.manga_id,
+                g.name
+            FROM manga_genre mg
+            JOIN genre g
+                ON g.id = mg.genre_id
+
+            UNION ALL
+
+            SELECT
+                mt.manga_id,
+                t.name
+            FROM manga_theme mt
+            JOIN theme t
+                ON t.id = mt.theme_id
+
+            UNION ALL
+
+            SELECT
+                md.manga_id,
+                d.name
+            FROM manga_demographic md
+            JOIN demographic d
+                ON d.id = md.demographic_id
+        ),
+
+        candidate_intent_signals AS (
+            SELECT
+                manga_id,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Supernatural', 'Urban Fantasy', 'Super Power')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_supernatural_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Mystery', 'Suspense')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_mystery_signal,
+
+                MAX(
+                    CASE
+                        WHEN name = 'Psychological'
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_psychological_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Action', 'Adventure', 'Super Power', 'Martial Arts')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_action_adventure_signal,
+
+                MAX(
+                    CASE
+                        WHEN name = 'Shounen'
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_shounen_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Seinen', 'Josei')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_mature_demographic_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Slice of Life')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_slice_of_life_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Iyashikei')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_iyashikei_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Sports', 'Team Sports', 'Combat Sports')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_sports_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Romance', 'Love Polygon', 'Shoujo', 'Josei')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_romance_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Gore', 'Horror', 'Survival', 'Psychological', 'Seinen')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_dark_signal,
+
+                MAX(
+                    CASE
+                        WHEN name IN ('Historical', 'Military', 'Samurai')
+                        THEN 1 ELSE 0
+                    END
+                )::int AS has_historical_signal
+
+            FROM candidate_attributes
+            GROUP BY manga_id
+        ),
+
+        candidate_genre_stats AS (
+            SELECT
+                mg.manga_id,
+                COUNT(DISTINCT g.id)::int AS common_genre_count,
+                ARRAY_AGG(DISTINCT g.name ORDER BY g.name) AS common_genres,
+
+                SUM(
+                    (
+                        CASE
+                            WHEN g.name = 'Award Winning' THEN 3
+                            WHEN g.name IN ('Action', 'Adventure', 'Drama', 'Fantasy', 'Comedy') THEN 5
+                            WHEN g.name IN ('Mystery', 'Suspense', 'Supernatural', 'Sports', 'Romance', 'Slice of Life') THEN 12
+                            WHEN g.name IN ('Horror', 'Sci-Fi') THEN 10
+                            ELSE 8
+                        END
+                    )
+                    *
+                    (
+                        CASE
+                            WHEN sgc.source_count >= 3 THEN 1.25
+                            WHEN sgc.source_count = 2 THEN 1.00
+                            WHEN sgc.source_count = 1 THEN 0.55
+                            ELSE 0.00
+                        END
+                    )
+                )::float AS common_genre_weight
+
+            FROM manga_genre mg
+            JOIN source_genre_counts sgc
+                ON sgc.genre_id = mg.genre_id
+            JOIN genre g
+                ON g.id = mg.genre_id
+            GROUP BY mg.manga_id
+        ),
+
+        candidate_theme_stats AS (
+            SELECT
+                mt.manga_id,
+                COUNT(DISTINCT t.id)::int AS common_theme_count,
+                ARRAY_AGG(DISTINCT t.name ORDER BY t.name) AS common_themes,
+
+                SUM(
+                    (
+                        CASE
+                            WHEN t.name = 'Psychological' THEN 50
+                            WHEN t.name IN ('Gore', 'Survival') THEN 42
+                            WHEN t.name IN ('Team Sports', 'Combat Sports') THEN 38
+                            WHEN t.name IN ('Iyashikei') THEN 45
+                            WHEN t.name IN ('Love Polygon') THEN 32
+                            WHEN t.name IN ('Martial Arts', 'Super Power') THEN 28
+                            WHEN t.name IN ('Urban Fantasy', 'Strategy Game') THEN 25
+                            WHEN t.name IN ('School', 'Music', 'Showbiz', 'Visual Arts') THEN 18
+                            WHEN t.name IN ('Adult Cast', 'Historical', 'Military', 'Samurai') THEN 12
+                            WHEN t.name IN ('Harem', 'Reverse Harem') THEN 10
+                            ELSE 20
+                        END
+                    )
+                    *
+                    (
+                        CASE
+                            WHEN stc.source_count >= 3 THEN 1.25
+                            WHEN stc.source_count = 2 THEN 1.00
+                            WHEN stc.source_count = 1 AND sp.profile_size >= 3 THEN 0.30
+                            WHEN stc.source_count = 1 THEN 0.60
+                            ELSE 0.00
+                        END
+                    )
+                )::float AS common_theme_weight
+
+            FROM manga_theme mt
+            JOIN source_theme_counts stc
+                ON stc.theme_id = mt.theme_id
+            JOIN theme t
+                ON t.id = mt.theme_id
+            CROSS JOIN source_profile sp
+            GROUP BY mt.manga_id
+        ),
+
+        candidate_demographic_stats AS (
+            SELECT
+                md.manga_id,
+                COUNT(DISTINCT d.id)::int AS common_demographic_count,
+                ARRAY_AGG(DISTINCT d.name ORDER BY d.name) AS common_demographics,
+
+                SUM(
+                    CASE
+                        WHEN sdc.source_count >= 3 THEN 20
+                        WHEN sdc.source_count = 2 THEN 14
+                        WHEN sdc.source_count = 1 THEN 6
+                        ELSE 0
+                    END
+                )::float AS common_demographic_weight
+
+            FROM manga_demographic md
+            JOIN source_demographic_counts sdc
+                ON sdc.demographic_id = md.demographic_id
+            JOIN demographic d
+                ON d.id = md.demographic_id
+            GROUP BY md.manga_id
+        ),
+
+        candidate_community_stats AS (
+            SELECT
+                e.recommended_manga_id AS manga_id,
+                COUNT(DISTINCT e.source_manga_id)::int AS community_source_count,
+                SUM(COALESCE(e.votes, 0))::int AS community_votes,
+                ARRAY_AGG(DISTINCT sm.title ORDER BY sm.title) AS community_recommended_from
+            FROM manga_recommendation_edge e
+            JOIN source_manga sm
+                ON sm.id = e.source_manga_id
+            WHERE e.source_manga_id = ANY(%(source_ids)s)
+              AND e.recommended_manga_id IS NOT NULL
+              AND e.recommended_manga_id <> ALL(%(source_ids)s)
+            GROUP BY e.recommended_manga_id
+        ),
+
+        candidate_sensitive_attributes AS (
+            SELECT DISTINCT
+                mg.manga_id,
+                g.name
+            FROM manga_genre mg
+            JOIN genre g
+                ON g.id = mg.genre_id
+            WHERE g.name IN (
+                'Ecchi',
+                'Harem',
+                'Reverse Harem',
+                'Romance',
+                'School',
+                'Slice of Life',
+                'Sports',
+                'Horror'
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM source_attribute_names s
+                WHERE s.name = g.name
+            )
+
+            UNION
+
+            SELECT DISTINCT
+                mt.manga_id,
+                t.name
+            FROM manga_theme mt
+            JOIN theme t
+                ON t.id = mt.theme_id
+            WHERE t.name IN (
+                'Ecchi',
+                'Harem',
+                'Reverse Harem',
+                'Romance',
+                'School',
+                'Slice of Life',
+                'Sports',
+                'Gore',
+                'Love Polygon',
+                'Music',
+                'Showbiz',
+                'Visual Arts'
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM source_attribute_names s
+                WHERE s.name = t.name
+            )
+        ),
+
+        candidate_penalty_stats AS (
+            SELECT
+                manga_id,
+                COUNT(*)::int AS sensitive_mismatch_count,
+                ARRAY_AGG(name ORDER BY name) AS sensitive_mismatches
+            FROM candidate_sensitive_attributes
+            GROUP BY manga_id
+        ),
+
+        candidate_base AS (
+            SELECT
+                m.id,
+                m.source_mal_id,
+                m.title,
+                m.title_english,
+                m.status,
+                m.manga_type,
+                m.score::float AS score,
+                m.popularity,
+
+                COALESCE(cgs.common_genre_count, 0)::int AS common_genre_count,
+                COALESCE(cts.common_theme_count, 0)::int AS common_theme_count,
+                COALESCE(cds.common_demographic_count, 0)::int AS common_demographic_count,
+
+                COALESCE(cgs.common_genres, ARRAY[]::text[]) AS common_genres,
+                COALESCE(cts.common_themes, ARRAY[]::text[]) AS common_themes,
+                COALESCE(cds.common_demographics, ARRAY[]::text[]) AS common_demographics,
+
+                COALESCE(cgs.common_genre_weight, 0)::float AS common_genre_weight,
+                COALESCE(cts.common_theme_weight, 0)::float AS common_theme_weight,
+                COALESCE(cds.common_demographic_weight, 0)::float AS common_demographic_weight,
+
+                COALESCE(ccs.community_source_count, 0)::int AS community_source_count,
+                COALESCE(ccs.community_votes, 0)::int AS community_votes,
+                COALESCE(ccs.community_recommended_from, ARRAY[]::text[]) AS community_recommended_from,
+
+                COALESCE(cps.sensitive_mismatch_count, 0)::int AS sensitive_mismatch_count,
+                COALESCE(cps.sensitive_mismatches, ARRAY[]::text[]) AS sensitive_mismatches,
+
+                COALESCE(cis.has_supernatural_signal, 0)::int AS has_supernatural_signal,
+                COALESCE(cis.has_mystery_signal, 0)::int AS has_mystery_signal,
+                COALESCE(cis.has_psychological_signal, 0)::int AS has_psychological_signal,
+                COALESCE(cis.has_action_adventure_signal, 0)::int AS has_action_adventure_signal,
+                COALESCE(cis.has_shounen_signal, 0)::int AS has_shounen_signal,
+                COALESCE(cis.has_mature_demographic_signal, 0)::int AS has_mature_demographic_signal,
+                COALESCE(cis.has_slice_of_life_signal, 0)::int AS has_slice_of_life_signal,
+                COALESCE(cis.has_iyashikei_signal, 0)::int AS has_iyashikei_signal,
+                COALESCE(cis.has_sports_signal, 0)::int AS has_sports_signal,
+                COALESCE(cis.has_romance_signal, 0)::int AS has_romance_signal,
+                COALESCE(cis.has_dark_signal, 0)::int AS has_dark_signal,
+                COALESCE(cis.has_historical_signal, 0)::int AS has_historical_signal,
+
+                (
+                    (
+                        CASE
+                            WHEN COALESCE(ccs.community_source_count, 0) >= 3 THEN 22
+                            WHEN COALESCE(ccs.community_source_count, 0) = 2 THEN 14
+                            WHEN COALESCE(ccs.community_source_count, 0) = 1 THEN 4
+                            ELSE 0
+                        END
+                        + LEAST(COALESCE(ccs.community_votes, 0), 30) * 0.35
+                    )
+                    *
+                    CASE
+                        WHEN COALESCE(ccs.community_source_count, 0) = 0 THEN 0
+                        WHEN COALESCE(cds.common_demographic_count, 0) = 0
+                         AND COALESCE(cps.sensitive_mismatch_count, 0) > 0 THEN 0.20
+                        WHEN COALESCE(cds.common_demographic_count, 0) = 0 THEN 0.45
+                        WHEN COALESCE(cps.sensitive_mismatch_count, 0) > 0 THEN 0.55
+                        ELSE 1
+                    END
+                )::float AS community_score,
+
+                (
+                    CASE
+                        WHEN sip.source_supernatural_count >= 2 THEN
+                            CASE
+                                WHEN COALESCE(cis.has_supernatural_signal, 0) = 1 THEN 30
+                                ELSE -24
+                            END
+
+                            +
+                            CASE
+                                WHEN (
+                                        sip.source_shounen_count >= 2
+                                        OR sip.source_action_adventure_count >= 1
+                                     )
+                                 AND COALESCE(cis.has_supernatural_signal, 0) = 1
+                                 AND COALESCE(cis.has_shounen_signal, 0) = 1
+                                 AND COALESCE(cis.has_action_adventure_signal, 0) = 1
+                                THEN 54
+                                ELSE 0
+                            END
+
+                            +
+                            CASE
+                                WHEN (
+                                        sip.source_shounen_count >= 2
+                                        OR sip.source_action_adventure_count >= 1
+                                     )
+                                 AND COALESCE(cis.has_supernatural_signal, 0) = 1
+                                 AND COALESCE(cis.has_shounen_signal, 0) = 1
+                                THEN 20
+                                ELSE 0
+                            END
+
+                            +
+                            CASE
+                                WHEN (
+                                        sip.source_shounen_count >= 2
+                                        OR sip.source_action_adventure_count >= 1
+                                     )
+                                 AND COALESCE(cis.has_supernatural_signal, 0) = 1
+                                 AND COALESCE(cis.has_action_adventure_signal, 0) = 1
+                                THEN 16
+                                ELSE 0
+                            END
+
+                            +
+                            CASE
+                                WHEN COALESCE(ccs.community_source_count, 0) >= 2
+                                 AND COALESCE(cis.has_supernatural_signal, 0) = 1
+                                THEN 14
+                                WHEN COALESCE(ccs.community_source_count, 0) = 1
+                                 AND COALESCE(cis.has_supernatural_signal, 0) = 1
+                                THEN 6
+                                ELSE 0
+                            END
+
+                            -
+                            CASE
+                                WHEN COALESCE(cis.has_psychological_signal, 0) = 1
+                                 AND COALESCE(cis.has_action_adventure_signal, 0) = 0
+                                 AND COALESCE(cis.has_shounen_signal, 0) = 0
+                                THEN 22
+                                ELSE 0
+                            END
+
+                            -
+                            CASE
+                                WHEN COALESCE(cis.has_mature_demographic_signal, 0) = 1
+                                 AND COALESCE(cis.has_shounen_signal, 0) = 0
+                                 AND COALESCE(cis.has_action_adventure_signal, 0) = 0
+                                THEN 14
+                                ELSE 0
+                            END
+                        ELSE 0
+                    END
+                )::float AS supernatural_intent_score,
+
+                (
+                    CASE
+                        WHEN sip.source_slice_of_life_count >= 2
+                          OR sip.source_iyashikei_count >= 1
+                        THEN
+                            CASE
+                                WHEN COALESCE(cis.has_iyashikei_signal, 0) = 1 THEN 34
+                                WHEN COALESCE(cis.has_slice_of_life_signal, 0) = 1 THEN 24
+                                ELSE -20
+                            END
+                            +
+                            CASE
+                                WHEN COALESCE(cis.has_slice_of_life_signal, 0) = 0
+                                 AND COALESCE(cis.has_dark_signal, 0) = 1
+                                THEN -28
+                                ELSE 0
+                            END
+                            +
+                            CASE
+                                WHEN COALESCE(cis.has_slice_of_life_signal, 0) = 0
+                                 AND COALESCE(cis.has_historical_signal, 0) = 1
+                                THEN -12
+                                ELSE 0
+                            END
+                        ELSE 0
+                    END
+                )::float AS slice_of_life_intent_score,
+
+                (
+                    CASE
+                        WHEN sip.source_sports_count >= 2 THEN
+                            CASE
+                                WHEN COALESCE(cis.has_sports_signal, 0) = 1 THEN 20
+                                ELSE -22
+                            END
+                        ELSE 0
+                    END
+                )::float AS sports_intent_score,
+
+                (
+                    CASE
+                        WHEN sip.source_romance_count >= 1 THEN
+                            CASE
+                                WHEN COALESCE(cis.has_romance_signal, 0) = 1 THEN 18
+                                ELSE -8
+                            END
+                        ELSE 0
+                    END
+                )::float AS romance_intent_score,
+
+                (
+                    CASE
+                        WHEN sip.source_dark_count >= 2 THEN
+                            CASE
+                                WHEN COALESCE(cis.has_dark_signal, 0) = 1 THEN 12
+                                ELSE -6
+                            END
+                        ELSE 0
+                    END
+                )::float AS dark_intent_score
+
+            FROM manga m
+
+            CROSS JOIN source_intent_profile sip
+
+            LEFT JOIN candidate_genre_stats cgs
+                ON cgs.manga_id = m.id
+
+            LEFT JOIN candidate_theme_stats cts
+                ON cts.manga_id = m.id
+
+            LEFT JOIN candidate_demographic_stats cds
+                ON cds.manga_id = m.id
+
+            LEFT JOIN candidate_community_stats ccs
+                ON ccs.manga_id = m.id
+
+            LEFT JOIN candidate_penalty_stats cps
+                ON cps.manga_id = m.id
+
+            LEFT JOIN candidate_intent_signals cis
+                ON cis.manga_id = m.id
+
+            WHERE m.id <> ALL(%(source_ids)s)
+              AND COALESCE(m.score, 0) >= %(min_score)s
+              AND m.manga_type IN ('Manga', 'Manhwa', 'Manhua', 'One-shot')
+              AND (
+                    %(only_finished)s = FALSE
+                    OR m.status = 'Finished'
+              )
+              AND (
+                    %(exclude_sensitive_mismatches)s = FALSE
+                    OR COALESCE(cps.sensitive_mismatch_count, 0) = 0
+              )
+              AND (
+                    COALESCE(cts.common_theme_count, 0) > 0
+                    OR COALESCE(cgs.common_genre_count, 0) >= 2
+                    OR COALESCE(cds.common_demographic_count, 0) > 0
+                    OR COALESCE(ccs.community_source_count, 0) > 0
+              )
+        ),
+
+        candidate_scored AS (
+            SELECT
+                cb.*,
+
+                (
+                    cb.common_theme_weight
+                    + cb.common_genre_weight
+                    + cb.common_demographic_weight
+                )::float AS editorial_score,
+
+                (
+                    cb.supernatural_intent_score
+                    + cb.slice_of_life_intent_score
+                    + cb.sports_intent_score
+                    + cb.romance_intent_score
+                    + cb.dark_intent_score
+                )::float AS dominant_intent_score,
+
+                (
+                    COALESCE(cb.score, 0) * 2
+                    + CASE
+                        WHEN cb.popularity IS NOT NULL AND cb.popularity <= 100 THEN 12
+                        WHEN cb.popularity IS NOT NULL AND cb.popularity <= 250 THEN 8
+                        WHEN cb.popularity IS NOT NULL AND cb.popularity <= 500 THEN 4
+                        ELSE 0
+                      END
+                )::float AS quality_score,
+
+                (
+                    cb.common_theme_weight
+                    + cb.common_genre_weight
+                    + cb.common_demographic_weight
+
+                    + cb.community_score
+
+                    + cb.supernatural_intent_score
+                    + cb.slice_of_life_intent_score
+                    + cb.sports_intent_score
+                    + cb.romance_intent_score
+                    + cb.dark_intent_score
+
+                    + COALESCE(cb.score, 0) * 2
+
+                    + CASE
+                        WHEN cb.popularity IS NOT NULL AND cb.popularity <= 100 THEN 12
+                        WHEN cb.popularity IS NOT NULL AND cb.popularity <= 250 THEN 8
+                        WHEN cb.popularity IS NOT NULL AND cb.popularity <= 500 THEN 4
+                        ELSE 0
+                      END
+
+                    - CASE
+                        WHEN cb.title ILIKE '%% Part %%'
+                          OR cb.title ILIKE '%%Episode %%'
+                          OR cb.title ILIKE '%%Tanpenshuu%%'
+                        THEN 32
+                        ELSE 0
+                      END
+
+                    - CASE
+                        WHEN cb.status = 'On Hiatus' THEN 12
+                        ELSE 0
+                      END
+
+                    - CASE
+                        WHEN cb.common_demographic_count = 0 THEN 10
+                        ELSE 0
+                      END
+
+                    - CASE
+                        WHEN cb.common_theme_count = 1
+                         AND cb.common_genre_count = 0
+                         AND cb.common_demographic_count = 0
+                         AND cb.community_source_count <= 1
+                        THEN 18
+                        ELSE 0
+                      END
+
+                    - cb.sensitive_mismatch_count * 14
+
+                    - CASE
+                        WHEN COALESCE(cb.score, 0) < 7 THEN 20
+                        WHEN COALESCE(cb.score, 0) < 7.5 THEN 8
+                        ELSE 0
+                      END
+                )::float AS recommendation_score
+
+            FROM candidate_base cb
+        ),
+
+        candidate_ranked AS (
+            SELECT
+                cs.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY LOWER(cs.title)
+                    ORDER BY
+                        CASE
+                            WHEN cs.manga_type = 'Manga' THEN 0
+                            WHEN cs.manga_type IN ('Manhwa', 'Manhua') THEN 1
+                            WHEN cs.manga_type = 'One-shot' THEN 2
+                            ELSE 9
+                        END,
+                        cs.recommendation_score DESC,
+                        cs.popularity ASC NULLS LAST,
+                        cs.score DESC NULLS LAST,
+                        cs.id ASC
+                ) AS candidate_rank
+            FROM candidate_scored cs
+        )
+
+        SELECT
+            id,
+            source_mal_id,
+            title,
+            title_english,
+            status,
+            manga_type,
+            score,
+            popularity,
+
+            common_genre_count,
+            common_theme_count,
+            common_demographic_count,
+
+            common_genres,
+            common_themes,
+            common_demographics,
+
+            community_source_count,
+            community_votes,
+            community_recommended_from,
+            community_score,
+
+            editorial_score,
+            dominant_intent_score,
+            quality_score,
+
+            supernatural_intent_score,
+            slice_of_life_intent_score,
+            sports_intent_score,
+            romance_intent_score,
+            dark_intent_score,
+
+            sensitive_mismatch_count,
+            sensitive_mismatches,
+
+            recommendation_score
+
+        FROM candidate_ranked
+        WHERE candidate_rank = 1
+
+        ORDER BY
+            recommendation_score DESC,
+            community_source_count DESC,
+            community_votes DESC,
+            common_theme_count DESC,
+            common_genre_count DESC,
+            popularity ASC NULLS LAST,
+            title ASC
+
+        LIMIT %(limit)s;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(source_sql, {"titles": liked_titles})
+            sources = cur.fetchall()
+
+            if not sources:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Aucun manga aimé n'a été retrouvé dans le catalogue.",
+                )
+
+            source_ids = [source["id"] for source in sources]
+
+            cur.execute(
+                recommendations_sql,
+                {
+                    "source_ids": source_ids,
+                    "limit": payload.limit,
+                    "min_score": payload.min_score,
+                    "only_finished": payload.only_finished,
+                    "exclude_sensitive_mismatches": payload.exclude_sensitive_mismatches,
+                },
+            )
+            rows = cur.fetchall()
+
+    source_titles = [source["title"] for source in sources]
+
+    recommendations = []
+
+    for row in rows:
+        common_genres = row.get("common_genres") or []
+        common_themes = row.get("common_themes") or []
+        common_demographics = row.get("common_demographics") or []
+        sensitive_mismatches = row.get("sensitive_mismatches") or []
+
+        community_recommended_from = row.get("community_recommended_from") or []
+        community_votes = row.get("community_votes") or 0
+
+        dominant_intent_score = row.get("dominant_intent_score") or 0
+
+        reason_parts = []
+
+        if community_recommended_from:
+            reason_parts.append(
+                "signal communautaire : recommandé depuis "
+                + ", ".join(community_recommended_from)
+                + f" ({community_votes} votes)"
+            )
+
+        if dominant_intent_score > 0:
+            reason_parts.append(
+                f"intention dominante du profil respectée (+{dominant_intent_score:.1f})"
+            )
+
+        if common_demographics:
+            reason_parts.append(
+                f"cible éditoriale proche : {', '.join(common_demographics)}"
+            )
+
+        if common_themes:
+            reason_parts.append(
+                f"thèmes proches : {', '.join(common_themes)}"
+            )
+
+        if common_genres:
+            reason_parts.append(
+                f"genres proches : {', '.join(common_genres)}"
+            )
+
+        if reason_parts:
+            reason = (
+                "Recommandé car ce manga correspond à ton profil de lecture "
+                f"basé sur : {', '.join(source_titles)}. "
+                + " ; ".join(reason_parts)
+                + "."
+            )
+        else:
+            reason = (
+                "Recommandé car ce manga semble proche de ton profil "
+                "selon les données disponibles."
+            )
+
+        if sensitive_mismatches:
+            reason += (
+                " Attention toutefois : certains éléments peuvent éloigner la recommandation "
+                f"({', '.join(sensitive_mismatches)})."
+            )
+
+        row["reason"] = reason
+        recommendations.append(row)
+
+    return {
+        "sources": sources,
+        "count": len(recommendations),
+        "recommendations": recommendations,
+    }

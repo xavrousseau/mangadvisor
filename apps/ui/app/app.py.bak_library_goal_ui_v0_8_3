@@ -1,0 +1,927 @@
+import os
+from typing import Any
+
+import requests
+import streamlit as st
+
+
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+
+st.set_page_config(
+    page_title="Mangadvisor",
+    page_icon="📚",
+    layout="wide",
+)
+
+
+def call_api_get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Appelle l'API Mangadvisor en GET.
+    """
+    url = f"{API_BASE_URL}{path}"
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as exc:
+        st.error(f"Erreur lors de l'appel API GET : {exc}")
+        st.stop()
+
+
+def call_api_post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Appelle l'API Mangadvisor en POST.
+    """
+    url = f"{API_BASE_URL}{path}"
+
+    try:
+        response = requests.post(url, json=payload, timeout=20)
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as exc:
+        st.error(f"Erreur lors de l'appel API POST : {exc}")
+        st.stop()
+
+
+def call_api_delete(path: str) -> dict[str, Any]:
+    """
+    Appelle l'API Mangadvisor en DELETE.
+    """
+    url = f"{API_BASE_URL}{path}"
+
+    try:
+        response = requests.delete(url, timeout=10)
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as exc:
+        st.error(f"Erreur lors de l'appel API DELETE : {exc}")
+        st.stop()
+
+
+def get_health() -> dict[str, Any]:
+    return call_api_get("/health")
+
+
+def get_mangas(search: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"limit": limit}
+
+    if search:
+        params["q"] = search
+
+    data = call_api_get("/mangas", params=params)
+    return data.get("items", [])
+
+
+def get_manga_detail(manga_id: int) -> dict[str, Any]:
+    return call_api_get(f"/mangas/{manga_id}")
+
+
+def get_similar_recommendations(title: str, limit: int = 5) -> dict[str, Any]:
+    return call_api_get(
+        "/recommendations/similar",
+        params={
+            "title": title,
+            "limit": limit,
+        },
+    )
+
+
+def get_profile_recommendations(
+    liked_titles: list[str],
+    limit: int = 5,
+    min_score: float = 6.8,
+    only_finished: bool = False,
+    exclude_sensitive_mismatches: bool = False,
+) -> dict[str, Any]:
+    return call_api_post(
+        "/recommendations/profile",
+        payload={
+            "liked_titles": liked_titles,
+            "limit": limit,
+            "min_score": min_score,
+            "only_finished": only_finished,
+            "exclude_sensitive_mismatches": exclude_sensitive_mismatches,
+        },
+    )
+
+
+LIBRARY_STATUS_OPTIONS = {
+    "Lu": "READ",
+    "En cours": "READING",
+    "Possédé": "OWNED",
+    "Envie de lire": "WANT_TO_READ",
+    "Abandonné": "DROPPED",
+    "Pas intéressé": "NOT_INTERESTED",
+}
+
+LIBRARY_STATUS_LABELS = {
+    "READ": "Lu",
+    "READING": "En cours",
+    "OWNED": "Possédé",
+    "WANT_TO_READ": "Envie de lire",
+    "DROPPED": "Abandonné",
+    "NOT_INTERESTED": "Pas intéressé",
+}
+
+
+def get_library(
+    status: str | None = None,
+    search: str | None = None,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"limit": limit}
+
+    if status:
+        params["status"] = status
+
+    if search:
+        params["q"] = search
+
+    data = call_api_get("/library", params=params)
+    return data.get("items", [])
+
+
+def upsert_library_item(
+    manga_id: int,
+    library_status: str,
+    user_score: float | None = None,
+    is_favorite: bool = False,
+    owned_volumes: int | None = None,
+    read_volumes: int | None = None,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "manga_id": manga_id,
+        "library_status": library_status,
+        "user_score": user_score,
+        "is_favorite": is_favorite,
+        "owned_volumes": owned_volumes,
+        "read_volumes": read_volumes,
+        "notes": notes,
+        "started_at": None,
+        "finished_at": None,
+    }
+
+    return call_api_post("/library/items", payload=payload)
+
+
+def delete_library_item(manga_id: int) -> dict[str, Any]:
+    return call_api_delete(f"/library/items/{manga_id}")
+
+
+def get_library_recommendations(
+    limit: int = 5,
+    min_score: float = 6.8,
+    only_finished: bool = False,
+    exclude_sensitive_mismatches: bool = False,
+) -> dict[str, Any]:
+    return call_api_post(
+        "/recommendations/library",
+        payload={
+            "limit": limit,
+            "min_score": min_score,
+            "only_finished": only_finished,
+            "exclude_sensitive_mismatches": exclude_sensitive_mismatches,
+        },
+    )
+
+
+def rerun_app() -> None:
+    try:
+        st.rerun()
+    except AttributeError:
+        st.experimental_rerun()
+
+
+def display_library_item_card(item: dict[str, Any]) -> None:
+    title = item.get("title") or "Titre inconnu"
+    status = item.get("library_status")
+    status_label = LIBRARY_STATUS_LABELS.get(status, status or "N/A")
+
+    with st.container(border=True):
+        st.markdown(f"### {title}")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            st.metric("Statut bibliothèque", status_label)
+
+        with c2:
+            st.metric("Note perso", format_number(item.get("user_score"), 1))
+
+        with c3:
+            st.metric("Score manga", format_number(item.get("manga_score"), 2))
+
+        with c4:
+            st.metric("Type", item.get("manga_type") or "N/A")
+
+        c5, c6, c7, c8 = st.columns(4)
+
+        with c5:
+            st.metric("Volumes possédés", item.get("owned_volumes") or "N/A")
+
+        with c6:
+            st.metric("Volumes lus", item.get("read_volumes") or "N/A")
+
+        with c7:
+            st.metric("Statut série", item.get("status") or "N/A")
+
+        with c8:
+            st.metric("Favori", "Oui" if item.get("is_favorite") else "Non")
+
+        st.write("**Genres :**")
+        st.write(format_list(item.get("genres"), "Genres non renseignés"))
+
+        st.write("**Thèmes :**")
+        st.write(format_list(item.get("themes"), "Thèmes non renseignés"))
+
+        st.write("**Cible éditoriale :**")
+        st.write(format_list(item.get("demographics"), "Cible non renseignée"))
+
+        notes = item.get("notes")
+
+        if notes:
+            st.write("**Notes :**")
+            st.write(notes)
+
+        manga_id = item.get("manga_id")
+
+        if manga_id:
+            if st.button(
+                "Retirer de ma bibliothèque",
+                key=f"delete_library_item_{manga_id}",
+            ):
+                delete_library_item(int(manga_id))
+                st.success(f"{title} a été retiré de ta bibliothèque.")
+                rerun_app()
+
+
+def format_list(values: list[str] | None, empty_label: str = "Non renseigné") -> str:
+    if not values:
+        return empty_label
+
+    return ", ".join(values)
+
+
+def format_number(value: Any, decimals: int = 1) -> str:
+    if value is None:
+        return "N/A"
+
+    try:
+        return f"{float(value):.{decimals}f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def format_integer(value: Any) -> str:
+    if value is None:
+        return "N/A"
+
+    try:
+        return f"{int(value):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def proximity_label(score: Any) -> str:
+    if score is None:
+        return "N/A"
+
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return "N/A"
+
+    if value >= 100:
+        return "Très forte"
+    if value >= 80:
+        return "Forte"
+    if value >= 60:
+        return "Moyenne"
+    return "Faible"
+
+
+def display_badges(label: str, values: list[str] | None) -> None:
+    st.write(f"**{label} :**")
+
+    if not values:
+        st.caption("Non renseigné")
+        return
+
+    badges = " ".join([f"`{value}`" for value in values])
+    st.markdown(badges)
+
+
+def display_manga_detail(manga: dict[str, Any]) -> None:
+    """
+    Affiche une fiche manga complète.
+    """
+    title = manga.get("title") or "Titre inconnu"
+    title_english = manga.get("title_english")
+    title_japanese = manga.get("title_japanese")
+    synopsis = manga.get("synopsis")
+
+    st.markdown(f"## {title}")
+
+    subtitle_parts = []
+
+    if title_english and title_english != title:
+        subtitle_parts.append(f"**Titre anglais :** {title_english}")
+
+    if title_japanese:
+        subtitle_parts.append(f"**Titre japonais :** {title_japanese}")
+
+    if subtitle_parts:
+        st.markdown(" · ".join(subtitle_parts))
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Score", format_number(manga.get("score"), 2))
+
+    with col2:
+        st.metric("Statut", manga.get("status") or "N/A")
+
+    with col3:
+        st.metric("Type", manga.get("manga_type") or "N/A")
+
+    with col4:
+        st.metric("Popularité", manga.get("popularity") or "N/A")
+
+    col5, col6, col7, col8 = st.columns(4)
+
+    with col5:
+        st.metric("Volumes", manga.get("volumes") or "N/A")
+
+    with col6:
+        st.metric("Chapitres", manga.get("chapters") or "N/A")
+
+    with col7:
+        st.metric("Membres", format_integer(manga.get("members")))
+
+    with col8:
+        st.metric("Favoris", format_integer(manga.get("favorites")))
+
+    st.divider()
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        display_badges("Genres", manga.get("genres"))
+
+    with c2:
+        display_badges("Thèmes", manga.get("themes"))
+
+    with c3:
+        display_badges("Cible éditoriale", manga.get("demographics"))
+
+    st.divider()
+
+    st.write("**Synopsis :**")
+
+    if synopsis:
+        st.write(synopsis)
+    else:
+        st.caption("Aucun synopsis disponible pour ce manga.")
+
+
+def display_recommendation_card(
+    recommendation: dict[str, Any],
+    index: int,
+) -> None:
+    """
+    Affiche une carte de recommandation.
+    """
+    with st.container(border=True):
+        st.markdown(f"### {index}. {recommendation.get('title')}")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            st.metric(
+                "Score reco",
+                format_number(recommendation.get("recommendation_score"), 1),
+            )
+
+        with c2:
+            st.metric(
+                "Proximité calculée",
+                proximity_label(recommendation.get("recommendation_score")),
+            )
+
+        with c3:
+            st.metric(
+                "Score manga",
+                format_number(recommendation.get("score"), 2),
+            )
+
+        with c4:
+            st.metric(
+                "Statut",
+                recommendation.get("status") or "N/A",
+            )
+
+        community_from = recommendation.get("community_recommended_from") or []
+        community_votes = recommendation.get("community_votes") or 0
+        community_score = recommendation.get("community_score") or 0
+
+        if community_from:
+            st.write("**Signal communautaire :**")
+            st.write(
+                "Recommandé depuis "
+                + format_list(community_from)
+                + f" — {community_votes} votes communautaires "
+                + f"(bonus {format_number(community_score, 1)})"
+            )
+
+        st.write("**Cible éditoriale commune :**")
+        st.write(
+            format_list(
+                recommendation.get("common_demographics"),
+                "Aucune cible commune renseignée",
+            )
+        )
+
+        st.write("**Thèmes communs :**")
+        st.write(
+            format_list(
+                recommendation.get("common_themes"),
+                "Aucun thème commun renseigné",
+            )
+        )
+
+        st.write("**Genres communs :**")
+        st.write(
+            format_list(
+                recommendation.get("common_genres"),
+                "Aucun genre commun renseigné",
+            )
+        )
+
+        sensitive_mismatches = recommendation.get("sensitive_mismatches") or []
+
+        if sensitive_mismatches:
+            st.warning(
+                "Éléments qui peuvent éloigner la recommandation : "
+                + ", ".join(sensitive_mismatches)
+            )
+
+        st.info(recommendation.get("reason", "Pas d'explication disponible."))
+
+        manga_id = recommendation.get("id")
+
+        if manga_id:
+            with st.expander("Voir la fiche manga"):
+                manga_detail = get_manga_detail(int(manga_id))
+                display_manga_detail(manga_detail)
+
+
+st.title("📚 Mangadvisor")
+st.caption(
+    "Version V0.8 : bibliothèque utilisateur et recommandations manga depuis ton profil de lecture."
+)
+
+with st.sidebar:
+    st.header("État de la stack")
+
+    health = get_health()
+
+    st.success("API disponible")
+    st.write(f"Base PostgreSQL : `{health.get('database', 'inconnue')}`")
+
+    st.divider()
+
+    recommendation_limit = st.slider(
+        "Nombre de recommandations",
+        min_value=3,
+        max_value=10,
+        value=5,
+    )
+
+    st.caption(
+        "Le moteur actuel utilise les genres, les thèmes, la cible éditoriale, le statut, la popularité, les malus simples et les recommandations communautaires Jikan."
+    )
+
+
+tab_single, tab_profile, tab_detail, tab_library = st.tabs(
+    [
+        "🔎 Recommandation depuis un manga",
+        "🧠 Recommandation depuis mon profil",
+        "📖 Fiche manga",
+        "📚 Ma bibliothèque",
+    ]
+)
+
+
+with tab_single:
+    st.subheader("1. Recherche un manga de référence")
+
+    search = st.text_input(
+        "Titre du manga",
+        value="Naruto",
+        help="Exemples : Naruto, One Piece, Berserk, Death Note...",
+        key="single_search",
+    )
+
+    mangas = get_mangas(search=search if search else None, limit=100)
+
+    if not mangas:
+        st.warning("Aucun manga trouvé avec cette recherche.")
+    else:
+        manga_titles = [manga["title"] for manga in mangas]
+
+        selected_title = st.selectbox(
+            "Manga sélectionné",
+            options=manga_titles,
+            key="single_selected_title",
+        )
+
+        selected_manga = next(
+            manga for manga in mangas if manga["title"] == selected_title
+        )
+
+        st.subheader("2. Manga sélectionné")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Score manga", format_number(selected_manga.get("score"), 2))
+
+        with col2:
+            st.metric("Statut", selected_manga.get("status") or "N/A")
+
+        with col3:
+            st.metric("Volumes", selected_manga.get("volumes") or "N/A")
+
+        with col4:
+            st.metric("Popularité", selected_manga.get("popularity") or "N/A")
+
+        st.write("**Genres :**")
+        st.write(format_list(selected_manga.get("genres"), "Genres non renseignés"))
+
+        st.write("**Thèmes :**")
+        st.write(format_list(selected_manga.get("themes"), "Thèmes non renseignés"))
+
+        st.write("**Cible éditoriale :**")
+        st.write(
+            format_list(
+                selected_manga.get("demographics"),
+                "Cible éditoriale non renseignée",
+            )
+        )
+
+        with st.expander("Voir la fiche complète du manga sélectionné"):
+            selected_manga_detail = get_manga_detail(int(selected_manga["id"]))
+            display_manga_detail(selected_manga_detail)
+
+        st.divider()
+
+        st.subheader("3. Recommandations")
+
+        if st.button("Me recommander des mangas similaires", type="primary"):
+            result = get_similar_recommendations(
+                title=selected_title,
+                limit=recommendation_limit,
+            )
+
+            source = result.get("source", {})
+            recommendations = result.get("recommendations", [])
+
+            st.write(
+                f"Recommandations à partir de : **{source.get('title', selected_title)}**"
+            )
+
+            if not recommendations:
+                st.warning("Aucune recommandation trouvée.")
+            else:
+                for index, recommendation in enumerate(recommendations, start=1):
+                    display_recommendation_card(recommendation, index)
+
+        else:
+            st.info("Clique sur le bouton pour générer les recommandations.")
+
+
+with tab_profile:
+    st.subheader("1. Sélectionne plusieurs mangas que tu aimes")
+
+    all_mangas = get_mangas(limit=500)
+    all_titles = [manga["title"] for manga in all_mangas]
+
+    default_profile_titles = [
+        title
+        for title in ["Naruto", "Bleach", "Hunter x Hunter"]
+        if title in all_titles
+    ]
+
+    liked_titles = st.multiselect(
+        "Mangas aimés",
+        options=all_titles,
+        default=default_profile_titles,
+        help="Choisis entre 1 et 10 mangas que tu aimes.",
+    )
+
+    if liked_titles:
+        st.write("Profil de lecture sélectionné :")
+        st.write(", ".join(liked_titles))
+    else:
+        st.warning("Sélectionne au moins un manga pour générer un profil.")
+
+    st.subheader("2. Préférences de lecture")
+
+    profile_min_score = st.slider(
+        "Score minimum du manga recommandé",
+        min_value=0.0,
+        max_value=10.0,
+        value=6.8,
+        step=0.1,
+        help="Augmente cette valeur pour éviter les recommandations trop faibles ou trop obscures.",
+    )
+
+    profile_only_finished = st.checkbox(
+        "Recommander uniquement des séries terminées",
+        value=False,
+        help="Pratique si tu veux éviter les séries encore en cours ou en pause.",
+    )
+
+    profile_exclude_sensitive = st.checkbox(
+        "Exclure les recommandations avec éléments éloignants",
+        value=False,
+        help="Exclut par exemple certains écarts comme Gore, Harem, Ecchi, Romance, School selon ton profil.",
+    )
+
+    st.divider()
+
+    st.subheader("3. Recommandations selon ton profil")
+
+    if st.button("Me recommander selon mon profil", type="primary"):
+        if not liked_titles:
+            st.warning("Sélectionne au moins un manga avant de lancer la recommandation.")
+        elif len(liked_titles) > 10:
+            st.warning("Sélectionne au maximum 10 mangas pour cette première version.")
+        else:
+            result = get_profile_recommendations(
+                liked_titles=liked_titles,
+                limit=recommendation_limit,
+                min_score=profile_min_score,
+                only_finished=profile_only_finished,
+                exclude_sensitive_mismatches=profile_exclude_sensitive,
+            )
+
+            sources = result.get("sources", [])
+            recommendations = result.get("recommendations", [])
+
+            source_titles = [source.get("title") for source in sources]
+
+            st.write("Profil reconnu par l’API :")
+            st.write(", ".join(source_titles))
+
+            if not recommendations:
+                st.warning("Aucune recommandation trouvée pour ce profil.")
+            else:
+                for index, recommendation in enumerate(recommendations, start=1):
+                    display_recommendation_card(recommendation, index)
+
+    else:
+        st.info("Clique sur le bouton pour générer des recommandations selon ton profil.")
+
+
+with tab_detail:
+    st.subheader("Recherche et fiche détaillée manga")
+
+    detail_search = st.text_input(
+        "Rechercher un manga",
+        value="Death Note",
+        help="Exemples : Death Note, Berserk, Nana, Jujutsu Kaisen...",
+        key="detail_search",
+    )
+
+    detail_mangas = get_mangas(search=detail_search if detail_search else None, limit=100)
+
+    if not detail_mangas:
+        st.warning("Aucun manga trouvé avec cette recherche.")
+    else:
+        manga_by_id = {manga["id"]: manga for manga in detail_mangas}
+
+        selected_manga_id = st.selectbox(
+            "Manga à afficher",
+            options=list(manga_by_id.keys()),
+            format_func=lambda manga_id: (
+                f"{manga_by_id[manga_id].get('title')} "
+                f"({manga_by_id[manga_id].get('manga_type') or 'Type inconnu'})"
+            ),
+            key="detail_selected_manga_id",
+        )
+
+        if st.button("Afficher la fiche manga", type="primary"):
+            manga_detail = get_manga_detail(int(selected_manga_id))
+            display_manga_detail(manga_detail)
+        else:
+            st.info("Clique sur le bouton pour afficher la fiche complète.")
+
+
+with tab_library:
+    st.subheader("1. Ajouter ou mettre à jour un manga dans ma bibliothèque")
+
+    library_search = st.text_input(
+        "Rechercher un manga à ajouter",
+        value="Naruto",
+        help="Exemples : Naruto, Death Note, Berserk, Nana...",
+        key="library_search",
+    )
+
+    library_search_results = get_mangas(
+        search=library_search if library_search else None,
+        limit=100,
+    )
+
+    if not library_search_results:
+        st.warning("Aucun manga trouvé avec cette recherche.")
+    else:
+        manga_by_id = {manga["id"]: manga for manga in library_search_results}
+
+        selected_library_manga_id = st.selectbox(
+            "Manga à ajouter / modifier",
+            options=list(manga_by_id.keys()),
+            format_func=lambda manga_id: (
+                f"{manga_by_id[manga_id].get('title')} "
+                f"— {manga_by_id[manga_id].get('manga_type') or 'Type inconnu'} "
+                f"— score {format_number(manga_by_id[manga_id].get('score'), 2)}"
+            ),
+            key="library_selected_manga_id",
+        )
+
+        selected_library_manga = manga_by_id[selected_library_manga_id]
+
+        with st.form("library_item_form"):
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                selected_status_label = st.selectbox(
+                    "Statut dans ma bibliothèque",
+                    options=list(LIBRARY_STATUS_OPTIONS.keys()),
+                    index=0,
+                )
+
+            with c2:
+                user_score = st.number_input(
+                    "Ma note /10",
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=8.0,
+                    step=0.5,
+                )
+
+            with c3:
+                is_favorite = st.checkbox("Favori", value=False)
+
+            c4, c5 = st.columns(2)
+
+            with c4:
+                owned_volumes = st.number_input(
+                    "Volumes possédés",
+                    min_value=0,
+                    value=0,
+                    step=1,
+                )
+
+            with c5:
+                read_volumes = st.number_input(
+                    "Volumes lus",
+                    min_value=0,
+                    value=0,
+                    step=1,
+                )
+
+            notes = st.text_area(
+                "Notes personnelles",
+                value="",
+                placeholder="Exemple : très bon shōnen, univers sympa, envie de lire la suite...",
+            )
+
+            submitted = st.form_submit_button("Ajouter / mettre à jour")
+
+        if submitted:
+            upsert_library_item(
+                manga_id=int(selected_library_manga_id),
+                library_status=LIBRARY_STATUS_OPTIONS[selected_status_label],
+                user_score=user_score,
+                is_favorite=is_favorite,
+                owned_volumes=int(owned_volumes) if owned_volumes > 0 else None,
+                read_volumes=int(read_volumes) if read_volumes > 0 else None,
+                notes=notes.strip() if notes.strip() else None,
+            )
+
+            st.success(
+                f"{selected_library_manga.get('title')} a été ajouté / mis à jour dans ta bibliothèque."
+            )
+
+    st.divider()
+
+    st.subheader("2. Ma bibliothèque")
+
+    c_filter_1, c_filter_2 = st.columns(2)
+
+    with c_filter_1:
+        library_status_filter_label = st.selectbox(
+            "Filtrer par statut",
+            options=["Tous"] + list(LIBRARY_STATUS_OPTIONS.keys()),
+            index=0,
+            key="library_status_filter",
+        )
+
+    with c_filter_2:
+        library_text_filter = st.text_input(
+            "Rechercher dans ma bibliothèque",
+            value="",
+            key="library_text_filter",
+        )
+
+    selected_status_filter = None
+
+    if library_status_filter_label != "Tous":
+        selected_status_filter = LIBRARY_STATUS_OPTIONS[library_status_filter_label]
+
+    library_items = get_library(
+        status=selected_status_filter,
+        search=library_text_filter.strip() if library_text_filter.strip() else None,
+        limit=200,
+    )
+
+    st.write(f"Nombre de mangas dans la bibliothèque : **{len(library_items)}**")
+
+    if not library_items:
+        st.info("Ta bibliothèque est vide ou aucun manga ne correspond aux filtres.")
+    else:
+        for item in library_items:
+            display_library_item_card(item)
+
+    st.divider()
+
+    st.subheader("3. Recommandations à partir de ma bibliothèque")
+
+    c_rec_1, c_rec_2, c_rec_3 = st.columns(3)
+
+    with c_rec_1:
+        library_reco_limit = st.slider(
+            "Nombre de recommandations bibliothèque",
+            min_value=3,
+            max_value=10,
+            value=5,
+            key="library_reco_limit",
+        )
+
+    with c_rec_2:
+        library_reco_min_score = st.slider(
+            "Score minimum",
+            min_value=0.0,
+            max_value=10.0,
+            value=6.8,
+            step=0.1,
+            key="library_reco_min_score",
+        )
+
+    with c_rec_3:
+        library_reco_only_finished = st.checkbox(
+            "Séries terminées uniquement",
+            value=False,
+            key="library_reco_only_finished",
+        )
+
+    library_reco_exclude_sensitive = st.checkbox(
+        "Exclure les recommandations avec éléments éloignants",
+        value=False,
+        key="library_reco_exclude_sensitive",
+    )
+
+    if st.button("Me recommander depuis ma bibliothèque", type="primary"):
+        result = get_library_recommendations(
+            limit=library_reco_limit,
+            min_score=library_reco_min_score,
+            only_finished=library_reco_only_finished,
+            exclude_sensitive_mismatches=library_reco_exclude_sensitive,
+        )
+
+        positive_sources = result.get("positive_sources", [])
+        recommendations = result.get("recommendations", [])
+
+        if positive_sources:
+            st.write("Mangas utilisés pour construire ton profil :")
+            st.write(", ".join([source.get("title", "") for source in positive_sources]))
+
+        st.write(
+            f"Mangas exclus car déjà dans ta bibliothèque : **{result.get('excluded_library_manga_count', 0)}**"
+        )
+
+        if not recommendations:
+            st.warning("Aucune recommandation trouvée depuis ta bibliothèque.")
+        else:
+            for index, recommendation in enumerate(recommendations, start=1):
+                display_recommendation_card(recommendation, index)
+    else:
+        st.info("Ajoute quelques mangas à ta bibliothèque, puis lance une recommandation.")
+

@@ -1,0 +1,152 @@
+# =============================================================================
+# Mangadvisor — STACK V1 MINIMALE (simple, lisible, facile à démarrer)
+#
+# Objectif :
+# - Démarrer rapidement une base saine : DB + search + API + UI + engine
+# - Comprendre ce qui tourne, sans se noyer dans l'observabilité au début
+#
+# Démarrage recommandé (DEV) :
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# =============================================================================
+
+name: mangadvisor
+
+networks:
+  mangadvisor-net: {}
+
+volumes:
+  mangadvisor-pgdata: {}
+  mangadvisor-meili: {}
+  mangadvisor-redis: {}
+  mangadvisor-ollama: {}  # utilisé seulement si tu actives Ollama
+
+services:
+  # -------------------------
+  # PostgreSQL + pgvector (coeur des données)
+  # -------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mangadvisor-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mangadvisor}
+      POSTGRES_USER: ${POSTGRES_USER:-manga}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manga_pw}
+    volumes:
+      - mangadvisor-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"${POSTGRES_USER:-manga}\" -d \"${POSTGRES_DB:-mangadvisor}\" -h 127.0.0.1 -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks: [mangadvisor-net]
+
+  # -------------------------
+  # Meilisearch (recherche texte + facettes)
+  # -------------------------
+  meilisearch:
+    image: getmeili/meilisearch:v1.11.0
+    container_name: mangadvisor-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_master_key}
+    command: ["meilisearch", "--db-path", "/meili_data", "--http-addr", "0.0.0.0:7700"]
+    volumes:
+      - mangadvisor-meili:/meili_data
+    networks: [mangadvisor-net]
+
+  # -------------------------
+  # Redis (cache/queue pour plus tard)
+  # -------------------------
+  redis:
+    image: redis:7.4-alpine
+    container_name: mangadvisor-redis
+    restart: unless-stopped
+    volumes:
+      - mangadvisor-redis:/data
+    networks: [mangadvisor-net]
+
+  # -------------------------
+  # API FastAPI (coeur SaaS)
+  # -------------------------
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    image: mangadvisor-api:v1
+    container_name: mangadvisor-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # DB
+      DATABASE_URL: postgresql://${POSTGRES_USER:-manga}:${POSTGRES_PASSWORD:-manga_pw}@postgres:5432/${POSTGRES_DB:-mangadvisor}
+      # Services internes Docker
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_master_key}
+      REDIS_URL: redis://redis:6379/0
+      # Runtime API
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+    ports:
+      - "${API_PORT_PUBLISHED:-8000}:8000"
+    networks: [mangadvisor-net]
+
+  # -------------------------
+  # UI Streamlit (client de l'API)
+  # -------------------------
+  ui:
+    build:
+      context: ./services/ui_streamlit
+      dockerfile: Dockerfile
+    image: mangadvisor-ui-streamlit:v1
+    container_name: mangadvisor-ui
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "${UI_STREAMLIT_PORT_PUBLISHED:-8501}:8501"
+    networks: [mangadvisor-net]
+
+  # -------------------------
+  # Engine (batch/jobs) - pour l'instant idle (ne fait rien)
+  # -------------------------
+  engine:
+    build:
+      context: ./services/engine
+      dockerfile: Dockerfile
+    image: mangadvisor-engine:v1
+    container_name: mangadvisor-engine
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - meilisearch
+      - redis
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-manga}:${POSTGRES_PASSWORD:-manga_pw}@postgres:5432/${POSTGRES_DB:-mangadvisor}
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev_master_key}
+      REDIS_URL: redis://redis:6379/0
+    command: ["bash", "-lc", "sleep infinity"]
+    networks: [mangadvisor-net]
+
+  # -------------------------
+  # Ollama (optionnel) - on le gardera désactivé au début
+  # Si tu veux l'activer un jour : on fera un override ou une commande dédiée
+  # -------------------------
+  ollama:
+    image: ollama/ollama:0.3.14
+    container_name: mangadvisor-ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: "0.0.0.0"
+    volumes:
+      - mangadvisor-ollama:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT_PUBLISHED:-11434}:11434"
+    networks: [mangadvisor-net]

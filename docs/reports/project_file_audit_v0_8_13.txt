@@ -1,0 +1,1035 @@
+================================================== 
+  Mangadvisor - Audit fichiers projet V0.8.13 
+================================================== 
+ 
+Projet : F:\1.Boulot\03_Github\mangadvisor\cmd\.. 
+Date   : 07/06/2026 18:43:33,43 
+ 
+================================================== 
+1. Git status 
+================================================== 
+ D .gitattributes
+ M .gitignore
+ D api/.dockerignore
+ D api/Dockerfile
+ D api/app/main.py
+ D docker-compose.yml
+ D engine/.dockerignore
+ D engine/Dockerfile
+ D metrics/prometheus.yml
+ D metrics/provisioning/dashboards/dashboard.yaml
+ D metrics/provisioning/dashboards/mangadvisor-api.json
+ D metrics/provisioning/datasources/prometheus.yaml
+ D notebooks/01_Scraping_API_Jikan.ipynb
+ D notebooks/02_Scraping_API_AniList.ipynb
+ D notebooks/03_Scraping_MangaNews.ipynb
+ D notebooks/04_Rapprochement.ipynb
+ D notebooks/README.md
+ D ui/.dockerignore
+ D ui/Dockerfile
+?? .env.example
+?? README.md
+?? apps/
+?? cd
+?? cmd/
+?? data/
+?? docker
+?? docs/
+?? infra/
+?? legacy/
+?? mangadvisor.cmd
+?? pipelines/
+?? pyproject.toml
+?? sql/
+?? tools/
+ 
+================================================== 
+2. Fichiers suivis par Git 
+================================================== 
+.gitattributes
+.gitignore
+api/.dockerignore
+api/Dockerfile
+api/app/main.py
+docker-compose.yml
+engine/.dockerignore
+engine/Dockerfile
+metrics/prometheus.yml
+metrics/provisioning/dashboards/dashboard.yaml
+metrics/provisioning/dashboards/mangadvisor-api.json
+metrics/provisioning/datasources/prometheus.yaml
+notebooks/01_Scraping_API_Jikan.ipynb
+notebooks/02_Scraping_API_AniList.ipynb
+notebooks/03_Scraping_MangaNews.ipynb
+notebooks/04_Rapprochement.ipynb
+notebooks/README.md
+ui/.dockerignore
+ui/Dockerfile
+ 
+================================================== 
+3. Fichiers non suivis par Git 
+================================================== 
+.env.example
+README.md
+apps/api/app/main.py
+apps/api/app/main.py.bak
+apps/api/app/main.py.bak_community_bonus
+apps/api/app/main.py.bak_intent_mode
+apps/api/app/main.py.bak_library_api_v0_8
+apps/api/app/main.py.bak_library_goal_v0_8_3
+apps/api/app/main.py.bak_library_import_v0_8_7
+apps/api/app/main.py.bak_library_profile_v0_8_6
+apps/api/app/main.py.bak_library_v0_8_2
+apps/api/app/main.py.bak_library_v0_8_5
+apps/api/app/main.py.bak_v0_7_1
+apps/api/app/main.py.bak_v0_7_2
+apps/api/app/main.py.bak_v0_7_4
+apps/api/requirements.txt
+apps/ui/app/app.py
+apps/ui/app/app.py.bak_community_bonus
+apps/ui/app/app.py.bak_import_templates_v0_8_9
+apps/ui/app/app.py.bak_intent_mode
+apps/ui/app/app.py.bak_library_goal_ui_v0_8_3
+apps/ui/app/app.py.bak_library_import_csv_v0_8_7
+apps/ui/app/app.py.bak_library_import_excel_v0_8_8
+apps/ui/app/app.py.bak_library_profile_v0_8_6
+apps/ui/app/app.py.bak_library_ui_v0_8
+apps/ui/app/app.py.bak_page_detail_manga
+apps/ui/requirements.txt
+cd
+cmd/audit-project-files.cmd
+cmd/build.cmd
+cmd/clean.cmd
+cmd/common.cmd
+cmd/diagnose-jikan-recommendations.cmd
+cmd/down.cmd
+cmd/extract-jikan-recommendations.cmd
+cmd/install-check.cmd
+cmd/load-jikan-recommendations.cmd
+cmd/logs.cmd
+cmd/nuke.cmd
+cmd/rebuild-canonical-catalog.cmd
+cmd/restart.cmd
+cmd/run-jikan-catalog.cmd
+cmd/run-jikan-pipeline.cmd
+cmd/run-library-goal-tests.cmd
+cmd/run-library-import-robustness-tests.cmd
+cmd/run-library-import-tests.cmd
+cmd/run-library-recommendation-tests.cmd
+cmd/run-library-status-tests.cmd
+cmd/run-recommendation-tests.cmd
+cmd/run-v0-8-validation.cmd
+cmd/start.cmd
+cmd/status.cmd
+cmd/stop.cmd
+cmd/up.cmd
+data/modele_bibliotheque_mangadvisor.csv
+data/modele_bibliotheque_mangadvisor.xlsx
+docker
+docs/02_data/data_model_v1.md
+docs/02_data/data_pipeline_v1.md
+docs/03_technical/mangadvisor_architecture_v1.md
+docs/03_technical/project_structure.md
+docs/STABILISATION_V0_8.md
+docs/recommandation_tests_v0_6.md
+docs/reports/Mangadvisor V0.7 Data Foundation.docx
+docs/reports/jikan_recommendation_edges_diagnostic.md
+docs/reports/library_goal_tests_v0_8_3.md
+docs/reports/library_import_robustness_tests_v0_8_11.md
+docs/reports/library_import_tests_v0_8_10.md
+docs/reports/library_recommendation_tests_v0_8_1.md
+docs/reports/library_recommendation_tests_v0_8_2.md
+docs/reports/library_recommendation_tests_v0_8_2_profile_summary.md
+docs/reports/library_status_tests_v0_8_4.md
+docs/reports/library_status_tests_v0_8_5.md
+docs/reports/project_file_audit_v0_8_13.txt
+docs/reports/recommendation_profile_tests_latest.md
+docs/reports/recommendation_profile_tests_v0_6.md
+docs/reports/recommendation_profile_tests_v0_7_1.md
+docs/reports/recommendation_profile_tests_v0_7_2.md
+docs/reports/recommendation_profile_tests_v0_7_3.md
+docs/reports/recommendation_profile_tests_v0_7_4.md
+docs/reports/recommendation_profile_tests_v0_8_0.md
+infra/compose/docker-compose.dev.yml
+infra/compose/docker-compose.yml
+infra/docker/api/Dockerfile
+infra/docker/engine/Dockerfile
+infra/docker/ui/Dockerfile
+legacy/full_stack_2026_03/.gitattributes
+legacy/full_stack_2026_03/.gitignore
+legacy/full_stack_2026_03/README.md
+legacy/full_stack_2026_03/arborescence.txt
+legacy/full_stack_2026_03/docker-compose.dev.yml
+legacy/full_stack_2026_03/docker-compose.full.yml
+legacy/full_stack_2026_03/docker-compose.yml
+legacy/full_stack_2026_03/infra/dbt/dbt_project.yml
+legacy/full_stack_2026_03/infra/dbt/packages.yml
+legacy/full_stack_2026_03/infra/dbt/profiles.yml
+legacy/full_stack_2026_03/infra/grafana/dashboards/dashboard.yaml
+legacy/full_stack_2026_03/infra/grafana/dashboards/mangadvisor-api.json
+legacy/full_stack_2026_03/infra/grafana/provisioning/datasources/prometheus.yaml
+legacy/full_stack_2026_03/infra/nginx/nginx.conf
+legacy/full_stack_2026_03/infra/pgadmin/sessions/0062873c-59c6-47f9-8dd1-55df3935b735
+legacy/full_stack_2026_03/infra/pgadmin/sessions/031bb926-3921-4a5f-acf8-af90d6a22363
+legacy/full_stack_2026_03/infra/pgadmin/sessions/04330acf-7d57-4964-8f92-948f9a5a87da
+legacy/full_stack_2026_03/infra/pgadmin/sessions/0dd4749c-7df6-4551-a163-7046f931a2db
+legacy/full_stack_2026_03/infra/pgadmin/sessions/1519d344-c390-470c-bd81-9166776e86ac
+legacy/full_stack_2026_03/infra/pgadmin/sessions/1f6f11f3-9fa5-4505-a77c-0d8972ede814
+legacy/full_stack_2026_03/infra/pgadmin/sessions/2915f598-9951-4a89-8517-4fb8dffd723b
+legacy/full_stack_2026_03/infra/pgadmin/sessions/2a0e90ea-5de2-41d9-b493-8099893aec3e
+legacy/full_stack_2026_03/infra/pgadmin/sessions/2c0612f6-3ae1-4171-8a06-85ae8e67bc14
+legacy/full_stack_2026_03/infra/pgadmin/sessions/3bb97fe4-ddfc-49f6-9daa-65303b46d71f
+legacy/full_stack_2026_03/infra/pgadmin/sessions/441691a4-5d5d-45d6-b0cd-2825133bfb0a
+legacy/full_stack_2026_03/infra/pgadmin/sessions/4770d9c2-98be-429b-894e-1193edf0d90e
+legacy/full_stack_2026_03/infra/pgadmin/sessions/4adcd83b-023b-48c3-acbe-4f89619d7bbb
+legacy/full_stack_2026_03/infra/pgadmin/sessions/4f4e9594-9197-485a-86b4-b2d370c219b0
+legacy/full_stack_2026_03/infra/pgadmin/sessions/56fb7809-588a-4f5f-a0d7-2e6d81485497
+legacy/full_stack_2026_03/infra/pgadmin/sessions/624e1d0f-85c9-448c-88ad-88a3f3960b02
+legacy/full_stack_2026_03/infra/pgadmin/sessions/730803ec-ff7b-40ad-8b37-791f22334fcb
+legacy/full_stack_2026_03/infra/pgadmin/sessions/739dae4f-a749-43c1-b3ef-39791250318e
+legacy/full_stack_2026_03/infra/pgadmin/sessions/75e64b66-7044-4ba3-9cbc-e46bf2772e2d
+legacy/full_stack_2026_03/infra/pgadmin/sessions/7985df70-8d3a-406d-aaa2-8a38f5814f86
+legacy/full_stack_2026_03/infra/pgadmin/sessions/7a464356-7465-4f2e-badf-f9db04bd843d
+legacy/full_stack_2026_03/infra/pgadmin/sessions/7fafa85d-91e1-4743-be54-7c77d51a6f53
+legacy/full_stack_2026_03/infra/pgadmin/sessions/85f64f80-b906-477b-969a-270177868ff1
+legacy/full_stack_2026_03/infra/pgadmin/sessions/8afcc3f2-e958-4105-851e-bf3e7a8600e7
+legacy/full_stack_2026_03/infra/pgadmin/sessions/8d055664-f047-4500-9d10-e734a6a80ec8
+legacy/full_stack_2026_03/infra/pgadmin/sessions/95437d48-57fe-486d-a9ec-9cbdaa080659
+legacy/full_stack_2026_03/infra/pgadmin/sessions/98047856-ff62-459c-9f0b-6756d78902be
+legacy/full_stack_2026_03/infra/pgadmin/sessions/993567bd-998c-4e24-82f7-11913fbec39a
+legacy/full_stack_2026_03/infra/pgadmin/sessions/9b92c773-b2c7-4f46-9aa8-c29eb5eda586
+legacy/full_stack_2026_03/infra/pgadmin/sessions/9d9fc5ab-3ef9-45b1-a3ee-ba9bb4261cfe
+legacy/full_stack_2026_03/infra/pgadmin/sessions/9ddf9508-e7c8-48f5-97af-ae6e4cfb690e
+legacy/full_stack_2026_03/infra/pgadmin/sessions/9ebbdddb-3d7e-4098-8a98-011494786b58
+legacy/full_stack_2026_03/infra/pgadmin/sessions/c528bb19-1a59-43c7-92a3-2cb309f108ff
+legacy/full_stack_2026_03/infra/pgadmin/sessions/d4a79069-659a-45b5-9d4b-738551ae6171
+legacy/full_stack_2026_03/infra/pgadmin/sessions/da38aee1-2709-4d99-8682-3b4460f5d7a6
+legacy/full_stack_2026_03/infra/pgadmin/sessions/f1e84802-402b-419e-a692-64403877cb21
+legacy/full_stack_2026_03/infra/pgadmin/sessions/f3546316-970d-4a02-b627-6279f78fc0db
+legacy/full_stack_2026_03/infra/pgadmin/sessions/f5709b21-5c22-469b-815f-eb4c5ac5424e
+legacy/full_stack_2026_03/infra/pgadmin/sessions/f86a3c39-e686-4870-a4f4-1922236444cd
+legacy/full_stack_2026_03/infra/prometheus/prometheus.yml
+legacy/full_stack_2026_03/notebooks/01_Scraping_API_Jikan.ipynb
+legacy/full_stack_2026_03/notebooks/02_Scraping_API_AniList.ipynb
+legacy/full_stack_2026_03/notebooks/03_Scraping_MangaNews.ipynb
+legacy/full_stack_2026_03/notebooks/04_Rapprochement.ipynb
+legacy/full_stack_2026_03/notebooks/README.md
+legacy/full_stack_2026_03/notebooks/src/config.py
+legacy/full_stack_2026_03/services/api/.dockerignore
+legacy/full_stack_2026_03/services/api/Dockerfile
+legacy/full_stack_2026_03/services/api/app/deps.py
+legacy/full_stack_2026_03/services/api/app/main.py
+legacy/full_stack_2026_03/services/api/requirements.txt
+legacy/full_stack_2026_03/services/engine/.dockerignore
+legacy/full_stack_2026_03/services/engine/Dockerfile
+legacy/full_stack_2026_03/services/engine/requirements.txt
+legacy/full_stack_2026_03/services/engine/scripts/scrape_anilist.py
+legacy/full_stack_2026_03/services/engine/scripts/scrape_jikan.py
+legacy/full_stack_2026_03/services/engine/scripts/scrape_manganews.py
+legacy/full_stack_2026_03/services/scheduler/Dockerfile
+legacy/full_stack_2026_03/services/scheduler/app.py
+legacy/full_stack_2026_03/services/scheduler/requirements.txt
+legacy/full_stack_2026_03/services/ui/.dockerignore
+legacy/full_stack_2026_03/services/ui/Dockerfile
+legacy/full_stack_2026_03/services/ui/app.py
+legacy/full_stack_2026_03/services/ui/requirements.txt
+legacy/full_stack_2026_03/services/ui_streamlit/.dockerignore
+legacy/full_stack_2026_03/services/ui_streamlit/Dockerfile
+legacy/full_stack_2026_03/services/ui_streamlit/app/app.py
+legacy/full_stack_2026_03/services/ui_streamlit/requirements.txt
+mangadvisor.cmd
+pipelines/__init__.py
+pipelines/engine/requirements.txt
+pipelines/engine/scripts/analyze_jikan_recommendation_edges.py
+pipelines/engine/scripts/extract_jikan.py
+pipelines/engine/scripts/extract_jikan.py.bak_v0_7
+pipelines/engine/scripts/extract_jikan_recommendations.py
+pipelines/engine/scripts/load_jikan_recommendations_to_postgres.py
+pipelines/engine/scripts/load_jikan_to_postgres.py
+pipelines/engine/scripts/load_jikan_to_postgres.py.bak_v0_7
+pipelines/engine/scripts/run_jikan_pipeline.py
+pipelines/engine/scripts/run_library_goal_tests.py
+pipelines/engine/scripts/run_library_import_robustness_tests.py
+pipelines/engine/scripts/run_library_import_tests.py
+pipelines/engine/scripts/run_library_recommendation_tests.py
+pipelines/engine/scripts/run_library_recommendation_tests.py.bak_profile_summary
+pipelines/engine/scripts/run_library_recommendation_tests.py.bak_v0_8_2
+pipelines/engine/scripts/run_library_status_tests.py
+pipelines/engine/scripts/run_library_status_tests.py.bak_v0_8_5
+pipelines/engine/scripts/run_recommendation_profile_tests.py
+pipelines/engine/scripts/run_recommendation_profile_tests.py.bak_intent_mode
+pipelines/engine/scripts/run_recommendation_profile_tests.py.bak_v0_7_4
+pipelines/engine/src/__init__.py
+pipelines/engine/src/extract/__init__.py
+pipelines/engine/src/extract/jikan_client.py
+pipelines/engine/src/load/__init__.py
+pipelines/engine/src/load/postgres_loader.py
+pyproject.toml
+sql/queries/check_jikan_data_quality.sql
+sql/queries/check_jikan_source_data.sql
+sql/queries/inspect_jikan_attributes.sql
+sql/schema/001_jikan_source_tables.sql
+sql/schema/002_canonical_manga_tables.sql
+sql/schema/003_build_canonical_from_jikan.sql
+sql/schema/004_add_theme_demographic_tables.sql
+sql/schema/005_build_theme_demographic_from_jikan.sql
+sql/schema/006_add_jikan_recommendation_tables.sql
+sql/schema/007_add_user_library_tables.sql
+tools/fix_library_goal_ui_payload_v0_8_3.py
+tools/fix_v0_7_3_percent_placeholders.py
+tools/patch_import_templates_ui_v0_8_9.py
+tools/patch_intent_mode.py
+tools/patch_library_api_v0_8.py
+tools/patch_library_goal_ui_v0_8_3.py
+tools/patch_library_goal_v0_8_3.py
+tools/patch_library_import_csv_ui_v0_8_7.py
+tools/patch_library_import_csv_v0_8_7.py
+tools/patch_library_import_excel_ui_v0_8_8.py
+tools/patch_library_low_score_v0_8_5.py
+tools/patch_library_low_score_v0_8_5_v2.py
+tools/patch_library_low_score_v0_8_5_v3.py
+tools/patch_library_profile_ui_v0_8_6.py
+tools/patch_library_profile_v0_8_6.py
+tools/patch_library_reco_v0_8_2.py
+tools/patch_library_report_profile_summary.py
+tools/patch_library_ui_v0_8.py
+tools/patch_v0_7_3.py
+tools/patch_v0_7_4.py
+ 
+================================================== 
+4. Arborescence complete 
+================================================== 
+Structure du dossier pour le volume Extreme SSD
+Le numéro de série du volume est 00000076 1E3D:FE34
+F:.
+|   .env
+|   .env.example
+|   .gitignore
+|   cd
+|   docker
+|   mangadvisor.cmd
+|   pyproject.toml
+|   README.md
+|   
++---apps
+|   +---api
+|   |   |   requirements.txt
+|   |   |   
+|   |   \---app
+|   |       |   main.py
+|   |       |   main.py.bak
+|   |       |   main.py.bak_community_bonus
+|   |       |   main.py.bak_intent_mode
+|   |       |   main.py.bak_library_api_v0_8
+|   |       |   main.py.bak_library_goal_v0_8_3
+|   |       |   main.py.bak_library_import_v0_8_7
+|   |       |   main.py.bak_library_profile_v0_8_6
+|   |       |   main.py.bak_library_v0_8_2
+|   |       |   main.py.bak_library_v0_8_5
+|   |       |   main.py.bak_v0_7_1
+|   |       |   main.py.bak_v0_7_2
+|   |       |   main.py.bak_v0_7_4
+|   |       |   
+|   |       \---__pycache__
+|   |               main.cpython-311.pyc
+|   |               
+|   \---ui
+|       |   requirements.txt
+|       |   
+|       \---app
+|               app.py
+|               app.py.bak_community_bonus
+|               app.py.bak_import_templates_v0_8_9
+|               app.py.bak_intent_mode
+|               app.py.bak_library_goal_ui_v0_8_3
+|               app.py.bak_library_import_csv_v0_8_7
+|               app.py.bak_library_import_excel_v0_8_8
+|               app.py.bak_library_profile_v0_8_6
+|               app.py.bak_library_ui_v0_8
+|               app.py.bak_page_detail_manga
+|               
++---cmd
+|       audit-project-files.cmd
+|       build.cmd
+|       clean.cmd
+|       common.cmd
+|       diagnose-jikan-recommendations.cmd
+|       down.cmd
+|       extract-jikan-recommendations.cmd
+|       install-check.cmd
+|       load-jikan-recommendations.cmd
+|       logs.cmd
+|       nuke.cmd
+|       rebuild-canonical-catalog.cmd
+|       restart.cmd
+|       run-jikan-catalog.cmd
+|       run-jikan-pipeline.cmd
+|       run-library-goal-tests.cmd
+|       run-library-import-robustness-tests.cmd
+|       run-library-import-tests.cmd
+|       run-library-recommendation-tests.cmd
+|       run-library-status-tests.cmd
+|       run-recommendation-tests.cmd
+|       run-v0-8-validation.cmd
+|       start.cmd
+|       status.cmd
+|       stop.cmd
+|       up.cmd
+|       
++---data
+|   |   modele_bibliotheque_mangadvisor.csv
+|   |   modele_bibliotheque_mangadvisor.xlsx
+|   |   
+|   \---raw
+|       \---jikan
+|           |   manga_page_1.json
+|           |   manga_page_10.json
+|           |   manga_page_2.json
+|           |   manga_page_3.json
+|           |   manga_page_4.json
+|           |   manga_page_5.json
+|           |   manga_page_6.json
+|           |   manga_page_7.json
+|           |   manga_page_8.json
+|           |   manga_page_9.json
+|           |   
+|           +---recommendations
+|           |       manga_100128_recommendations.json
+|           |       manga_103897_recommendations.json
+|           |       manga_104565_recommendations.json
+|           |       manga_113138_recommendations.json
+|           |       manga_1133_recommendations.json
+|           |       manga_114745_recommendations.json
+|           |       manga_116778_recommendations.json
+|           |       manga_119161_recommendations.json
+|           |       manga_11_recommendations.json
+|           |       manga_121496_recommendations.json
+|           |       manga_122663_recommendations.json
+|           |       manga_126146_recommendations.json
+|           |       manga_12_recommendations.json
+|           |       manga_135496_recommendations.json
+|           |       manga_13_recommendations.json
+|           |       manga_16765_recommendations.json
+|           |       manga_1706_recommendations.json
+|           |       manga_1_recommendations.json
+|           |       manga_21_recommendations.json
+|           |       manga_23390_recommendations.json
+|           |       manga_24294_recommendations.json
+|           |       manga_25_recommendations.json
+|           |       manga_26_recommendations.json
+|           |       manga_2_recommendations.json
+|           |       manga_3009_recommendations.json
+|           |       manga_31499_recommendations.json
+|           |       manga_33327_recommendations.json
+|           |       manga_35243_recommendations.json
+|           |       manga_3986_recommendations.json
+|           |       manga_3_recommendations.json
+|           |       manga_42451_recommendations.json
+|           |       manga_436_recommendations.json
+|           |       manga_44347_recommendations.json
+|           |       manga_4632_recommendations.json
+|           |       manga_51_recommendations.json
+|           |       manga_564_recommendations.json
+|           |       manga_56805_recommendations.json
+|           |       manga_583_recommendations.json
+|           |       manga_598_recommendations.json
+|           |       manga_642_recommendations.json
+|           |       manga_656_recommendations.json
+|           |       manga_70345_recommendations.json
+|           |       manga_75989_recommendations.json
+|           |       manga_81117_recommendations.json
+|           |       manga_86337_recommendations.json
+|           |       manga_90125_recommendations.json
+|           |       manga_908_recommendations.json
+|           |       manga_96792_recommendations.json
+|           |       manga_98270_recommendations.json
+|           |       manga_99007_recommendations.json
+|           |       
+|           +---search
+|           |       search_page_1.json
+|           |       search_page_10.json
+|           |       search_page_2.json
+|           |       search_page_3.json
+|           |       search_page_4.json
+|           |       search_page_5.json
+|           |       search_page_6.json
+|           |       search_page_7.json
+|           |       search_page_8.json
+|           |       search_page_9.json
+|           |       
+|           \---top
+|                   top_manga_page_1.json
+|                   top_manga_page_10.json
+|                   top_manga_page_2.json
+|                   top_manga_page_3.json
+|                   top_manga_page_4.json
+|                   top_manga_page_5.json
+|                   top_manga_page_6.json
+|                   top_manga_page_7.json
+|                   top_manga_page_8.json
+|                   top_manga_page_9.json
+|                   
++---docs
+|   |   recommandation_tests_v0_6.md
+|   |   STABILISATION_V0_8.md
+|   |   
+|   +---02_data
+|   |       data_model_v1.md
+|   |       data_pipeline_v1.md
+|   |       
+|   +---03_technical
+|   |       mangadvisor_architecture_v1.md
+|   |       project_structure.md
+|   |       
+|   \---reports
+|           jikan_recommendation_edges_diagnostic.md
+|           library_goal_tests_v0_8_3.md
+|           library_import_robustness_tests_v0_8_11.md
+|           library_import_tests_v0_8_10.md
+|           library_recommendation_tests_v0_8_1.md
+|           library_recommendation_tests_v0_8_2.md
+|           library_recommendation_tests_v0_8_2_profile_summary.md
+|           library_status_tests_v0_8_4.md
+|           library_status_tests_v0_8_5.md
+|           Mangadvisor V0.7 Data Foundation.docx
+|           project_file_audit_v0_8_13.txt
+|           recommendation_profile_tests_latest.md
+|           recommendation_profile_tests_v0_6.md
+|           recommendation_profile_tests_v0_7_1.md
+|           recommendation_profile_tests_v0_7_2.md
+|           recommendation_profile_tests_v0_7_3.md
+|           recommendation_profile_tests_v0_7_4.md
+|           recommendation_profile_tests_v0_8_0.md
+|           
++---infra
+|   +---compose
+|   |       docker-compose.dev.yml
+|   |       docker-compose.yml
+|   |       
+|   \---docker
+|       +---api
+|       |       Dockerfile
+|       |       
+|       +---engine
+|       |       Dockerfile
+|       |       
+|       \---ui
+|               Dockerfile
+|               
++---legacy
+|   \---full_stack_2026_03
+|       |   .env
+|       |   .gitattributes
+|       |   .gitignore
+|       |   arborescence.txt
+|       |   docker-compose.dev.yml
+|       |   docker-compose.full.yml
+|       |   docker-compose.yml
+|       |   README.md
+|       |   
+|       +---data
+|       |   +---outputs
+|       |   +---processed
+|       |   |       mangas_#.csv
+|       |   |       mangas_A.csv
+|       |   |       mangas_B.csv
+|       |   |       mangas_C.csv
+|       |   |       mangas_D.csv
+|       |   |       mangas_E.csv
+|       |   |       mangas_F.csv
+|       |   |       mangas_G.csv
+|       |   |       mangas_H.csv
+|       |   |       mangas_I.csv
+|       |   |       mangas_J.csv
+|       |   |       mangas_K.csv
+|       |   |       mangas_L.csv
+|       |   |       mangas_M.csv
+|       |   |       mangas_N.csv
+|       |   |       mangas_O.csv
+|       |   |       mangas_P.csv
+|       |   |       mangas_Q.csv
+|       |   |       mangas_R.csv
+|       |   |       mangas_S.csv
+|       |   |       mangas_T.csv
+|       |   |       mangas_U.csv
+|       |   |       mangas_V.csv
+|       |   |       mangas_W.csv
+|       |   |       mangas_X.csv
+|       |   |       mangas_Y.csv
+|       |   |       mangas_Z.csv
+|       |   |       
+|       |   +---profile
+|       |   +---raw
+|       |   \---tmp
+|       +---docs
+|       +---infra
+|       |   +---dbt
+|       |   |       dbt_project.yml
+|       |   |       packages.yml
+|       |   |       profiles.yml
+|       |   |       
+|       |   +---grafana
+|       |   |   +---dashboards
+|       |   |   |       dashboard.yaml
+|       |   |   |       mangadvisor-api.json
+|       |   |   |       
+|       |   |   \---provisioning
+|       |   |       \---datasources
+|       |   |               prometheus.yaml
+|       |   |               
+|       |   +---minio
+|       |   |   \---init
+|       |   |           init_minio.sh
+|       |   |           
+|       |   +---nginx
+|       |   |       nginx.conf
+|       |   |       
+|       |   +---pgadmin
+|       |   |   |   pgadmin4.db
+|       |   |   |   
+|       |   |   +---azurecredentialcache
+|       |   |   +---sessions
+|       |   |   |       0062873c-59c6-47f9-8dd1-55df3935b735
+|       |   |   |       031bb926-3921-4a5f-acf8-af90d6a22363
+|       |   |   |       04330acf-7d57-4964-8f92-948f9a5a87da
+|       |   |   |       0dd4749c-7df6-4551-a163-7046f931a2db
+|       |   |   |       1519d344-c390-470c-bd81-9166776e86ac
+|       |   |   |       1f6f11f3-9fa5-4505-a77c-0d8972ede814
+|       |   |   |       2915f598-9951-4a89-8517-4fb8dffd723b
+|       |   |   |       2a0e90ea-5de2-41d9-b493-8099893aec3e
+|       |   |   |       2c0612f6-3ae1-4171-8a06-85ae8e67bc14
+|       |   |   |       3bb97fe4-ddfc-49f6-9daa-65303b46d71f
+|       |   |   |       441691a4-5d5d-45d6-b0cd-2825133bfb0a
+|       |   |   |       4770d9c2-98be-429b-894e-1193edf0d90e
+|       |   |   |       4adcd83b-023b-48c3-acbe-4f89619d7bbb
+|       |   |   |       4f4e9594-9197-485a-86b4-b2d370c219b0
+|       |   |   |       56fb7809-588a-4f5f-a0d7-2e6d81485497
+|       |   |   |       624e1d0f-85c9-448c-88ad-88a3f3960b02
+|       |   |   |       730803ec-ff7b-40ad-8b37-791f22334fcb
+|       |   |   |       739dae4f-a749-43c1-b3ef-39791250318e
+|       |   |   |       75e64b66-7044-4ba3-9cbc-e46bf2772e2d
+|       |   |   |       7985df70-8d3a-406d-aaa2-8a38f5814f86
+|       |   |   |       7a464356-7465-4f2e-badf-f9db04bd843d
+|       |   |   |       7fafa85d-91e1-4743-be54-7c77d51a6f53
+|       |   |   |       85f64f80-b906-477b-969a-270177868ff1
+|       |   |   |       8afcc3f2-e958-4105-851e-bf3e7a8600e7
+|       |   |   |       8d055664-f047-4500-9d10-e734a6a80ec8
+|       |   |   |       95437d48-57fe-486d-a9ec-9cbdaa080659
+|       |   |   |       98047856-ff62-459c-9f0b-6756d78902be
+|       |   |   |       993567bd-998c-4e24-82f7-11913fbec39a
+|       |   |   |       9b92c773-b2c7-4f46-9aa8-c29eb5eda586
+|       |   |   |       9d9fc5ab-3ef9-45b1-a3ee-ba9bb4261cfe
+|       |   |   |       9ddf9508-e7c8-48f5-97af-ae6e4cfb690e
+|       |   |   |       9ebbdddb-3d7e-4098-8a98-011494786b58
+|       |   |   |       c528bb19-1a59-43c7-92a3-2cb309f108ff
+|       |   |   |       d4a79069-659a-45b5-9d4b-738551ae6171
+|       |   |   |       da38aee1-2709-4d99-8682-3b4460f5d7a6
+|       |   |   |       f1e84802-402b-419e-a692-64403877cb21
+|       |   |   |       f3546316-970d-4a02-b627-6279f78fc0db
+|       |   |   |       f5709b21-5c22-469b-815f-eb4c5ac5424e
+|       |   |   |       f86a3c39-e686-4870-a4f4-1922236444cd
+|       |   |   |       
+|       |   |   \---storage
+|       |   +---postgres
+|       |   |   \---init
+|       |   \---prometheus
+|       |           prometheus.yml
+|       |           
+|       +---notebooks
+|       |   |   01_Scraping_API_Jikan.ipynb
+|       |   |   02_Scraping_API_AniList.ipynb
+|       |   |   03_Scraping_MangaNews.ipynb
+|       |   |   04_Rapprochement.ipynb
+|       |   |   README.md
+|       |   |   
+|       |   \---src
+|       |       |   config.py
+|       |       |   
+|       |       \---__pycache__
+|       |               config.cpython-311.pyc
+|       |               config.cpython-39.pyc
+|       |               
+|       +---scripts
+|       |   \---ps
+|       \---services
+|           +---api
+|           |   |   .dockerignore
+|           |   |   Dockerfile
+|           |   |   requirements.txt
+|           |   |   
+|           |   \---app
+|           |       |   deps.py
+|           |       |   main.py
+|           |       |   
+|           |       +---db
+|           |       +---models
+|           |       +---routers
+|           |       \---utils
+|           +---dbt
+|           +---engine
+|           |   |   .dockerignore
+|           |   |   Dockerfile
+|           |   |   requirements.txt
+|           |   |   
+|           |   \---scripts
+|           |           scrape_anilist.py
+|           |           scrape_jikan.py
+|           |           scrape_manganews.py
+|           |           
+|           +---scheduler
+|           |       app.py
+|           |       Dockerfile
+|           |       requirements.txt
+|           |       
+|           +---ui
+|           |       .dockerignore
+|           |       app.py
+|           |       Dockerfile
+|           |       requirements.txt
+|           |       
+|           \---ui_streamlit
+|               |   .dockerignore
+|               |   Dockerfile
+|               |   requirements.txt
+|               |   
+|               \---app
+|                       app.py
+|                       
++---pipelines
+|   |   __init__.py
+|   |   
+|   \---engine
+|       |   requirements.txt
+|       |   
+|       +---scripts
+|       |       analyze_jikan_recommendation_edges.py
+|       |       extract_jikan.py
+|       |       extract_jikan.py.bak_v0_7
+|       |       extract_jikan_recommendations.py
+|       |       load_jikan_recommendations_to_postgres.py
+|       |       load_jikan_to_postgres.py
+|       |       load_jikan_to_postgres.py.bak_v0_7
+|       |       run_jikan_pipeline.py
+|       |       run_library_goal_tests.py
+|       |       run_library_import_robustness_tests.py
+|       |       run_library_import_tests.py
+|       |       run_library_recommendation_tests.py
+|       |       run_library_recommendation_tests.py.bak_profile_summary
+|       |       run_library_recommendation_tests.py.bak_v0_8_2
+|       |       run_library_status_tests.py
+|       |       run_library_status_tests.py.bak_v0_8_5
+|       |       run_recommendation_profile_tests.py
+|       |       run_recommendation_profile_tests.py.bak_intent_mode
+|       |       run_recommendation_profile_tests.py.bak_v0_7_4
+|       |       
+|       \---src
+|           |   __init__.py
+|           |   
+|           +---extract
+|           |   |   jikan_client.py
+|           |   |   __init__.py
+|           |   |   
+|           |   \---__pycache__
+|           |           jikan_client.cpython-311.pyc
+|           |           __init__.cpython-311.pyc
+|           |           
+|           \---load
+|               |   postgres_loader.py
+|               |   __init__.py
+|               |   
+|               \---__pycache__
+|                       postgres_loader.cpython-311.pyc
+|                       __init__.cpython-311.pyc
+|                       
++---sql
+|   +---queries
+|   |       check_jikan_data_quality.sql
+|   |       check_jikan_source_data.sql
+|   |       inspect_jikan_attributes.sql
+|   |       
+|   \---schema
+|           001_jikan_source_tables.sql
+|           002_canonical_manga_tables.sql
+|           003_build_canonical_from_jikan.sql
+|           004_add_theme_demographic_tables.sql
+|           005_build_theme_demographic_from_jikan.sql
+|           006_add_jikan_recommendation_tables.sql
+|           007_add_user_library_tables.sql
+|           
+\---tools
+        fix_library_goal_ui_payload_v0_8_3.py
+        fix_v0_7_3_percent_placeholders.py
+        patch_import_templates_ui_v0_8_9.py
+        patch_intent_mode.py
+        patch_library_api_v0_8.py
+        patch_library_goal_ui_v0_8_3.py
+        patch_library_goal_v0_8_3.py
+        patch_library_import_csv_ui_v0_8_7.py
+        patch_library_import_csv_v0_8_7.py
+        patch_library_import_excel_ui_v0_8_8.py
+        patch_library_low_score_v0_8_5.py
+        patch_library_low_score_v0_8_5_v2.py
+        patch_library_low_score_v0_8_5_v3.py
+        patch_library_profile_ui_v0_8_6.py
+        patch_library_profile_v0_8_6.py
+        patch_library_reco_v0_8_2.py
+        patch_library_report_profile_summary.py
+        patch_library_ui_v0_8.py
+        patch_v0_7_3.py
+        patch_v0_7_4.py
+        
+ 
+================================================== 
+5. Fichiers de sauvegarde / backup 
+================================================== 
+F:\1.Boulot\03_Github\mangadvisor\apps\api\app\main.py.bak
+ 
+================================================== 
+6. Scripts de patch / outils temporaires 
+================================================== 
+F:\1.Boulot\03_Github\mangadvisor\tools\fix_library_goal_ui_payload_v0_8_3.py
+F:\1.Boulot\03_Github\mangadvisor\tools\fix_v0_7_3_percent_placeholders.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_import_templates_ui_v0_8_9.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_intent_mode.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_api_v0_8.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_goal_ui_v0_8_3.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_goal_v0_8_3.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_import_csv_ui_v0_8_7.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_import_csv_v0_8_7.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_import_excel_ui_v0_8_8.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_low_score_v0_8_5.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_low_score_v0_8_5_v2.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_low_score_v0_8_5_v3.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_profile_ui_v0_8_6.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_profile_v0_8_6.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_reco_v0_8_2.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_report_profile_summary.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_ui_v0_8.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_v0_7_3.py
+F:\1.Boulot\03_Github\mangadvisor\tools\patch_v0_7_4.py
+ 
+================================================== 
+7. Scripts CMD 
+================================================== 
+F:\1.Boulot\03_Github\mangadvisor\cmd\audit-project-files.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\build.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\clean.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\common.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\diagnose-jikan-recommendations.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\down.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\extract-jikan-recommendations.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\install-check.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\load-jikan-recommendations.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\logs.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\nuke.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\rebuild-canonical-catalog.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\restart.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-jikan-catalog.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-jikan-pipeline.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-library-goal-tests.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-library-import-robustness-tests.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-library-import-tests.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-library-recommendation-tests.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-library-status-tests.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-recommendation-tests.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\run-v0-8-validation.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\start.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\status.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\stop.cmd
+F:\1.Boulot\03_Github\mangadvisor\cmd\up.cmd
+ 
+================================================== 
+8. Rapports docs/reports 
+================================================== 
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\jikan_recommendation_edges_diagnostic.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_goal_tests_v0_8_3.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_import_robustness_tests_v0_8_11.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_import_tests_v0_8_10.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_recommendation_tests_v0_8_1.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_recommendation_tests_v0_8_2.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_recommendation_tests_v0_8_2_profile_summary.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_status_tests_v0_8_4.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_status_tests_v0_8_5.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\Mangadvisor V0.7 Data Foundation.docx
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\project_file_audit_v0_8_13.txt
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_latest.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_6.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_1.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_2.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_3.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_4.md
+F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_8_0.md
+ 
+================================================== 
+9. Fichiers Docker Compose 
+================================================== 
+F:\1.Boulot\03_Github\mangadvisor\infra\compose\docker-compose.dev.yml
+F:\1.Boulot\03_Github\mangadvisor\infra\compose\docker-compose.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\docker-compose.dev.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\docker-compose.full.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\docker-compose.yml
+ 
+================================================== 
+10. Dossiers legacy 
+================================================== 
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\.env
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\.gitattributes
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\.gitignore
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\arborescence.txt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\docker-compose.dev.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\docker-compose.full.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\docker-compose.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\docs
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\README.md
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\scripts
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\outputs
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\profile
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\raw
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\tmp
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_#.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_A.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_B.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_C.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_D.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_E.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_F.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_G.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_H.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_I.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_J.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_K.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_L.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_M.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_N.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_O.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_P.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_Q.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_R.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_S.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_T.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_U.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_V.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_W.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_X.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_Y.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\data\processed\mangas_Z.csv
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\dbt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\grafana
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\minio
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\nginx
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\postgres
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\prometheus
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\dbt\dbt_project.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\dbt\packages.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\dbt\profiles.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\grafana\dashboards
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\grafana\provisioning
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\grafana\dashboards\dashboard.yaml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\grafana\dashboards\mangadvisor-api.json
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\grafana\provisioning\datasources
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\grafana\provisioning\datasources\prometheus.yaml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\minio\init
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\minio\init\init_minio.sh
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\nginx\nginx.conf
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\azurecredentialcache
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\pgadmin4.db
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\storage
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\0062873c-59c6-47f9-8dd1-55df3935b735
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\031bb926-3921-4a5f-acf8-af90d6a22363
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\04330acf-7d57-4964-8f92-948f9a5a87da
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\0dd4749c-7df6-4551-a163-7046f931a2db
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\1519d344-c390-470c-bd81-9166776e86ac
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\1f6f11f3-9fa5-4505-a77c-0d8972ede814
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\2915f598-9951-4a89-8517-4fb8dffd723b
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\2a0e90ea-5de2-41d9-b493-8099893aec3e
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\2c0612f6-3ae1-4171-8a06-85ae8e67bc14
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\3bb97fe4-ddfc-49f6-9daa-65303b46d71f
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\441691a4-5d5d-45d6-b0cd-2825133bfb0a
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\4770d9c2-98be-429b-894e-1193edf0d90e
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\4adcd83b-023b-48c3-acbe-4f89619d7bbb
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\4f4e9594-9197-485a-86b4-b2d370c219b0
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\56fb7809-588a-4f5f-a0d7-2e6d81485497
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\624e1d0f-85c9-448c-88ad-88a3f3960b02
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\730803ec-ff7b-40ad-8b37-791f22334fcb
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\739dae4f-a749-43c1-b3ef-39791250318e
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\75e64b66-7044-4ba3-9cbc-e46bf2772e2d
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\7985df70-8d3a-406d-aaa2-8a38f5814f86
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\7a464356-7465-4f2e-badf-f9db04bd843d
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\7fafa85d-91e1-4743-be54-7c77d51a6f53
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\85f64f80-b906-477b-969a-270177868ff1
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\8afcc3f2-e958-4105-851e-bf3e7a8600e7
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\8d055664-f047-4500-9d10-e734a6a80ec8
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\95437d48-57fe-486d-a9ec-9cbdaa080659
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\98047856-ff62-459c-9f0b-6756d78902be
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\993567bd-998c-4e24-82f7-11913fbec39a
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9b92c773-b2c7-4f46-9aa8-c29eb5eda586
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9d9fc5ab-3ef9-45b1-a3ee-ba9bb4261cfe
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9ddf9508-e7c8-48f5-97af-ae6e4cfb690e
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9ebbdddb-3d7e-4098-8a98-011494786b58
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\c528bb19-1a59-43c7-92a3-2cb309f108ff
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\d4a79069-659a-45b5-9d4b-738551ae6171
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\da38aee1-2709-4d99-8682-3b4460f5d7a6
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f1e84802-402b-419e-a692-64403877cb21
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f3546316-970d-4a02-b627-6279f78fc0db
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f5709b21-5c22-469b-815f-eb4c5ac5424e
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f86a3c39-e686-4870-a4f4-1922236444cd
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\postgres\init
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\prometheus\prometheus.yml
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\01_Scraping_API_Jikan.ipynb
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\02_Scraping_API_AniList.ipynb
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\03_Scraping_MangaNews.ipynb
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\04_Rapprochement.ipynb
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\README.md
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\config.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\__pycache__
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\__pycache__\config.cpython-311.pyc
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\__pycache__\config.cpython-39.pyc
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\scripts\ps
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\dbt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\scheduler
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui_streamlit
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\.dockerignore
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\app
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\Dockerfile
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\requirements.txt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\app\db
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\app\deps.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\app\main.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\app\models
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\app\routers
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api\app\utils
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine\.dockerignore
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine\Dockerfile
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine\requirements.txt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine\scripts
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine\scripts\scrape_anilist.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine\scripts\scrape_jikan.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\engine\scripts\scrape_manganews.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\scheduler\app.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\scheduler\Dockerfile
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\scheduler\requirements.txt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui\.dockerignore
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui\app.py
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui\Dockerfile
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui\requirements.txt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui_streamlit\.dockerignore
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui_streamlit\app
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui_streamlit\Dockerfile
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui_streamlit\requirements.txt
+F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\ui_streamlit\app\app.py
+ 
+================================================== 
+Audit termine 
+================================================== 

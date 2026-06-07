@@ -1,0 +1,20 @@
+# =============================================================================
+# Mangadvisor — API (FastAPI)
+# Objectif : image lean, dépendances strictement nécessaires à l’API.
+# Python 3.11 (wheels stables) — pas de toolchain C requis.
+# =============================================================================
+
+# --- Web / API ---
+fastapi==0.115.0                 # framework API
+uvicorn[standard]==0.30.6        # serveur ASGI (watchdog, uvloop, etc.)
+httpx==0.27.2                    # client HTTP async (calls vers Ollama, etc.)
+prometheus-client==0.21.0        # exposition /metrics
+
+# --- Modélisation / validation ---
+pydantic==2.9.2                  # schémas d’E/S
+
+# --- Base de données ---
+psycopg[binary]==3.2.3           # driver Postgres (binaire : pas de gcc/libpq)
+ 
+redis==5.0.8
+requests==2.32.3

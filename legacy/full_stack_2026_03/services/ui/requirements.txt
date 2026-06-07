@@ -1,0 +1,5 @@
+# requirements.txt — mangadvisor-ui (NiceGUI)
+nicegui==1.4.22
+httpx==0.27.2
+pandas==2.2.2
+numpy==1.26.4
