@@ -25,3 +25,10 @@ data/logs/*
 # OS
 Thumbs.db
 .DS_Store
+
+# Legacy runtime / secrets
+legacy/**/.env
+legacy/**/pgadmin4.db
+legacy/**/infra/pgadmin/sessions/
+legacy/**/infra/pgadmin/storage/
+legacy/**/infra/pgadmin/azurecredentialcache/
