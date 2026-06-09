@@ -1,21 +1,27 @@
-__pycache__/
-*.pyc
-
+# Environnement local
 .env
-
 venv/
 .venv/
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Données générées / temporaires
 data/raw/*
 data/staging/*
 data/curated/*
 data/features/*
 data/logs/*
 
+# Jupyter
 .ipynb_checkpoints/
 
+# IDE
 .vscode/
 .idea/
 
+# OS
 Thumbs.db
 .DS_Store
