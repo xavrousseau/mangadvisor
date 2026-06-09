@@ -3,73 +3,18 @@
 ================================================== 
  
 Projet : F:\1.Boulot\03_Github\mangadvisor\cmd\.. 
-Date   : 07/06/2026 18:43:33,43 
+Date   : 07/06/2026 19:42:44,61 
  
 ================================================== 
 1. Git status 
 ================================================== 
- D .gitattributes
- M .gitignore
- D api/.dockerignore
- D api/Dockerfile
- D api/app/main.py
- D docker-compose.yml
- D engine/.dockerignore
- D engine/Dockerfile
- D metrics/prometheus.yml
- D metrics/provisioning/dashboards/dashboard.yaml
- D metrics/provisioning/dashboards/mangadvisor-api.json
- D metrics/provisioning/datasources/prometheus.yaml
- D notebooks/01_Scraping_API_Jikan.ipynb
- D notebooks/02_Scraping_API_AniList.ipynb
- D notebooks/03_Scraping_MangaNews.ipynb
- D notebooks/04_Rapprochement.ipynb
- D notebooks/README.md
- D ui/.dockerignore
- D ui/Dockerfile
-?? .env.example
-?? README.md
-?? apps/
-?? cd
-?? cmd/
-?? data/
-?? docker
-?? docs/
-?? infra/
-?? legacy/
-?? mangadvisor.cmd
-?? pipelines/
-?? pyproject.toml
-?? sql/
-?? tools/
+ M docs/reports/project_file_audit_v0_8_13.txt
  
 ================================================== 
 2. Fichiers suivis par Git 
 ================================================== 
-.gitattributes
-.gitignore
-api/.dockerignore
-api/Dockerfile
-api/app/main.py
-docker-compose.yml
-engine/.dockerignore
-engine/Dockerfile
-metrics/prometheus.yml
-metrics/provisioning/dashboards/dashboard.yaml
-metrics/provisioning/dashboards/mangadvisor-api.json
-metrics/provisioning/datasources/prometheus.yaml
-notebooks/01_Scraping_API_Jikan.ipynb
-notebooks/02_Scraping_API_AniList.ipynb
-notebooks/03_Scraping_MangaNews.ipynb
-notebooks/04_Rapprochement.ipynb
-notebooks/README.md
-ui/.dockerignore
-ui/Dockerfile
- 
-================================================== 
-3. Fichiers non suivis par Git 
-================================================== 
 .env.example
+.gitignore
 README.md
 apps/api/app/main.py
 apps/api/app/main.py.bak
@@ -297,10 +242,14 @@ tools/patch_v0_7_3.py
 tools/patch_v0_7_4.py
  
 ================================================== 
+3. Fichiers non suivis par Git 
+================================================== 
+ 
+================================================== 
 4. Arborescence complete 
 ================================================== 
 Structure du dossier pour le volume Extreme SSD
-Le numéro de série du volume est 00000076 1E3D:FE34
+Le numéro de série du volume est 00000041 1E3D:FE34
 F:.
 |   .env
 |   .env.example
