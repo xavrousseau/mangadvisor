@@ -3,7 +3,7 @@
 ================================================== 
  
 Projet : F:\1.Boulot\03_Github\mangadvisor\cmd\.. 
-Date   : 07/06/2026 19:42:44,61 
+Date   : 09/06/2026 13:21:03,41 
  
 ================================================== 
 1. Git status 
@@ -16,32 +16,68 @@ Date   : 07/06/2026 19:42:44,61
 .env.example
 .gitignore
 README.md
+_archive/v0_8_13_cleanup/backups/app.py.bak_community_bonus
+_archive/v0_8_13_cleanup/backups/app.py.bak_import_templates_v0_8_9
+_archive/v0_8_13_cleanup/backups/app.py.bak_intent_mode
+_archive/v0_8_13_cleanup/backups/app.py.bak_library_goal_ui_v0_8_3
+_archive/v0_8_13_cleanup/backups/app.py.bak_library_import_csv_v0_8_7
+_archive/v0_8_13_cleanup/backups/app.py.bak_library_import_excel_v0_8_8
+_archive/v0_8_13_cleanup/backups/app.py.bak_library_profile_v0_8_6
+_archive/v0_8_13_cleanup/backups/app.py.bak_library_ui_v0_8
+_archive/v0_8_13_cleanup/backups/app.py.bak_page_detail_manga
+_archive/v0_8_13_cleanup/backups/extract_jikan.py.bak_v0_7
+_archive/v0_8_13_cleanup/backups/load_jikan_to_postgres.py.bak_v0_7
+_archive/v0_8_13_cleanup/backups/main.py.bak
+_archive/v0_8_13_cleanup/backups/main.py.bak_community_bonus
+_archive/v0_8_13_cleanup/backups/main.py.bak_intent_mode
+_archive/v0_8_13_cleanup/backups/main.py.bak_library_api_v0_8
+_archive/v0_8_13_cleanup/backups/main.py.bak_library_goal_v0_8_3
+_archive/v0_8_13_cleanup/backups/main.py.bak_library_import_v0_8_7
+_archive/v0_8_13_cleanup/backups/main.py.bak_library_profile_v0_8_6
+_archive/v0_8_13_cleanup/backups/main.py.bak_library_v0_8_2
+_archive/v0_8_13_cleanup/backups/main.py.bak_library_v0_8_5
+_archive/v0_8_13_cleanup/backups/main.py.bak_v0_7_1
+_archive/v0_8_13_cleanup/backups/main.py.bak_v0_7_2
+_archive/v0_8_13_cleanup/backups/main.py.bak_v0_7_4
+_archive/v0_8_13_cleanup/backups/run_library_recommendation_tests.py.bak_profile_summary
+_archive/v0_8_13_cleanup/backups/run_library_recommendation_tests.py.bak_v0_8_2
+_archive/v0_8_13_cleanup/backups/run_library_status_tests.py.bak_v0_8_5
+_archive/v0_8_13_cleanup/backups/run_recommendation_profile_tests.py.bak_intent_mode
+_archive/v0_8_13_cleanup/backups/run_recommendation_profile_tests.py.bak_v0_7_4
+_archive/v0_8_13_cleanup/old_reports/library_recommendation_tests_v0_8_1.md
+_archive/v0_8_13_cleanup/old_reports/library_recommendation_tests_v0_8_2.md
+_archive/v0_8_13_cleanup/old_reports/library_status_tests_v0_8_4.md
+_archive/v0_8_13_cleanup/old_reports/recommendation_profile_tests_v0_6.md
+_archive/v0_8_13_cleanup/old_reports/recommendation_profile_tests_v0_7_1.md
+_archive/v0_8_13_cleanup/old_reports/recommendation_profile_tests_v0_7_2.md
+_archive/v0_8_13_cleanup/old_reports/recommendation_profile_tests_v0_7_3.md
+_archive/v0_8_13_cleanup/old_reports/recommendation_profile_tests_v0_8_0.md
+_archive/v0_8_13_cleanup/tools_patches/fix_library_goal_ui_payload_v0_8_3.py
+_archive/v0_8_13_cleanup/tools_patches/fix_v0_7_3_percent_placeholders.py
+_archive/v0_8_13_cleanup/tools_patches/patch_import_templates_ui_v0_8_9.py
+_archive/v0_8_13_cleanup/tools_patches/patch_intent_mode.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_api_v0_8.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_goal_ui_v0_8_3.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_goal_v0_8_3.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_import_csv_ui_v0_8_7.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_import_csv_v0_8_7.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_import_excel_ui_v0_8_8.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_low_score_v0_8_5.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_low_score_v0_8_5_v2.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_low_score_v0_8_5_v3.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_profile_ui_v0_8_6.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_profile_v0_8_6.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_reco_v0_8_2.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_report_profile_summary.py
+_archive/v0_8_13_cleanup/tools_patches/patch_library_ui_v0_8.py
+_archive/v0_8_13_cleanup/tools_patches/patch_v0_7_3.py
+_archive/v0_8_13_cleanup/tools_patches/patch_v0_7_4.py
 apps/api/app/main.py
-apps/api/app/main.py.bak
-apps/api/app/main.py.bak_community_bonus
-apps/api/app/main.py.bak_intent_mode
-apps/api/app/main.py.bak_library_api_v0_8
-apps/api/app/main.py.bak_library_goal_v0_8_3
-apps/api/app/main.py.bak_library_import_v0_8_7
-apps/api/app/main.py.bak_library_profile_v0_8_6
-apps/api/app/main.py.bak_library_v0_8_2
-apps/api/app/main.py.bak_library_v0_8_5
-apps/api/app/main.py.bak_v0_7_1
-apps/api/app/main.py.bak_v0_7_2
-apps/api/app/main.py.bak_v0_7_4
 apps/api/requirements.txt
 apps/ui/app/app.py
-apps/ui/app/app.py.bak_community_bonus
-apps/ui/app/app.py.bak_import_templates_v0_8_9
-apps/ui/app/app.py.bak_intent_mode
-apps/ui/app/app.py.bak_library_goal_ui_v0_8_3
-apps/ui/app/app.py.bak_library_import_csv_v0_8_7
-apps/ui/app/app.py.bak_library_import_excel_v0_8_8
-apps/ui/app/app.py.bak_library_profile_v0_8_6
-apps/ui/app/app.py.bak_library_ui_v0_8
-apps/ui/app/app.py.bak_page_detail_manga
 apps/ui/requirements.txt
 cd
+cmd/archive-v0-8-temp-files.cmd
 cmd/audit-project-files.cmd
 cmd/build.cmd
 cmd/clean.cmd
@@ -82,19 +118,11 @@ docs/reports/jikan_recommendation_edges_diagnostic.md
 docs/reports/library_goal_tests_v0_8_3.md
 docs/reports/library_import_robustness_tests_v0_8_11.md
 docs/reports/library_import_tests_v0_8_10.md
-docs/reports/library_recommendation_tests_v0_8_1.md
-docs/reports/library_recommendation_tests_v0_8_2.md
 docs/reports/library_recommendation_tests_v0_8_2_profile_summary.md
-docs/reports/library_status_tests_v0_8_4.md
 docs/reports/library_status_tests_v0_8_5.md
 docs/reports/project_file_audit_v0_8_13.txt
 docs/reports/recommendation_profile_tests_latest.md
-docs/reports/recommendation_profile_tests_v0_6.md
-docs/reports/recommendation_profile_tests_v0_7_1.md
-docs/reports/recommendation_profile_tests_v0_7_2.md
-docs/reports/recommendation_profile_tests_v0_7_3.md
 docs/reports/recommendation_profile_tests_v0_7_4.md
-docs/reports/recommendation_profile_tests_v0_8_0.md
 infra/compose/docker-compose.dev.yml
 infra/compose/docker-compose.yml
 infra/docker/api/Dockerfile
@@ -187,23 +215,16 @@ pipelines/__init__.py
 pipelines/engine/requirements.txt
 pipelines/engine/scripts/analyze_jikan_recommendation_edges.py
 pipelines/engine/scripts/extract_jikan.py
-pipelines/engine/scripts/extract_jikan.py.bak_v0_7
 pipelines/engine/scripts/extract_jikan_recommendations.py
 pipelines/engine/scripts/load_jikan_recommendations_to_postgres.py
 pipelines/engine/scripts/load_jikan_to_postgres.py
-pipelines/engine/scripts/load_jikan_to_postgres.py.bak_v0_7
 pipelines/engine/scripts/run_jikan_pipeline.py
 pipelines/engine/scripts/run_library_goal_tests.py
 pipelines/engine/scripts/run_library_import_robustness_tests.py
 pipelines/engine/scripts/run_library_import_tests.py
 pipelines/engine/scripts/run_library_recommendation_tests.py
-pipelines/engine/scripts/run_library_recommendation_tests.py.bak_profile_summary
-pipelines/engine/scripts/run_library_recommendation_tests.py.bak_v0_8_2
 pipelines/engine/scripts/run_library_status_tests.py
-pipelines/engine/scripts/run_library_status_tests.py.bak_v0_8_5
 pipelines/engine/scripts/run_recommendation_profile_tests.py
-pipelines/engine/scripts/run_recommendation_profile_tests.py.bak_intent_mode
-pipelines/engine/scripts/run_recommendation_profile_tests.py.bak_v0_7_4
 pipelines/engine/src/__init__.py
 pipelines/engine/src/extract/__init__.py
 pipelines/engine/src/extract/jikan_client.py
@@ -220,26 +241,6 @@ sql/schema/004_add_theme_demographic_tables.sql
 sql/schema/005_build_theme_demographic_from_jikan.sql
 sql/schema/006_add_jikan_recommendation_tables.sql
 sql/schema/007_add_user_library_tables.sql
-tools/fix_library_goal_ui_payload_v0_8_3.py
-tools/fix_v0_7_3_percent_placeholders.py
-tools/patch_import_templates_ui_v0_8_9.py
-tools/patch_intent_mode.py
-tools/patch_library_api_v0_8.py
-tools/patch_library_goal_ui_v0_8_3.py
-tools/patch_library_goal_v0_8_3.py
-tools/patch_library_import_csv_ui_v0_8_7.py
-tools/patch_library_import_csv_v0_8_7.py
-tools/patch_library_import_excel_ui_v0_8_8.py
-tools/patch_library_low_score_v0_8_5.py
-tools/patch_library_low_score_v0_8_5_v2.py
-tools/patch_library_low_score_v0_8_5_v3.py
-tools/patch_library_profile_ui_v0_8_6.py
-tools/patch_library_profile_v0_8_6.py
-tools/patch_library_reco_v0_8_2.py
-tools/patch_library_report_profile_summary.py
-tools/patch_library_ui_v0_8.py
-tools/patch_v0_7_3.py
-tools/patch_v0_7_4.py
  
 ================================================== 
 3. Fichiers non suivis par Git 
@@ -249,7 +250,7 @@ tools/patch_v0_7_4.py
 4. Arborescence complete 
 ================================================== 
 Structure du dossier pour le volume Extreme SSD
-Le numéro de série du volume est 00000041 1E3D:FE34
+Le numéro de série du volume est 00000070 1E3D:FE34
 F:.
 |   .env
 |   .env.example
@@ -266,18 +267,6 @@ F:.
 |   |   |   
 |   |   \---app
 |   |       |   main.py
-|   |       |   main.py.bak
-|   |       |   main.py.bak_community_bonus
-|   |       |   main.py.bak_intent_mode
-|   |       |   main.py.bak_library_api_v0_8
-|   |       |   main.py.bak_library_goal_v0_8_3
-|   |       |   main.py.bak_library_import_v0_8_7
-|   |       |   main.py.bak_library_profile_v0_8_6
-|   |       |   main.py.bak_library_v0_8_2
-|   |       |   main.py.bak_library_v0_8_5
-|   |       |   main.py.bak_v0_7_1
-|   |       |   main.py.bak_v0_7_2
-|   |       |   main.py.bak_v0_7_4
 |   |       |   
 |   |       \---__pycache__
 |   |               main.cpython-311.pyc
@@ -287,17 +276,9 @@ F:.
 |       |   
 |       \---app
 |               app.py
-|               app.py.bak_community_bonus
-|               app.py.bak_import_templates_v0_8_9
-|               app.py.bak_intent_mode
-|               app.py.bak_library_goal_ui_v0_8_3
-|               app.py.bak_library_import_csv_v0_8_7
-|               app.py.bak_library_import_excel_v0_8_8
-|               app.py.bak_library_profile_v0_8_6
-|               app.py.bak_library_ui_v0_8
-|               app.py.bak_page_detail_manga
 |               
 +---cmd
+|       archive-v0-8-temp-files.cmd
 |       audit-project-files.cmd
 |       build.cmd
 |       clean.cmd
@@ -435,20 +416,12 @@ F:.
 |           library_goal_tests_v0_8_3.md
 |           library_import_robustness_tests_v0_8_11.md
 |           library_import_tests_v0_8_10.md
-|           library_recommendation_tests_v0_8_1.md
-|           library_recommendation_tests_v0_8_2.md
 |           library_recommendation_tests_v0_8_2_profile_summary.md
-|           library_status_tests_v0_8_4.md
 |           library_status_tests_v0_8_5.md
 |           Mangadvisor V0.7 Data Foundation.docx
 |           project_file_audit_v0_8_13.txt
 |           recommendation_profile_tests_latest.md
-|           recommendation_profile_tests_v0_6.md
-|           recommendation_profile_tests_v0_7_1.md
-|           recommendation_profile_tests_v0_7_2.md
-|           recommendation_profile_tests_v0_7_3.md
 |           recommendation_profile_tests_v0_7_4.md
-|           recommendation_profile_tests_v0_8_0.md
 |           
 +---infra
 |   +---compose
@@ -653,23 +626,16 @@ F:.
 |       +---scripts
 |       |       analyze_jikan_recommendation_edges.py
 |       |       extract_jikan.py
-|       |       extract_jikan.py.bak_v0_7
 |       |       extract_jikan_recommendations.py
 |       |       load_jikan_recommendations_to_postgres.py
 |       |       load_jikan_to_postgres.py
-|       |       load_jikan_to_postgres.py.bak_v0_7
 |       |       run_jikan_pipeline.py
 |       |       run_library_goal_tests.py
 |       |       run_library_import_robustness_tests.py
 |       |       run_library_import_tests.py
 |       |       run_library_recommendation_tests.py
-|       |       run_library_recommendation_tests.py.bak_profile_summary
-|       |       run_library_recommendation_tests.py.bak_v0_8_2
 |       |       run_library_status_tests.py
-|       |       run_library_status_tests.py.bak_v0_8_5
 |       |       run_recommendation_profile_tests.py
-|       |       run_recommendation_profile_tests.py.bak_intent_mode
-|       |       run_recommendation_profile_tests.py.bak_v0_7_4
 |       |       
 |       \---src
 |           |   __init__.py
@@ -705,61 +671,86 @@ F:.
 |           006_add_jikan_recommendation_tables.sql
 |           007_add_user_library_tables.sql
 |           
-\---tools
-        fix_library_goal_ui_payload_v0_8_3.py
-        fix_v0_7_3_percent_placeholders.py
-        patch_import_templates_ui_v0_8_9.py
-        patch_intent_mode.py
-        patch_library_api_v0_8.py
-        patch_library_goal_ui_v0_8_3.py
-        patch_library_goal_v0_8_3.py
-        patch_library_import_csv_ui_v0_8_7.py
-        patch_library_import_csv_v0_8_7.py
-        patch_library_import_excel_ui_v0_8_8.py
-        patch_library_low_score_v0_8_5.py
-        patch_library_low_score_v0_8_5_v2.py
-        patch_library_low_score_v0_8_5_v3.py
-        patch_library_profile_ui_v0_8_6.py
-        patch_library_profile_v0_8_6.py
-        patch_library_reco_v0_8_2.py
-        patch_library_report_profile_summary.py
-        patch_library_ui_v0_8.py
-        patch_v0_7_3.py
-        patch_v0_7_4.py
-        
++---tools
+\---_archive
+    \---v0_8_13_cleanup
+        +---backups
+        |       app.py.bak_community_bonus
+        |       app.py.bak_import_templates_v0_8_9
+        |       app.py.bak_intent_mode
+        |       app.py.bak_library_goal_ui_v0_8_3
+        |       app.py.bak_library_import_csv_v0_8_7
+        |       app.py.bak_library_import_excel_v0_8_8
+        |       app.py.bak_library_profile_v0_8_6
+        |       app.py.bak_library_ui_v0_8
+        |       app.py.bak_page_detail_manga
+        |       extract_jikan.py.bak_v0_7
+        |       load_jikan_to_postgres.py.bak_v0_7
+        |       main.py.bak
+        |       main.py.bak_community_bonus
+        |       main.py.bak_intent_mode
+        |       main.py.bak_library_api_v0_8
+        |       main.py.bak_library_goal_v0_8_3
+        |       main.py.bak_library_import_v0_8_7
+        |       main.py.bak_library_profile_v0_8_6
+        |       main.py.bak_library_v0_8_2
+        |       main.py.bak_library_v0_8_5
+        |       main.py.bak_v0_7_1
+        |       main.py.bak_v0_7_2
+        |       main.py.bak_v0_7_4
+        |       run_library_recommendation_tests.py.bak_profile_summary
+        |       run_library_recommendation_tests.py.bak_v0_8_2
+        |       run_library_status_tests.py.bak_v0_8_5
+        |       run_recommendation_profile_tests.py.bak_intent_mode
+        |       run_recommendation_profile_tests.py.bak_v0_7_4
+        |       
+        +---old_reports
+        |       library_recommendation_tests_v0_8_1.md
+        |       library_recommendation_tests_v0_8_2.md
+        |       library_status_tests_v0_8_4.md
+        |       recommendation_profile_tests_v0_6.md
+        |       recommendation_profile_tests_v0_7_1.md
+        |       recommendation_profile_tests_v0_7_2.md
+        |       recommendation_profile_tests_v0_7_3.md
+        |       recommendation_profile_tests_v0_8_0.md
+        |       
+        \---tools_patches
+                fix_library_goal_ui_payload_v0_8_3.py
+                fix_v0_7_3_percent_placeholders.py
+                patch_import_templates_ui_v0_8_9.py
+                patch_intent_mode.py
+                patch_library_api_v0_8.py
+                patch_library_goal_ui_v0_8_3.py
+                patch_library_goal_v0_8_3.py
+                patch_library_import_csv_ui_v0_8_7.py
+                patch_library_import_csv_v0_8_7.py
+                patch_library_import_excel_ui_v0_8_8.py
+                patch_library_low_score_v0_8_5.py
+                patch_library_low_score_v0_8_5_v2.py
+                patch_library_low_score_v0_8_5_v3.py
+                patch_library_profile_ui_v0_8_6.py
+                patch_library_profile_v0_8_6.py
+                patch_library_reco_v0_8_2.py
+                patch_library_report_profile_summary.py
+                patch_library_ui_v0_8.py
+                patch_v0_7_3.py
+                patch_v0_7_4.py
+                
  
 ================================================== 
 5. Fichiers de sauvegarde / backup 
 ================================================== 
-F:\1.Boulot\03_Github\mangadvisor\apps\api\app\main.py.bak
+F:\1.Boulot\03_Github\mangadvisor\_archive\v0_8_13_cleanup\backups
+F:\1.Boulot\03_Github\mangadvisor\_archive\v0_8_13_cleanup\backups\main.py.bak
  
 ================================================== 
 6. Scripts de patch / outils temporaires 
 ================================================== 
-F:\1.Boulot\03_Github\mangadvisor\tools\fix_library_goal_ui_payload_v0_8_3.py
-F:\1.Boulot\03_Github\mangadvisor\tools\fix_v0_7_3_percent_placeholders.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_import_templates_ui_v0_8_9.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_intent_mode.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_api_v0_8.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_goal_ui_v0_8_3.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_goal_v0_8_3.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_import_csv_ui_v0_8_7.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_import_csv_v0_8_7.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_import_excel_ui_v0_8_8.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_low_score_v0_8_5.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_low_score_v0_8_5_v2.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_low_score_v0_8_5_v3.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_profile_ui_v0_8_6.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_profile_v0_8_6.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_reco_v0_8_2.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_report_profile_summary.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_library_ui_v0_8.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_v0_7_3.py
-F:\1.Boulot\03_Github\mangadvisor\tools\patch_v0_7_4.py
  
 ================================================== 
 7. Scripts CMD 
 ================================================== 
+F:\1.Boulot\03_Github\mangadvisor\cmd\archive-v0-8-temp-files.cmd
 F:\1.Boulot\03_Github\mangadvisor\cmd\audit-project-files.cmd
 F:\1.Boulot\03_Github\mangadvisor\cmd\build.cmd
 F:\1.Boulot\03_Github\mangadvisor\cmd\clean.cmd
@@ -794,20 +785,12 @@ F:\1.Boulot\03_Github\mangadvisor\docs\reports\jikan_recommendation_edges_diagno
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_goal_tests_v0_8_3.md
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_import_robustness_tests_v0_8_11.md
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_import_tests_v0_8_10.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_recommendation_tests_v0_8_1.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_recommendation_tests_v0_8_2.md
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_recommendation_tests_v0_8_2_profile_summary.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_status_tests_v0_8_4.md
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\library_status_tests_v0_8_5.md
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\Mangadvisor V0.7 Data Foundation.docx
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\project_file_audit_v0_8_13.txt
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_latest.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_6.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_1.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_2.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_3.md
 F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_7_4.md
-F:\1.Boulot\03_Github\mangadvisor\docs\reports\recommendation_profile_tests_v0_8_0.md
  
 ================================================== 
 9. Fichiers Docker Compose 
