@@ -3,7 +3,7 @@
 ================================================== 
  
 Projet : F:\1.Boulot\03_Github\mangadvisor\cmd\.. 
-Date   : 09/06/2026 13:21:03,41 
+Date   : 09/06/2026 13:33:30,30 
  
 ================================================== 
 1. Git status 
@@ -76,7 +76,6 @@ apps/api/app/main.py
 apps/api/requirements.txt
 apps/ui/app/app.py
 apps/ui/requirements.txt
-cd
 cmd/archive-v0-8-temp-files.cmd
 cmd/audit-project-files.cmd
 cmd/build.cmd
@@ -106,7 +105,6 @@ cmd/stop.cmd
 cmd/up.cmd
 data/modele_bibliotheque_mangadvisor.csv
 data/modele_bibliotheque_mangadvisor.xlsx
-docker
 docs/02_data/data_model_v1.md
 docs/02_data/data_pipeline_v1.md
 docs/03_technical/mangadvisor_architecture_v1.md
@@ -142,45 +140,6 @@ legacy/full_stack_2026_03/infra/grafana/dashboards/dashboard.yaml
 legacy/full_stack_2026_03/infra/grafana/dashboards/mangadvisor-api.json
 legacy/full_stack_2026_03/infra/grafana/provisioning/datasources/prometheus.yaml
 legacy/full_stack_2026_03/infra/nginx/nginx.conf
-legacy/full_stack_2026_03/infra/pgadmin/sessions/0062873c-59c6-47f9-8dd1-55df3935b735
-legacy/full_stack_2026_03/infra/pgadmin/sessions/031bb926-3921-4a5f-acf8-af90d6a22363
-legacy/full_stack_2026_03/infra/pgadmin/sessions/04330acf-7d57-4964-8f92-948f9a5a87da
-legacy/full_stack_2026_03/infra/pgadmin/sessions/0dd4749c-7df6-4551-a163-7046f931a2db
-legacy/full_stack_2026_03/infra/pgadmin/sessions/1519d344-c390-470c-bd81-9166776e86ac
-legacy/full_stack_2026_03/infra/pgadmin/sessions/1f6f11f3-9fa5-4505-a77c-0d8972ede814
-legacy/full_stack_2026_03/infra/pgadmin/sessions/2915f598-9951-4a89-8517-4fb8dffd723b
-legacy/full_stack_2026_03/infra/pgadmin/sessions/2a0e90ea-5de2-41d9-b493-8099893aec3e
-legacy/full_stack_2026_03/infra/pgadmin/sessions/2c0612f6-3ae1-4171-8a06-85ae8e67bc14
-legacy/full_stack_2026_03/infra/pgadmin/sessions/3bb97fe4-ddfc-49f6-9daa-65303b46d71f
-legacy/full_stack_2026_03/infra/pgadmin/sessions/441691a4-5d5d-45d6-b0cd-2825133bfb0a
-legacy/full_stack_2026_03/infra/pgadmin/sessions/4770d9c2-98be-429b-894e-1193edf0d90e
-legacy/full_stack_2026_03/infra/pgadmin/sessions/4adcd83b-023b-48c3-acbe-4f89619d7bbb
-legacy/full_stack_2026_03/infra/pgadmin/sessions/4f4e9594-9197-485a-86b4-b2d370c219b0
-legacy/full_stack_2026_03/infra/pgadmin/sessions/56fb7809-588a-4f5f-a0d7-2e6d81485497
-legacy/full_stack_2026_03/infra/pgadmin/sessions/624e1d0f-85c9-448c-88ad-88a3f3960b02
-legacy/full_stack_2026_03/infra/pgadmin/sessions/730803ec-ff7b-40ad-8b37-791f22334fcb
-legacy/full_stack_2026_03/infra/pgadmin/sessions/739dae4f-a749-43c1-b3ef-39791250318e
-legacy/full_stack_2026_03/infra/pgadmin/sessions/75e64b66-7044-4ba3-9cbc-e46bf2772e2d
-legacy/full_stack_2026_03/infra/pgadmin/sessions/7985df70-8d3a-406d-aaa2-8a38f5814f86
-legacy/full_stack_2026_03/infra/pgadmin/sessions/7a464356-7465-4f2e-badf-f9db04bd843d
-legacy/full_stack_2026_03/infra/pgadmin/sessions/7fafa85d-91e1-4743-be54-7c77d51a6f53
-legacy/full_stack_2026_03/infra/pgadmin/sessions/85f64f80-b906-477b-969a-270177868ff1
-legacy/full_stack_2026_03/infra/pgadmin/sessions/8afcc3f2-e958-4105-851e-bf3e7a8600e7
-legacy/full_stack_2026_03/infra/pgadmin/sessions/8d055664-f047-4500-9d10-e734a6a80ec8
-legacy/full_stack_2026_03/infra/pgadmin/sessions/95437d48-57fe-486d-a9ec-9cbdaa080659
-legacy/full_stack_2026_03/infra/pgadmin/sessions/98047856-ff62-459c-9f0b-6756d78902be
-legacy/full_stack_2026_03/infra/pgadmin/sessions/993567bd-998c-4e24-82f7-11913fbec39a
-legacy/full_stack_2026_03/infra/pgadmin/sessions/9b92c773-b2c7-4f46-9aa8-c29eb5eda586
-legacy/full_stack_2026_03/infra/pgadmin/sessions/9d9fc5ab-3ef9-45b1-a3ee-ba9bb4261cfe
-legacy/full_stack_2026_03/infra/pgadmin/sessions/9ddf9508-e7c8-48f5-97af-ae6e4cfb690e
-legacy/full_stack_2026_03/infra/pgadmin/sessions/9ebbdddb-3d7e-4098-8a98-011494786b58
-legacy/full_stack_2026_03/infra/pgadmin/sessions/c528bb19-1a59-43c7-92a3-2cb309f108ff
-legacy/full_stack_2026_03/infra/pgadmin/sessions/d4a79069-659a-45b5-9d4b-738551ae6171
-legacy/full_stack_2026_03/infra/pgadmin/sessions/da38aee1-2709-4d99-8682-3b4460f5d7a6
-legacy/full_stack_2026_03/infra/pgadmin/sessions/f1e84802-402b-419e-a692-64403877cb21
-legacy/full_stack_2026_03/infra/pgadmin/sessions/f3546316-970d-4a02-b627-6279f78fc0db
-legacy/full_stack_2026_03/infra/pgadmin/sessions/f5709b21-5c22-469b-815f-eb4c5ac5424e
-legacy/full_stack_2026_03/infra/pgadmin/sessions/f86a3c39-e686-4870-a4f4-1922236444cd
 legacy/full_stack_2026_03/infra/prometheus/prometheus.yml
 legacy/full_stack_2026_03/notebooks/01_Scraping_API_Jikan.ipynb
 legacy/full_stack_2026_03/notebooks/02_Scraping_API_AniList.ipynb
@@ -250,13 +209,11 @@ sql/schema/007_add_user_library_tables.sql
 4. Arborescence complete 
 ================================================== 
 Structure du dossier pour le volume Extreme SSD
-Le numéro de série du volume est 00000070 1E3D:FE34
+Le numéro de série du volume est 0000001B 1E3D:FE34
 F:.
 |   .env
 |   .env.example
 |   .gitignore
-|   cd
-|   docker
 |   mangadvisor.cmd
 |   pyproject.toml
 |   README.md
@@ -266,11 +223,8 @@ F:.
 |   |   |   requirements.txt
 |   |   |   
 |   |   \---app
-|   |       |   main.py
-|   |       |   
-|   |       \---__pycache__
-|   |               main.cpython-311.pyc
-|   |               
+|   |           main.py
+|   |           
 |   \---ui
 |       |   requirements.txt
 |       |   
@@ -510,47 +464,6 @@ F:.
 |       |   |   |   pgadmin4.db
 |       |   |   |   
 |       |   |   +---azurecredentialcache
-|       |   |   +---sessions
-|       |   |   |       0062873c-59c6-47f9-8dd1-55df3935b735
-|       |   |   |       031bb926-3921-4a5f-acf8-af90d6a22363
-|       |   |   |       04330acf-7d57-4964-8f92-948f9a5a87da
-|       |   |   |       0dd4749c-7df6-4551-a163-7046f931a2db
-|       |   |   |       1519d344-c390-470c-bd81-9166776e86ac
-|       |   |   |       1f6f11f3-9fa5-4505-a77c-0d8972ede814
-|       |   |   |       2915f598-9951-4a89-8517-4fb8dffd723b
-|       |   |   |       2a0e90ea-5de2-41d9-b493-8099893aec3e
-|       |   |   |       2c0612f6-3ae1-4171-8a06-85ae8e67bc14
-|       |   |   |       3bb97fe4-ddfc-49f6-9daa-65303b46d71f
-|       |   |   |       441691a4-5d5d-45d6-b0cd-2825133bfb0a
-|       |   |   |       4770d9c2-98be-429b-894e-1193edf0d90e
-|       |   |   |       4adcd83b-023b-48c3-acbe-4f89619d7bbb
-|       |   |   |       4f4e9594-9197-485a-86b4-b2d370c219b0
-|       |   |   |       56fb7809-588a-4f5f-a0d7-2e6d81485497
-|       |   |   |       624e1d0f-85c9-448c-88ad-88a3f3960b02
-|       |   |   |       730803ec-ff7b-40ad-8b37-791f22334fcb
-|       |   |   |       739dae4f-a749-43c1-b3ef-39791250318e
-|       |   |   |       75e64b66-7044-4ba3-9cbc-e46bf2772e2d
-|       |   |   |       7985df70-8d3a-406d-aaa2-8a38f5814f86
-|       |   |   |       7a464356-7465-4f2e-badf-f9db04bd843d
-|       |   |   |       7fafa85d-91e1-4743-be54-7c77d51a6f53
-|       |   |   |       85f64f80-b906-477b-969a-270177868ff1
-|       |   |   |       8afcc3f2-e958-4105-851e-bf3e7a8600e7
-|       |   |   |       8d055664-f047-4500-9d10-e734a6a80ec8
-|       |   |   |       95437d48-57fe-486d-a9ec-9cbdaa080659
-|       |   |   |       98047856-ff62-459c-9f0b-6756d78902be
-|       |   |   |       993567bd-998c-4e24-82f7-11913fbec39a
-|       |   |   |       9b92c773-b2c7-4f46-9aa8-c29eb5eda586
-|       |   |   |       9d9fc5ab-3ef9-45b1-a3ee-ba9bb4261cfe
-|       |   |   |       9ddf9508-e7c8-48f5-97af-ae6e4cfb690e
-|       |   |   |       9ebbdddb-3d7e-4098-8a98-011494786b58
-|       |   |   |       c528bb19-1a59-43c7-92a3-2cb309f108ff
-|       |   |   |       d4a79069-659a-45b5-9d4b-738551ae6171
-|       |   |   |       da38aee1-2709-4d99-8682-3b4460f5d7a6
-|       |   |   |       f1e84802-402b-419e-a692-64403877cb21
-|       |   |   |       f3546316-970d-4a02-b627-6279f78fc0db
-|       |   |   |       f5709b21-5c22-469b-815f-eb4c5ac5424e
-|       |   |   |       f86a3c39-e686-4870-a4f4-1922236444cd
-|       |   |   |       
 |       |   |   \---storage
 |       |   +---postgres
 |       |   |   \---init
@@ -565,12 +478,8 @@ F:.
 |       |   |   README.md
 |       |   |   
 |       |   \---src
-|       |       |   config.py
-|       |       |   
-|       |       \---__pycache__
-|       |               config.cpython-311.pyc
-|       |               config.cpython-39.pyc
-|       |               
+|       |           config.py
+|       |           
 |       +---scripts
 |       |   \---ps
 |       \---services
@@ -641,21 +550,13 @@ F:.
 |           |   __init__.py
 |           |   
 |           +---extract
-|           |   |   jikan_client.py
-|           |   |   __init__.py
-|           |   |   
-|           |   \---__pycache__
-|           |           jikan_client.cpython-311.pyc
-|           |           __init__.cpython-311.pyc
-|           |           
+|           |       jikan_client.py
+|           |       __init__.py
+|           |       
 |           \---load
-|               |   postgres_loader.py
-|               |   __init__.py
-|               |   
-|               \---__pycache__
-|                       postgres_loader.cpython-311.pyc
-|                       __init__.cpython-311.pyc
-|                       
+|                   postgres_loader.py
+|                   __init__.py
+|                   
 +---sql
 |   +---queries
 |   |       check_jikan_data_quality.sql
@@ -872,47 +773,7 @@ F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\minio\init\ini
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\nginx\nginx.conf
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\azurecredentialcache
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\pgadmin4.db
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\storage
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\0062873c-59c6-47f9-8dd1-55df3935b735
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\031bb926-3921-4a5f-acf8-af90d6a22363
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\04330acf-7d57-4964-8f92-948f9a5a87da
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\0dd4749c-7df6-4551-a163-7046f931a2db
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\1519d344-c390-470c-bd81-9166776e86ac
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\1f6f11f3-9fa5-4505-a77c-0d8972ede814
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\2915f598-9951-4a89-8517-4fb8dffd723b
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\2a0e90ea-5de2-41d9-b493-8099893aec3e
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\2c0612f6-3ae1-4171-8a06-85ae8e67bc14
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\3bb97fe4-ddfc-49f6-9daa-65303b46d71f
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\441691a4-5d5d-45d6-b0cd-2825133bfb0a
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\4770d9c2-98be-429b-894e-1193edf0d90e
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\4adcd83b-023b-48c3-acbe-4f89619d7bbb
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\4f4e9594-9197-485a-86b4-b2d370c219b0
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\56fb7809-588a-4f5f-a0d7-2e6d81485497
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\624e1d0f-85c9-448c-88ad-88a3f3960b02
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\730803ec-ff7b-40ad-8b37-791f22334fcb
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\739dae4f-a749-43c1-b3ef-39791250318e
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\75e64b66-7044-4ba3-9cbc-e46bf2772e2d
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\7985df70-8d3a-406d-aaa2-8a38f5814f86
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\7a464356-7465-4f2e-badf-f9db04bd843d
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\7fafa85d-91e1-4743-be54-7c77d51a6f53
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\85f64f80-b906-477b-969a-270177868ff1
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\8afcc3f2-e958-4105-851e-bf3e7a8600e7
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\8d055664-f047-4500-9d10-e734a6a80ec8
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\95437d48-57fe-486d-a9ec-9cbdaa080659
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\98047856-ff62-459c-9f0b-6756d78902be
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\993567bd-998c-4e24-82f7-11913fbec39a
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9b92c773-b2c7-4f46-9aa8-c29eb5eda586
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9d9fc5ab-3ef9-45b1-a3ee-ba9bb4261cfe
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9ddf9508-e7c8-48f5-97af-ae6e4cfb690e
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\9ebbdddb-3d7e-4098-8a98-011494786b58
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\c528bb19-1a59-43c7-92a3-2cb309f108ff
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\d4a79069-659a-45b5-9d4b-738551ae6171
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\da38aee1-2709-4d99-8682-3b4460f5d7a6
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f1e84802-402b-419e-a692-64403877cb21
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f3546316-970d-4a02-b627-6279f78fc0db
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f5709b21-5c22-469b-815f-eb4c5ac5424e
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\pgadmin\sessions\f86a3c39-e686-4870-a4f4-1922236444cd
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\postgres\init
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\infra\prometheus\prometheus.yml
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\01_Scraping_API_Jikan.ipynb
@@ -922,9 +783,6 @@ F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\04_Rapproc
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\README.md
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\config.py
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\__pycache__
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\__pycache__\config.cpython-311.pyc
-F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\notebooks\src\__pycache__\config.cpython-39.pyc
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\scripts\ps
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\api
 F:\1.Boulot\03_Github\mangadvisor\legacy\full_stack_2026_03\services\dbt
