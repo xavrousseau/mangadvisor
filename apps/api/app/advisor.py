@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from apps.api.app.mood_discovery import MOODS, match_mood, preference_overlap
+from apps.api.app.narrative_evidence import NARRATIVE_CONCEPTS, narrative_matches
 
 router = APIRouter(prefix="/advisor", tags=["Conversational manga advisor"])
 Mood = Literal["DARK", "COMFORT", "ACTION", "MYSTERY", "ROMANCE", "FANTASY"]
@@ -27,6 +28,11 @@ class AdvisorContext(BaseModel):
     french: FrenchEvidence = "ANY"
     use_library: bool = True
     avoid_romance: bool = False
+    avoid_horror: bool = False
+    avoid_gore: bool = False
+    narrative_preferences: list[Literal["INVESTIGATION","PSYCHOLOGICAL","SURVIVAL"]] = Field(
+        default_factory=list, max_length=3
+    )
     min_score: float = Field(default=6.5, ge=0, le=10)
 
 class AdvisorRequest(BaseModel):
@@ -57,6 +63,15 @@ FRENCH_REQUIRED = re.compile(r"\b(obligatoire\w*|uniquement|absolument|imperatif
 FRENCH_OPTIONAL = re.compile(r"\b(idealement|si possible|de preference|prefer|ideally|preferably)\b")
 ROMANCE = re.compile(r"\b(romance|romantique|amour|love.story)\b")
 MATURE = re.compile(r"\b(mature|adulte|adultes|seinen)\b")
+NARRATIVE_REQUESTS = {
+    "INVESTIGATION": (r"\benquet\w*\b", r"\binvestigat\w*\b", r"\bdetectiv\w*\b"),
+    "PSYCHOLOGICAL": (r"\bpsycholog\w*\b",),
+    "SURVIVAL": (r"\bsurvi\w*\b", r"\bsurviv\w*\b", r"\bsurvival\b"),
+}
+HORROR_EXCLUDE = re.compile(r"\b(?:sans|pas de|no|without|avoid|eviter|evite)\s+(?:(?:l|la|the)\s+)?(?:horreur|horror)\b")
+GORE_EXCLUDE = re.compile(r"\b(?:sans|pas de|no|without|avoid|eviter|evite)\s+(?:(?:le|the)\s+)?gore\b")
+HORROR_ALLOW = re.compile(r"\b(?:avec|j.accepte|autorise|allow)\s+(?:(?:l|la|the)\s+)?(?:horreur|horror)\b|\b(?:horreur|horror)\s+(?:ok|me va|is fine)\b")
+GORE_ALLOW = re.compile(r"\b(?:avec|autorise|allow)\s+(?:le\s+)?gore\b|\bgore\s+(?:ok|me va|is fine)\b")
 LIBRARY_OFF = re.compile(r"\b(sans (?:mes |ma )?(?:gouts|bibliotheque|preferences)|sans personnalisation|ignore my library|without my library)\b")
 LIBRARY_ON = re.compile(r"\b(selon mes gouts|mes preferences|ma bibliotheque|my library|my taste)\b")
 RATING = re.compile(r"\b(?:note|score|rating)\s*(?:minimum|min|de|d.au moins|>=|superieure a)?\s*(\d{1,2}(?:[.,]\d)?)\s*(?:/10)?\b")
@@ -97,6 +112,27 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
             current.mood = None
         if current.secondary_mood == "ROMANCE":
             current.secondary_mood = None
+    if HORROR_EXCLUDE.search(normalized):
+        current.avoid_horror=True;changes.append("avoid_horror")
+    elif HORROR_ALLOW.search(normalized):
+        current.avoid_horror=False;changes.append("avoid_horror")
+    if GORE_EXCLUDE.search(normalized):
+        current.avoid_gore=True;changes.append("avoid_gore")
+    elif GORE_ALLOW.search(normalized):
+        current.avoid_gore=False;changes.append("avoid_gore")
+    for concept, patterns in NARRATIVE_REQUESTS.items():
+        found_positive=False
+        for pattern in patterns:
+            for occurrence in re.finditer(pattern, normalized):
+                prefix=normalized[max(0,occurrence.start()-46):occurrence.start()]
+                if not NEGATION_BEFORE.search(prefix):
+                    found_positive=True
+                    break
+            if found_positive:
+                break
+        if found_positive and concept not in current.narrative_preferences:
+            current.narrative_preferences.append(concept)
+            changes.append("narrative_preferences")
     if SHORT.search(normalized):
         current.length = "SHORT"; changes.append("length")
     elif LONG.search(normalized):
@@ -189,6 +225,19 @@ def describe_context(context:AdvisorContext,lang:str)->str:
         parts.append("ISBN français enregistré souhaité" if fr else "recorded French ISBN preferred")
     if context.avoid_romance:
         parts.append("sans romance documentée" if fr else "without tagged romance")
+    if context.avoid_horror:
+        parts.append("sans horreur documentée" if fr else "without tagged horror")
+    if context.avoid_gore:
+        parts.append("sans gore documenté" if fr else "without tagged gore")
+    narrative_labels={
+        "INVESTIGATION":("enquête","investigation"),
+        "PSYCHOLOGICAL":("psychologique","psychological"),
+        "SURVIVAL":("survie","survival"),
+    }
+    if context.narrative_preferences:
+        names=[narrative_labels[key][0 if fr else 1] for key in context.narrative_preferences]
+        parts.append(("indices narratifs souhaités : " if fr else "preferred narrative clues: ")
+                     +", ".join(names))
     parts.append(("tes goûts" if fr else "your tastes") if context.use_library
                  else ("sans personnalisation" if fr else "no personalization"))
     return " · ".join(parts)
