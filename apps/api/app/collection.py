@@ -75,9 +75,9 @@ def isbn13_normalize(raw: str) -> str:
 def edition_kind_from_title(title: str) -> str:
     text = title.casefold()
     for pattern, kind in (
-        (r"\b(deluxe|prestige)\b", "DELUXE"),
+        (r"\bdeluxe\b", "DELUXE"),
         (r"\b(perfect|kanzenban)\b", "PERFECT"),
-        (r"\b(collector|collection)\b", "COLLECTOR"),
+        (r"\bcollector\b", "COLLECTOR"),
         (r"\b(intégrale|integrale)\b", "INTEGRAL"),
     ):
         if re.search(pattern, text):
