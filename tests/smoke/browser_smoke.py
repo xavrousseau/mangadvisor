@@ -157,6 +157,7 @@ def run():
             )
             page.locator('[data-action="bulk-preview"]').click()
             expect(page.locator(".bulk-preview")).to_be_visible(timeout=30000)
+            expect(page.locator(".bulk-preview h3")).to_have_text("Aperçu de l'import")
             expect(page.locator(".bulk-preview")).to_contain_text("ISBN reconnu")
             expect(page.locator(".bulk-preview")).to_contain_text("ISBN non référencé")
             expect(page.locator(".bulk-preview [data-action='bulk-apply']")).to_be_visible()
