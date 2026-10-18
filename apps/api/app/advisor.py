@@ -13,7 +13,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from apps.api.app.mood_discovery import MOODS, match_mood, preference_overlap
-from apps.api.app.narrative_evidence import NARRATIVE_CONCEPTS, narrative_matches
+from apps.api.app.narrative_evidence import narrative_matches
 
 router = APIRouter(prefix="/advisor", tags=["Conversational manga advisor"])
 Mood = Literal["DARK", "COMFORT", "ACTION", "MYSTERY", "ROMANCE", "FANTASY"]
@@ -68,8 +68,8 @@ NARRATIVE_REQUESTS = {
     "PSYCHOLOGICAL": (r"\bpsycholog\w*\b",),
     "SURVIVAL": (r"\bsurvi\w*\b", r"\bsurviv\w*\b", r"\bsurvival\b"),
 }
-HORROR_EXCLUDE = re.compile(r"\b(?:sans|pas de|no|without|avoid|eviter|evite)\s+(?:(?:l|la|the)\s+)?(?:horreur|horror)\b")
-GORE_EXCLUDE = re.compile(r"\b(?:sans|pas de|no|without|avoid|eviter|evite)\s+(?:(?:le|the)\s+)?gore\b")
+HORROR_EXCLUDE = re.compile(r"\b(?:sans|pas de|ni|no|without|avoid|eviter|evite)\s+(?:(?:l|la|the)\s+)?(?:horreur|horror)\b")
+GORE_EXCLUDE = re.compile(r"\b(?:sans|pas de|ni|no|without|avoid|eviter|evite)\s+(?:(?:le|the)\s+)?gore\b")
 HORROR_ALLOW = re.compile(r"\b(?:avec|j.accepte|autorise|allow)\s+(?:(?:l|la|the)\s+)?(?:horreur|horror)\b|\b(?:horreur|horror)\s+(?:ok|me va|is fine)\b")
 GORE_ALLOW = re.compile(r"\b(?:avec|autorise|allow)\s+(?:le\s+)?gore\b|\bgore\s+(?:ok|me va|is fine)\b")
 LIBRARY_OFF = re.compile(r"\b(sans (?:mes |ma )?(?:gouts|bibliotheque|preferences)|sans personnalisation|ignore my library|without my library)\b")
