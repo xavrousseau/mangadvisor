@@ -233,6 +233,11 @@ def run():
             # V1.2 : fiche française sur un livre distinct du manga canonique.
             page.goto(BASE+"/manga/1",wait_until="domcontentloaded",timeout=60000)
             expect(page.locator("#french-collection")).to_be_visible(timeout=40000)
+            expect(page.locator(".fr-notices")).to_be_visible(timeout=30000)
+            expect(page.locator(".fr-notices")).to_contain_text("Informations françaises vérifiées")
+            expect(page.locator(".fr-notices")).to_contain_text("Kana")
+            expect(page.locator(".edition-group")).to_have_count(1)
+            expect(page.locator(".edition-group")).to_have_attribute("data-edition-kind","CLASSIC")
             expect(page.locator(".edition-item")).to_have_count(1,timeout=30000)
             expect(page.locator(".edition-item")).to_contain_text("Naruto")
             expect(page.locator(".edition-item")).to_contain_text("9782871294146")
