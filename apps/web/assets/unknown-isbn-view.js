@@ -49,15 +49,16 @@ export function resolverMarkup(state, text, escape) {
    }).join(""):'<p class="muted">'+L("resolveNoMangas")+'</p>')+'</div>':"";
   const kind=EDITION_OPTIONS.includes(state.kind)?state.kind:
     EDITION_OPTIONS.includes(record.edition_kind_suggested)?record.edition_kind_suggested:"UNKNOWN";
-  const volume=Number.isInteger(Number(state.volume))&&Number(state.volume)>=1&&Number(state.volume)<=9999
-    ?Number(state.volume):1;
+  const volume=state.volume!==null&&state.volume!==undefined&&state.volume!==""&&
+    Number.isInteger(Number(state.volume))&&Number(state.volume)>=1&&Number(state.volume)<=9999
+    ?Number(state.volume):"";
   const confirm=selected?'<div class="bulk-resolver-confirm"><h4>'+L("resolveStepThree")+'</h4>'+
     '<p class="resolve-confirmation">'+L("resolveSelectedManga")+': <strong>'+e(selected.title)+'</strong></p>'+
     '<div class="form-grid"><div class="field"><label for="bulk-resolve-kind">'+L("collectionEditionType")+
     '</label><select id="bulk-resolve-kind" class="select">'+EDITION_OPTIONS.map(option=>
       '<option value="'+option+'"'+(option===kind?' selected':'')+'>'+L("edition"+option)+'</option>').join("")+
     '</select></div><div class="field"><label for="bulk-resolve-volume">'+L("collectionTome")+
-    '</label><input id="bulk-resolve-volume" class="input" min="1" max="9999" type="number" value="'+e(volume)+'"></div></div>'+
+    '</label><input id="bulk-resolve-volume" class="input" min="1" max="9999" type="number" required placeholder="'+L("collectionTome")+'" value="'+e(volume)+'"></div></div>'+
     '<label class="bulk-confirm-check"><input id="bulk-resolve-ack" type="checkbox"> <span>'+
       L("resolveAcknowledgement")+'</span></label>'+
     '<button type="button" class="btn btn-primary" data-action="bulk-resolve-confirm" disabled>'+
