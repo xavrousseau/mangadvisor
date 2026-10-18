@@ -1,4 +1,3 @@
-import { bibliographyPanel } from "./bibliography-view.js";
 /** Manga FR: source-attributed BOOK records, never invented series metadata.
  * Escaping/URL restrictions apply to everything read from the catalog.
  */
@@ -22,7 +21,7 @@ export function groupedEditions(editions) {
       Number(a.volume_number) - Number(b.volume_number) || Number(a.id) - Number(b.id)),
   }));
 }
-export function collectionPanel(data, library, lang, tr, escape, mangaTitle="") {
+export function collectionPanel(data, library, lang, tr, escape) {
  const e=value=>escape(String(value??""));
  const L=key=>e(tr(lang,key));
  const editionLabel=type=>L("edition"+(EDITION_KINDS.includes(type)?type:"UNKNOWN"));
@@ -101,8 +100,7 @@ export function collectionPanel(data, library, lang, tr, escape, mangaTitle="") 
    '<p class="section-caption">'+L("collectionSubtitle")+'</p></div></div>'+
    notices+stats+legacy+
    (editions.length?cards:'<div class="home-empty">'+L("collectionEmpty")+'</div>')+
-   '<p class="collection-caveat">'+L("collectionKnownOnly")+'</p>'+lookup+
-   bibliographyPanel(escape,tr,lang,mangaTitle)+'</section>';
+   '<p class="collection-caveat">'+L("collectionKnownOnly")+'</p>'+lookup+'</section>';
 }
 export function editionPreview(record, lang, tr, escape) {
  const e=value=>escape(String(value??"")), L=key=>e(tr(lang,key));
