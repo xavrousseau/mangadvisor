@@ -54,6 +54,11 @@ LibraryStatus = Literal[
 ]
 
 
+class RecommendationFeedbackRequest(BaseModel):
+    manga_id: int = Field(..., ge=1, description="Manga canonique du catalogue.")
+    action: Literal["INTERESTED", "ALREADY_READ", "NOT_FOR_ME"]
+
+
 class LibraryItemRequest(BaseModel):
     manga_id: int = Field(
         ...,
@@ -1700,6 +1705,58 @@ def get_library_profile() -> dict[str, Any]:
     }
 
 
+@app.post("/recommendations/feedback")
+def record_recommendation_feedback(payload: RecommendationFeedbackRequest) -> dict[str, Any]:
+    """Enregistre un retour explicite sans écraser notes, volumes ou commentaires.
+
+    La bibliothèque existe déjà et alimente les signaux du moteur :
+      INTERESTED    → WANT_TO_READ (intérêt positif modéré)
+      ALREADY_READ  → READ (lecture comme source positive)
+      NOT_FOR_ME    → NOT_INTERESTED (exclusion des futures suggestions)
+
+    Une réaction rapide ne remplace pas OWNED/READING/READ par une intention
+    moins précise : seul « Déjà lu », explicite, peut actualiser un tel statut.
+    """
+    target_status = {
+        "INTERESTED": "WANT_TO_READ",
+        "ALREADY_READ": "READ",
+        "NOT_FOR_ME": "NOT_INTERESTED",
+    }[payload.action]
+    sql = """
+        INSERT INTO user_manga_library (user_id, manga_id, library_status)
+        VALUES (%(user_id)s, %(manga_id)s, %(new_status)s)
+        ON CONFLICT (user_id, manga_id) DO UPDATE
+            SET library_status = EXCLUDED.library_status
+        WHERE user_manga_library.library_status IN ('WANT_TO_READ', 'NOT_INTERESTED')
+           OR EXCLUDED.library_status = 'READ'
+        RETURNING manga_id, library_status;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM manga WHERE id = %(manga_id)s;",
+                        {"manga_id": payload.manga_id})
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Manga introuvable dans le catalogue.")
+            cur.execute(sql, {
+                "user_id": DEFAULT_USER_ID, "manga_id": payload.manga_id,
+                "new_status": target_status,
+            })
+            updated = cur.fetchone()
+            if not updated:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Ce manga est déjà suivi ou lu. Modifie son statut depuis sa fiche pour préserver ta bibliothèque.",
+                )
+            conn.commit()
+
+    return {
+        "status": "ok",
+        "action": payload.action,
+        "manga_id": updated["manga_id"],
+        "library_status": updated["library_status"],
+    }
+
+
 @app.post("/recommendations/library")
 def recommend_from_library(
     payload: LibraryRecommendationRequest,
@@ -2369,6 +2426,12 @@ def recommend_similar(
             ON cps.manga_id = m.id
 
         WHERE m.id <> %(source_id)s
+          AND NOT EXISTS (
+              SELECT 1 FROM user_manga_library skipped
+              WHERE skipped.user_id = %(user_id)s
+                AND skipped.manga_id = m.id
+                AND skipped.library_status IN ('NOT_INTERESTED', 'DROPPED')
+          )
           AND COALESCE(m.score, 0) >= 6.8
           AND (
                 COALESCE(cts.common_theme_count, 0) > 0
@@ -2401,6 +2464,7 @@ def recommend_similar(
                 {
                     "source_id": source["id"],
                     "limit": limit,
+                    "user_id": DEFAULT_USER_ID,
                 },
             )
             rows = cur.fetchall()
@@ -3218,6 +3282,12 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
                 ON cis.manga_id = m.id
 
             WHERE m.id <> ALL(%(source_ids)s)
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_library skipped
+                  WHERE skipped.user_id = %(user_id)s
+                    AND skipped.manga_id = m.id
+                    AND skipped.library_status IN ('NOT_INTERESTED', 'DROPPED')
+              )
               AND COALESCE(m.score, 0) >= %(min_score)s
               AND m.manga_type IN ('Manga', 'Manhwa', 'Manhua', 'One-shot')
               AND (
@@ -3415,6 +3485,7 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
                 recommendations_sql,
                 {
                     "source_ids": source_ids,
+                    "user_id": DEFAULT_USER_ID,
                     "limit": payload.limit,
                     "min_score": payload.min_score,
                     "only_finished": payload.only_finished,
