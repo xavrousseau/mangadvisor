@@ -1,5 +1,6 @@
 """Tests réels de la nouvelle interface Mangadvisor avec base CI jetable."""
 from pathlib import Path
+import json
 from playwright.sync_api import sync_playwright, expect
 
 BASE = "http://127.0.0.1:8501"
@@ -162,6 +163,39 @@ def run():
             expect(page.locator(".bulk-preview")).to_contain_text("ISBN non référencé")
             expect(page.locator(".bulk-preview [data-action='bulk-apply']")).to_be_visible()
             page.screenshot(path=str(OUTPUT / f"{device}-import-csv-apercu.png"), full_page=True)
+
+            # External BnF service is deterministically simulated ONLY in
+            # this disposable browser test. No fake source is written to DB.
+            bnf_record = {
+                "isbn13": "9782344074282",
+                "title_fr": "Volume de test français — tome 2",
+                "author_fr": "Auteur de test", "publisher_fr": "Éditeur de test",
+                "release_date_text": "2026",
+                "source_url": "https://catalogue.bnf.fr/ark:/12148/cbtest",
+                "source_name": "Bibliothèque nationale de France",
+                "verified_isbn": True, "edition_kind_suggested": "PERFECT",
+            }
+            page.route("**/api/collection/isbn/9782344074282",
+                lambda route: route.fulfill(status=200, content_type="application/json",
+                    body=json.dumps(bnf_record)))
+            page.locator('[data-action="resolve-unknown"][data-isbn="9782344074282"]').click()
+            expect(page.locator("#bulk-resolver-panel")).to_be_visible(timeout=30000)
+            expect(page.locator(".resolve-bnf")).to_contain_text("Volume de test français")
+            # BnF confirms the book only; the user must select the actual
+            # manga from the live Mangadvisor catalogue, then enter a number.
+            expect(page.locator('[data-action="resolve-confirm-edition"]')).to_have_count(0)
+            page.locator("#resolve-manga-query").fill("Naruto")
+            page.locator('[data-action="resolve-search-series"]').click()
+            expect(page.locator('[data-action="resolve-select-series"]').first).to_be_visible(timeout=30000)
+            page.locator('[data-action="resolve-select-series"]').first.click()
+            expect(page.locator('[data-action="resolve-confirm-edition"]')).to_be_visible()
+            expect(page.locator("#resolve-volume-number")).to_have_value("")
+            page.locator("#resolve-volume-number").fill("2")
+            page.screenshot(path=str(OUTPUT / f"{device}-isbn-inconnu-assiste.png"), full_page=True)
+            page.locator('[data-action="resolve-cancel"]').click()
+            expect(page.locator("#bulk-resolver-panel")).to_have_count(0)
+            expect(page.locator('.bulk-preview [data-action="resolve-unknown"]')).to_have_count(1)
+
             page.locator('[data-action="bulk-compare"]').click()
             expect(page.locator(".bulk-reconcile")).to_be_visible(timeout=30000)
             expect(page.locator(".bulk-reconcile")).to_contain_text("Compteurs historiques")
