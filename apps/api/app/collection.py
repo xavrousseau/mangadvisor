@@ -141,6 +141,36 @@ def verified_fr_overview(editions: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def edition_progress_from_books(editions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Progress is ONLY about recorded ISBNs, never estimated published volumes."""
+    priority = {kind: index for index, kind in enumerate(EDITION_KINDS)}
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for entry in editions:
+        kind = str(entry.get("edition_kind") or "UNKNOWN")
+        if kind not in priority:
+            kind = "UNKNOWN"
+        grouped.setdefault(kind, []).append(entry)
+    results = []
+    for kind in sorted(grouped, key=lambda x: priority[x]):
+        books = grouped[kind]
+        known = len(books)
+        owned = sum(bool(book.get("is_owned")) for book in books)
+        read = sum(bool(book.get("is_read")) for book in books)
+        results.append({
+            "edition_kind": kind,
+            "known_books": known,
+            "owned_books": owned,
+            "read_books": read,
+            "unowned_known_books": known - owned,
+            "unread_known_books": known - read,
+            "owned_pct_of_known": round(100 * owned / known, 1),
+            "read_pct_of_known": round(100 * read / known, 1),
+            "scope": "registered_isbns_only",
+            "published_total_known": False,
+        })
+    return results
+
+
 def parse_bnf_sru(xml_bytes: bytes, isbn: str) -> dict[str, Any] | None:
     """Parse only trustworthy Dublin Core data; reject ISBN-mismatched records."""
     if len(xml_bytes) > 1_500_000:
@@ -271,6 +301,7 @@ def create_collection_router(
         return {
             "manga_id": manga_id, "editions": entries,
             "french_overview": verified_fr_overview(entries),
+            "edition_progress": edition_progress_from_books(entries),
             "count": len(entries),
             "owned_books": sum(bool(e["is_owned"]) for e in entries),
             "read_books": sum(bool(e["is_read"]) for e in entries),

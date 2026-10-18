@@ -103,6 +103,27 @@ class FrenchEditionTests(unittest.TestCase):
         self.assertNotIn("official_series_title_fr",meta)
         self.assertEqual(verified_fr_overview([])["titles_fr"],[])
 
+    def test_progress_is_based_only_on_registered_isbns(self):
+        from apps.api.app.collection import edition_progress_from_books
+        books=[
+            {"edition_kind":"CLASSIC","is_owned":True,"is_read":True},
+            {"edition_kind":"CLASSIC","is_owned":True,"is_read":False},
+            {"edition_kind":"CLASSIC","is_owned":False,"is_read":True},
+            {"edition_kind":"PERFECT","is_owned":False,"is_read":False},
+        ]
+        results=edition_progress_from_books(books)
+        classic=next(x for x in results if x["edition_kind"]=="CLASSIC")
+        perfect=next(x for x in results if x["edition_kind"]=="PERFECT")
+        self.assertEqual(classic["known_books"],3)
+        self.assertEqual(classic["owned_books"],2)
+        self.assertEqual(classic["read_books"],2)
+        self.assertEqual(classic["unowned_known_books"],1)
+        self.assertEqual(classic["owned_pct_of_known"],66.7)
+        self.assertFalse(classic["published_total_known"])
+        self.assertEqual(perfect["read_pct_of_known"],0.0)
+        self.assertEqual(edition_progress_from_books([]),[])
+        self.assertEqual(len(books),4)
+
     def test_remote_service_failure_is_explicit(self):
         with patch("apps.api.app.collection.urllib.request.urlopen",side_effect=OSError("offline")):
             with self.assertRaises(HTTPException) as failure:

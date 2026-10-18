@@ -85,3 +85,32 @@ test("no French records means no invented publishers or official series title",(
  assert.doesNotMatch(html,/Fake/);
  assert.doesNotMatch(html,/class="fr-notices"/);
 });
+
+
+test("progress is explicitly scoped to recorded ISBNs and updates for each edition",()=>{
+ const data=structuredClone(example);
+ data.edition_progress=[
+   {edition_kind:"CLASSIC",known_books:1,owned_books:1,read_books:1,
+     owned_pct_of_known:100,read_pct_of_known:100,published_total_known:false},
+   {edition_kind:"DELUXE",known_books:1,owned_books:0,read_books:1,
+     owned_pct_of_known:0,read_pct_of_known:100,published_total_known:false},
+ ];
+ const markup=collectionPanel(data,null,"fr",t,escape);
+ assert.match(markup,/class="edition-progress"/);
+ assert.match(markup,/progressNoPublishedTotal/);
+ assert.match(markup,/aria-label="Possédé" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"/);
+ assert.match(markup,/aria-label="Possédé" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"/);
+ assert.match(markup,/style="width:100%"/);
+ assert.match(markup,/style="width:0%"/);
+});
+test("invalid server progress percentages are bounded and cannot inject CSS",()=>{
+ const data=structuredClone(example);
+ data.edition_progress=[{
+  edition_kind:"CLASSIC",known_books:1,
+  owned_pct_of_known:"9000; background:url(javascript:evil())",
+  read_pct_of_known:-500,
+ }];
+ const markup=collectionPanel(data,null,"fr",t,escape);
+ assert.doesNotMatch(markup,/javascript:evil/);
+ assert.match(markup,/style="width:0%"/);
+});
