@@ -23,6 +23,12 @@ def run():
             page.goto(BASE, wait_until="domcontentloaded", timeout=120000)
             expect(page.locator(".hero h1")).to_be_visible(timeout=90000)
             expect(page.locator(".manga-card").first).to_be_visible(timeout=30000)
+            # L'accueil personnel montre la lecture en cours et une vraie sélection
+            # du moteur sans perdre les raccourcis de découverte.
+            expect(page.locator("#home-continue .home-reading-card")).to_have_count(1, timeout=40000)
+            expect(page.locator("#home-continue")).to_contain_text("Vinland Saga")
+            expect(page.locator("#home-personal .rec-card").first).to_be_visible(timeout=90000)
+            expect(page.locator("#home-explore-title")).to_be_visible()
             page.screenshot(path=str(OUTPUT / f"{device}-accueil.png"), full_page=True)
 
             page.locator('[data-go="/discover"]').first.click()
