@@ -100,7 +100,8 @@ export function collectionPanel(data, library, lang, tr, escape) {
    '<p class="section-caption">'+L("collectionSubtitle")+'</p></div></div>'+
    notices+stats+legacy+
    (editions.length?cards:'<div class="home-empty">'+L("collectionEmpty")+'</div>')+
-   '<p class="collection-caveat">'+L("collectionKnownOnly")+'</p>'+lookup+'</section>';
+   '<p class="collection-caveat">'+L("collectionKnownOnly")+'</p>'+lookup+
+   '<div id="fr-discovery-anchor"></div></section>';
 }
 export function editionPreview(record, lang, tr, escape) {
  const e=value=>escape(String(value??"")), L=key=>e(tr(lang,key));
