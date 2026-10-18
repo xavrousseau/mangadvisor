@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -9,10 +10,15 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 
 st.set_page_config(
-    page_title="Mangadvisor",
+    page_title="Mangadvisor — Ton univers manga",
     page_icon="📚",
     layout="wide",
 )
+
+# Thème Mangadvisor 1.0 validé : sombre, élégant, accents orange.
+# L'interface conserve l'intégralité des endpoints et actions existants.
+_THEME_CSS = Path(__file__).with_name("theme.css").read_text(encoding="utf-8")
+st.markdown(f"<style>{_THEME_CSS}</style>", unsafe_allow_html=True)
 
 
 def call_api_get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -721,18 +727,36 @@ def display_recommendation_card(
                 display_manga_detail(manga_detail)
 
 
-st.title("📚 Mangadvisor")
-st.caption(
-    "Version V0.8.9 : bibliothèque utilisateur, recommandations, import CSV/Excel et modèles d'import."
+st.markdown(
+    """
+    <section class="ma-hero" aria-label="Bienvenue sur Mangadvisor">
+      <div class="ma-hero-text">
+        <div class="ma-eyebrow">✦ MANGADVISOR · TON UNIVERS MANGA</div>
+        <h1>Ta prochaine <span>obsession</span><br>commence ici.</h1>
+        <p>Explore les mangas qui te ressemblent et découvre de nouvelles histoires, guidé par tes goûts.</p>
+      </div>
+      <div class="ma-hero-art" aria-hidden="true"><span class="ma-ring"></span><span class="ma-slash"></span></div>
+    </section>
+    """,
+    unsafe_allow_html=True,
 )
 
 with st.sidebar:
-    st.header("État de la stack")
-
-    health = get_health()
-
-    st.success("API disponible")
-    st.write(f"Base PostgreSQL : `{health.get('database', 'inconnue')}`")
+    st.markdown(
+        """
+        <div class="ma-brand">
+            <span class="ma-brand-icon">M</span>
+            <span><strong>mangadvisor<span class="ma-dot">.</span></strong>
+            <small>YOUR MANGA UNIVERSE</small></span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.caption("Découvre · Explore · Collectionne")
+    with st.expander("État technique", expanded=False):
+        health = get_health()
+        st.success("API disponible")
+        st.write(f"Base PostgreSQL : `{health.get('database', 'inconnue')}`")
 
     st.divider()
 
@@ -750,8 +774,8 @@ with st.sidebar:
 
 tab_single, tab_profile, tab_detail, tab_library = st.tabs(
     [
-        "🔎 Recommandation depuis un manga",
-        "🧠 Recommandation depuis mon profil",
+        "🔎 Découvrir",
+        "✨ Pour moi",
         "📖 Fiche manga",
         "📚 Ma bibliothèque",
     ]
