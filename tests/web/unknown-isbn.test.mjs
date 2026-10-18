@@ -34,7 +34,7 @@ test("unknown CSV row has contextual verify button, known one does not",()=>{
 
 test("BnF verification alone does not choose a manga or default to tome 1",()=>{
  const html=unknownIsbnWizardMarkup(state,translate,escape);
- assert.match(html,/Notice/); // BnF text in the source label is provided by localization key.
+ assert.match(html,/resolveRecord/);
  assert.match(html,/Édition française — Tome 3/);
  assert.match(html,/catalogue.bnf.fr/);
  assert.doesNotMatch(html,/data-action="resolve-confirm-edition"/);
