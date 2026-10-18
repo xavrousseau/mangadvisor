@@ -266,3 +266,33 @@ div[data-testid="stMetric"] {
     min-height: 190px;
   }
 }
+
+
+/* Recommandations personnalisées — cartes et score lisible */
+.ma-rec-rank {
+  color: var(--ma-accent);
+  font-size: .68rem;
+  line-height: 1.6;
+  letter-spacing: .11em;
+  font-weight: 850;
+  margin: 2px 0 10px;
+}
+.stApp [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] {
+  border-color: var(--ma-border);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+.stApp [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] h4 {
+  font-size: clamp(1.05rem, 1.7vw, 1.26rem);
+  line-height: 1.2;
+  margin: 0 0 .4rem;
+  letter-spacing: -.04em;
+}
+.stApp [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] {
+  font-size: .75rem;
+}
+@media (max-width: 768px) {
+  .ma-rec-rank { margin-top: 0; }
+  .stApp [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] {
+    box-shadow: none;
+  }
+}
