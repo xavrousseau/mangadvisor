@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
 from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
+from apps.api.app.collection import create_collection_router, ensure_collection_schema
 
 
 app = FastAPI(
@@ -3651,3 +3652,13 @@ def get_manga_covers(
         covers.append({"manga_id": row["manga_id"], "image_url": url})
 
     return {"count": len(covers), "covers": covers}
+
+
+# Mangadvisor 1.2: création additive/idempotente des tables, au démarrage.
+# Les anciens compteurs user_manga_library ne sont pas modifiés.
+@app.on_event("startup")
+def prepare_fr_collection() -> None:
+    ensure_collection_schema(get_connection)
+
+
+app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
