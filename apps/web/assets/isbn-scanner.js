@@ -160,12 +160,25 @@ export function scannerMarkup(lang,escape,draft,count=0,session=[]){
    '<h3>'+L("success")+'</h3><p>'+e(draft.savedTitle||draft.isbn)+'</p>'+
    '<p class="scan-hint">'+L("preserved")+'</p><div class="actions">'+
    '<button class="btn btn-primary" data-action="scan-next">'+L("next")+'</button>'+
+   '<button class="btn btn-soft" data-action="scan-summary">'+L("reportView")+'</button>'+
+   '<button class="btn btn-soft" data-action="scan-close">'+L("done")+'</button></div></div>';
+ }
+ if(draft.phase==="summary"){
+  detail='<div class="scan-report"><h3>'+L("report")+'</h3><p class="scan-hint">'+L("sessionHelp")+'</p>'+
+   '<div class="scan-report-grid">'+["created","updated","duplicate","unresolved"].map(key=>
+    '<div class="scan-report-stat"><strong>'+e(totals[key])+'</strong><span>'+L(key)+'</span></div>').join("")+'</div>'+
+   (session.length?'<div class="scan-report-list">'+session.slice(-80).map(row=>
+    '<div class="scan-report-row"><span class="scan-report-badge">'+L(row.status)+'</span>'+
+    '<strong>'+e(row.title||row.isbn)+'</strong><small>'+e(row.isbn)+'</small>'+
+    (row.status==="unresolved"?'<button class="btn-link" data-action="scan-retry" data-isbn="'+e(row.isbn)+'">'+L("retry")+'</button>':"")+
+    '</div>').join("")+'</div>':'<p class="scan-hint">'+L("noScan")+'</p>')+
+   '<div class="actions"><button class="btn btn-primary" data-action="scan-resume">'+L("resume")+'</button>'+
    '<button class="btn btn-soft" data-action="scan-close">'+L("done")+'</button></div></div>';
  }
  return '<div class="scan-overlay" id="scan-overlay"><section id="scan-dialog" class="scan-dialog" role="dialog" aria-modal="true" aria-labelledby="scan-title">'+
   '<header class="scan-heading"><div><div class="eyebrow">MANGADVISOR · ISBN</div><h2 id="scan-title">'+L("title")+'</h2>'+
   '<p>'+L("intro")+'</p></div><button type="button" class="scan-x" data-action="scan-close" aria-label="'+L("close")+'">×</button></header>'+
-  (draft.phase==="saved"?detail:
+  (draft.phase==="saved"||draft.phase==="summary"?detail:
    '<div class="scan-body"><form class="scan-inline-form" id="scan-isbn-form">'+
    '<label for="scan-isbn-input">'+L("manual")+'</label><div class="actions">'+
    '<input class="input" id="scan-isbn-input" name="isbn" maxlength="18" autocomplete="off" inputmode="numeric" placeholder="978..." value="'+e(draft.isbn||"")+'">'+
@@ -173,8 +186,11 @@ export function scannerMarkup(lang,escape,draft,count=0,session=[]){
    cameraButtons+camera+
    (draft.phase==="loading"?'<div class="info">'+L("checking")+'</div>':"")+
    (draft.message?'<p class="scan-error" role="alert">'+e(draft.message)+'</p>':"")+
-   detail+'</div>')+
-  '<footer class="scan-footer">'+e(count)+' '+L("more")+'</footer></section></div>';
+   detail+'<div class="scan-footer-tools"><button type="button" class="btn-link" data-action="scan-summary">'+L("reportView")+'</button>'+
+   (draft.phase==="idle"&&draft.message&&draft.isbn?'<button class="btn btn-small" data-action="scan-skip">'+L("skip")+'</button>':"")+
+   '</div></div>')+
+  '<footer class="scan-footer">'+e(count)+' '+L("more")+' · '+
+   e(totals.created)+' '+L("created")+' · '+e(totals.unresolved)+' '+L("unresolved")+'</footer></section></div>';
 }
 
 export function createIsbnScanner({root,request,lang,escape,onSaved}){
