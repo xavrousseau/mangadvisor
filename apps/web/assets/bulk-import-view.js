@@ -12,7 +12,9 @@ export function csvPreviewMarkup(data, text, escape) {
   const labels=[row.is_owned?L("collectionOwned"):"",row.is_read?L("collectionRead"):""].filter(Boolean).join(" · ")||L("bulkNoChange");
   return '<tr><td><span class="bulk-status '+(matched?'matched':'pending')+'">'+
    (matched?'✓ '+L("bulkKnown"):'! '+L("bulkUnknown"))+'</span></td>'+
-   '<td class="bulk-isbn">'+e(row.isbn13)+'</td><td>'+description+'</td><td>'+labels+'</td></tr>';
+   '<td class="bulk-isbn">'+e(row.isbn13)+'</td><td>'+description+'</td><td>'+labels+
+    (matched?'':'<button type="button" class="btn-link bulk-resolve-trigger" data-action="bulk-resolve" data-isbn="'+e(row.isbn13)+'">'+L("resolveStart")+' →</button>')+
+    '</td></tr>';
  }).join("");
  const warnings=errors.length
    ?'<details class="bulk-errors"><summary>'+L("bulkInvalid")+' ('+e(errors.length)+')</summary><ul>'+
@@ -30,7 +32,7 @@ export function csvPreviewMarkup(data, text, escape) {
   ?'<button type="button" data-action="bulk-apply" class="btn btn-primary">'+L("bulkConfirm")+
    ' ('+e(data.to_update)+' '+L("bulkToUpdate")+')</button>':'';
  return '<div class="bulk-preview"><h3>'+L("bulkPreviewTitle")+'</h3><p>'+L("bulkPreviewHelp")+'</p>'+
-  header+table+warnings+button+'</div>';
+  header+table+warnings+'<div id="bulk-resolver-slot"></div>'+button+'</div>';
 }
 export function reconciliationMarkup(data, text, escape) {
  const e=x=>escape(present(x)), L=k=>e(text(k));
