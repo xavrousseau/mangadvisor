@@ -51,11 +51,28 @@ services:
       API_PORT: ${API_PORT}
       LIBRETRANSLATE_URL: ${LIBRETRANSLATE_URL:-}
       LIBRETRANSLATE_API_KEY: ${LIBRETRANSLATE_API_KEY:-}
+      # Explicit opt-in: the default guided advisor requires no model download.
+      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
     depends_on:
       postgres:
         condition: service_healthy
       meilisearch:
         condition: service_started
+    networks:
+      - mangadvisor_network
+
+  # Local AI model: optional, never exposed via a host port. Use option 15
+  # in mangadvisor.cmd to start it and download the model explicitly.
+  ollama:
+    image: ollama/ollama:0.6.8
+    container_name: mangadvisor_ollama
+    profiles: ["ai"]
+    environment:
+      OLLAMA_KEEP_ALIVE: 10m
+    volumes:
+      - mangadvisor_ollama_models:/root/.ollama
     networks:
       - mangadvisor_network
 
@@ -119,6 +136,8 @@ services:
       - mangadvisor_network
 
 volumes:
+  # Optional downloaded AI model files: never part of PostgreSQL backups.
+  mangadvisor_ollama_models:
   # Données persistantes PostgreSQL
   mangadvisor_pgdata:
 

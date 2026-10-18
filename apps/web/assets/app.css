@@ -902,3 +902,12 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
 .enrich-pagination p{font-size:11px;color:var(--muted);line-height:1.6;margin:0;overflow-wrap:anywhere}
 @media(max-width:520px){.enrich-query .btn{width:100%}.enrich-pagination .btn{width:100%}}
+
+
+/* 3.0: transparent local-model status; no implication that offline guided mode is AI. */
+.advisor-ai-state{display:flex;align-items:center;gap:9px;margin:10px 0 17px;
+ padding:10px 13px;border:1px solid var(--border);border-radius:11px;
+ background:var(--surface2);color:var(--muted);font-size:11px;line-height:1.6;
+ font-weight:600;overflow-wrap:anywhere}
+.advisor-ai-dot{font-size:17px;color:var(--muted)}
+.advisor-ai-dot.active{color:var(--accent)}

@@ -89,3 +89,16 @@ test("synopsis-derived tokens remain HTML escaped",()=>{
  assert.doesNotMatch(html,/<img src=x/);
  assert.match(html,/&lt;img src=x/);
 });
+
+
+test("the UI discloses whether the local AI is really available",()=>{
+ const local=advisorChatMarkup({history:[],aiMode:"local_ai",lang:"fr"},L,e);
+ assert.match(local,/advisorAIActive/);
+ assert.match(local,/advisor-ai-dot active/);
+ const guided=advisorChatMarkup({history:[],aiMode:"guided",lang:"fr"},L,e);
+ assert.match(guided,/advisorAIGuided/);
+ assert.doesNotMatch(guided,/advisor-ai-dot active/);
+ const fallback=advisorChatMarkup({history:[],aiMode:"guided_fallback",lang:"fr"},L,e);
+ assert.match(fallback,/advisorAIFallback/);
+ assert.doesNotMatch(fallback,/advisor-ai-dot active/);
+});

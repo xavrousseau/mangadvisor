@@ -299,9 +299,53 @@ def describe_context(context:AdvisorContext,lang:str)->str:
 
 
 def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->APIRouter:
+    # Lazy import: advisor_ai imports AdvisorContext but cannot write SQL or manga.
+    from apps.api.app.advisor_ai import (
+        LocalAiUnavailable, ai_status, interpret_with_ollama, local_ai_enabled,
+    )
+
+    @router.get("/ai-status")
+    def get_ai_status()->dict[str,Any]:
+        return ai_status()
+
     @router.post("/message")
     def ask_advisor(payload:AdvisorRequest)->dict[str,Any]:
         context,changes,more,warnings=interpret(payload.message,payload.context)
+        result=resolve_advisor(payload,context,changes,more,warnings)
+        result["ai_mode"]="guided"
+        return result
+
+    @router.post("/ai-message")
+    def ask_ai_advisor(payload:AdvisorRequest)->dict[str,Any]:
+        """Optional local model only parses intent; the same SQL engine retrieves results."""
+        ai_requested=local_ai_enabled()
+        if ai_requested:
+            try:
+                context,changes,more=interpret_with_ollama(
+                    payload.message,payload.context,payload.lang
+                )
+                # Explicit caveats are kept by the audited lexical interpreter.
+                _,_,_,warnings=interpret(payload.message,payload.context)
+                result=resolve_advisor(payload,context,changes,more,warnings)
+                result["ai_mode"]="local_ai"
+                return result
+            except LocalAiUnavailable:
+                pass  # Recover reliably without changing collection or returning fake results.
+        result=ask_advisor(payload)
+        result["ai_mode"]="guided_fallback" if ai_requested else "guided"
+        if ai_requested:
+            result["ai_notice"]=(
+                "IA locale indisponible : conseiller guidé utilisé."
+                if payload.lang=="fr" else
+                "Local AI unavailable: guided advisor used."
+            )
+        return result
+
+    def resolve_advisor(
+        payload:AdvisorRequest,context:AdvisorContext,
+        changes:list[str],more:bool,warnings:list[str],
+    )->dict[str,Any]:
+        """Only this audited code chooses and explains manga from PostgreSQL."""
         data={"context":context.model_dump(),"changes":changes,
               "limitations":warnings,"recommendations":[],"count":0,"personalized":False}
         is_fr=payload.lang=="fr"

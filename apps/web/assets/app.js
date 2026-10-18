@@ -24,6 +24,7 @@ const state = {
   recMode:"mood",mood:"MYSTERY",moodLength:"ANY",moodFinished:false,moodUseLibrary:true,moodMinScore:6.5,recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   advisorHistory:[],advisorContext:{},advisorSeen:[],advisorResponse:null,advisorBusy:false,
+  advisorAiMode:"guided",
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,biblioCandidates:null,biblioSearchNonce:0,
   enrichmentReport:null,enrichmentNonce:0,enrichmentAlias:"",enrichmentBusy:false,
@@ -540,6 +541,12 @@ async function recommendationMarkup(items,token){
    recommendationExplanation(m)+'</details></article>').join("")+'</div>';
 }
 async function renderAdvisorRecommendations(token){
+ // Ollama is optional; API always has a safe deterministic fallback.
+ try {
+  const status=await request("/advisor/ai-status");
+  state.advisorAiMode=status.available?"local_ai":"guided";
+ } catch {state.advisorAiMode="guided";}
+ if(token!==renderToken)return;
  const html='<div class="headline-row"><div><div class="eyebrow">✧ MANGADVISOR · YOUR MANGA ADVISOR</div>'+
   '<h1 class="page-title">'+L("advisorTitle")+'</h1><p class="page-desc">'+L("advisorPageIntro")+'</p></div></div>'+
   '<div class="toggle-tabs rec-mode-tabs" role="group" aria-label="'+L("forYou")+'">'+
@@ -548,7 +555,8 @@ async function renderAdvisorRecommendations(token){
   '<button data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
   '<button data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
   '<div id="advisor-main">'+advisorChatMarkup({
-   history:state.advisorHistory,busy:state.advisorBusy,lang:state.lang},L,e)+'</div>'+
+   history:state.advisorHistory,busy:state.advisorBusy,lang:state.lang,
+   aiMode:state.advisorAiMode},L,e)+'</div>'+
   '<div id="advisor-results"></div>';
  if(!mount(html,token))return;
  await paintAdvisorResults(token);
@@ -570,13 +578,14 @@ async function sendAdvisorMessage(raw){
  const currentToken=renderToken;
  if(state.recMode==="advisor"){
   const main=document.querySelector("#advisor-main");
-  if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:true,lang:state.lang},L,e);
+  if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:true,lang:state.lang,aiMode:state.advisorAiMode},L,e);
  }
  try{
-  const response=await request("/advisor/message",{method:"POST",data:{
+  const response=await request("/advisor/ai-message",{method:"POST",data:{
    message:value,context:state.advisorContext,seen_ids:state.advisorSeen,lang:state.lang,limit:6
   }});
   state.advisorContext=response.context||{};
+  state.advisorAiMode=response.ai_mode||"guided";
   state.advisorResponse=response;
   if(response.recommendations?.length)
    state.advisorSeen=[...new Set([...state.advisorSeen,...response.recommendations.map(x=>x.id)])].slice(-100);
@@ -590,7 +599,7 @@ async function sendAdvisorMessage(raw){
   state.advisorBusy=false;
   if(state.recMode==="advisor"&&currentToken===renderToken){
    const main=document.querySelector("#advisor-main");
-   if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:false,lang:state.lang},L,e);
+   if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:false,lang:state.lang,aiMode:state.advisorAiMode},L,e);
    const target=document.querySelector("#advisor-results");
    if(target)target.innerHTML="";
    await paintAdvisorResults(currentToken);

@@ -15,7 +15,11 @@ export const ADVISOR_PROMPTS={
  ]
 };
 
-export function advisorChatMarkup({history=[],busy=false,lang="fr"},L,e){
+export function advisorChatMarkup({history=[],busy=false,lang="fr",aiMode="guided"},L,e){
+ const modeKey=aiMode==="local_ai"?"advisorAIActive":
+   aiMode==="guided_fallback"?"advisorAIFallback":"advisorAIGuided";
+ const aiBanner='<div class="advisor-ai-state" aria-live="polite"><span class="advisor-ai-dot '+
+  (aiMode==="local_ai"?"active":"")+'" aria-hidden="true">✧</span>'+L(modeKey)+'</div>';
  const intro=history.length?"":'<div class="advisor-welcome">'+
   '<div class="advisor-orb" aria-hidden="true">✧</div><h2>'+L("advisorGreeting")+'</h2>'+
   '<p>'+L("advisorIntro")+'</p></div>';
@@ -30,6 +34,7 @@ export function advisorChatMarkup({history=[],busy=false,lang="fr"},L,e){
   '<h2>'+L("advisorTitle")+'</h2><p>'+L("advisorSubhead")+'</p></div>'+
   '<button type="button" class="btn btn-small btn-soft" data-action="advisor-reset"'+(busy?' disabled':'')+'>'+
   '↺ '+L("advisorReset")+'</button></div>'+
+  aiBanner+
   '<div class="advisor-transcript" id="advisor-transcript" role="log" aria-live="polite" aria-relevant="additions text">'+
   intro+samples+messages+(busy?'<div class="advisor-loading">'+L("loading")+'…</div>':"")+'</div>'+
   '<form id="advisor-form" class="advisor-composer">'+
