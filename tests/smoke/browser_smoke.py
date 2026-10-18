@@ -288,7 +288,7 @@ def run():
                 "Déjà associé")
             expect(page.locator('[data-action="fr-discovery-select"]')).to_have_count(1)
             expect(page.locator(".fr-discovery-found")).to_contain_text(
-                "Résultats",timeout=30000)
+                "Notices trouvées",timeout=30000)
             page.locator('[data-action="fr-discovery-select"][data-isbn="9782344074282"]').click()
             expect(page.locator("#edition-preview .edition-preview")).to_be_visible(timeout=30000)
             expect(page.locator("#edition-preview")).to_contain_text("Naruto — Tome 2")
