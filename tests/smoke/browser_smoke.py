@@ -1,5 +1,6 @@
 """Tests réels de la nouvelle interface Mangadvisor avec base CI jetable."""
 from pathlib import Path
+import json
 from playwright.sync_api import sync_playwright, expect
 
 BASE = "http://127.0.0.1:8501"
@@ -162,6 +163,69 @@ def run():
             expect(page.locator(".bulk-preview")).to_contain_text("ISBN non référencé")
             expect(page.locator(".bulk-preview [data-action='bulk-apply']")).to_be_visible()
             page.screenshot(path=str(OUTPUT / f"{device}-import-csv-apercu.png"), full_page=True)
+            # The BnF request is mocked ONLY in this browser test. The real
+            # PostgreSQL edition insert is checked separately inside the CI API
+            # container, with a patched external BnF lookup.
+            resolved={"saved":False,"preview_calls_after_save":0}
+            bnf_notice={
+                "isbn13":"9782344074282","title_fr":"Monster. Tome 1",
+                "author_fr":"Naoki Urasawa","publisher_fr":"Éditeur de démonstration CI",
+                "release_date_text":"2002","source_name":"BnF — notice CI simulée",
+                "source_url":"https://catalogue.bnf.fr/ark:/12148/cbexample",
+                "verified_isbn":True,"edition_kind_suggested":"UNKNOWN",
+            }
+            def bnf_mock(route):
+                route.fulfill(status=200,content_type="application/json",
+                              body=json.dumps(bnf_notice))
+            def edition_mock(route):
+                assert route.request.method=="POST"
+                data=route.request.post_data_json
+                assert data=={
+                    "isbn13":"9782344074282",
+                    "edition_kind":"PERFECT",
+                    "volume_number":1,
+                },data
+                resolved["saved"]=True
+                route.fulfill(status=201,content_type="application/json",
+                              body=json.dumps({"id":100,"manga_id":2,**data}))
+            def preview_mock(route):
+                reply=route.fetch()
+                data=reply.json()
+                if resolved["saved"]:
+                    resolved["preview_calls_after_save"]+=1
+                    row=next(x for x in data["items"] if x["isbn13"]=="9782344074282")
+                    row.update({
+                        "match":"EXACT_ISBN","edition_id":100,"manga_id":2,
+                        "title_fr":"Monster. Tome 1",
+                        "edition_kind":"PERFECT","volume_number":1,
+                    })
+                    data["matched"]+=1;data["unknown"]-=1;data["to_update"]+=1
+                route.fulfill(response=reply,body=json.dumps(data))
+            page.route("**/api/collection/isbn/9782344074282",bnf_mock)
+            page.route("**/api/collection/mangas/2/editions",edition_mock)
+            page.route("**/api/collection/import/preview",preview_mock)
+            page.locator('[data-action="bulk-resolve"][data-isbn="9782344074282"]').click()
+            expect(page.locator("#bulk-resolver .bulk-resolver-notice")).to_be_visible(timeout=30000)
+            expect(page.locator("#bulk-resolver")).to_contain_text("Monster. Tome 1")
+            page.locator("#bulk-resolve-query").fill("Monster")
+            page.locator("#bulk-resolve-search-form button[type=submit]").click()
+            expect(page.locator('[data-action="bulk-resolve-select"][data-id="2"]')).to_be_visible(timeout=30000)
+            page.locator('[data-action="bulk-resolve-select"][data-id="2"]').click()
+            expect(page.locator('[data-action="bulk-resolve-confirm"]')).to_be_disabled()
+            page.locator("#bulk-resolve-kind").select_option("PERFECT")
+            page.locator("#bulk-resolve-volume").fill("1")
+            page.locator("#bulk-resolve-ack").check()
+            expect(page.locator('[data-action="bulk-resolve-confirm"]')).to_be_enabled()
+            page.screenshot(path=str(OUTPUT / f"{device}-assistant-isbn.png"), full_page=True)
+            page.locator('[data-action="bulk-resolve-confirm"]').click()
+            expect(page.locator("#bulk-import-result")).to_contain_text(
+                "Livre lié à la série",timeout=30000)
+            expect(page.locator(".bulk-preview")).to_contain_text(
+                "Monster. Tome 1",timeout=30000)
+            assert resolved["saved"] and resolved["preview_calls_after_save"]==1,resolved
+            page.unroute("**/api/collection/isbn/9782344074282")
+            page.unroute("**/api/collection/mangas/2/editions")
+            page.unroute("**/api/collection/import/preview")
             page.locator('[data-action="bulk-compare"]').click()
             expect(page.locator(".bulk-reconcile")).to_be_visible(timeout=30000)
             expect(page.locator(".bulk-reconcile")).to_contain_text("Compteurs historiques")
