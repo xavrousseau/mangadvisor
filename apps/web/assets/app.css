@@ -223,3 +223,49 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 }
 @media(max-width:375px){.detail-hero{grid-template-columns:95px 1fr}.detail-info h1{font-size:23px}.rec-card{grid-template-columns:92px 1fr}.nav-link{font-size:8px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+
+/* Mangadvisor 1.1 — accueil personnel sans fausses recommandations. */
+.home-reading-grid{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;
+}
+.home-reading-card{
+  display:grid;grid-template-columns:87px minmax(0,1fr);align-items:start;
+  gap:13px;padding:11px;background:var(--surface);border:1px solid var(--border);
+  border-radius:13px;min-width:0;
+}
+.home-reading-card .poster-btn{
+  aspect-ratio:.71;border-radius:8px;
+}
+.home-reading-card .poster-fallback .poster-letter{font-size:34px}
+.home-reading-card .poster-fallback small{font-size:9px}
+.home-reading-body{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0}
+.home-reading-body h3{
+  font-size:15px;line-height:1.23;letter-spacing:-.03em;
+  overflow-wrap:anywhere;margin:0;
+}
+.home-reading-body .pill{font-size:10px}
+.home-progress{font-size:11px;color:var(--muted)}
+.home-reading-body .card-open{margin-top:auto}
+.home-source{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  margin:8px 0 15px;color:var(--muted);font-size:12px;
+}
+.home-source strong{color:var(--accent);font-weight:800}
+.home-empty{
+  display:flex;flex-wrap:wrap;align-items:center;gap:14px;
+  padding:18px 22px;border:1px dashed #48505e;border-radius:13px;
+  background:rgba(255,255,255,.022);
+}
+.home-empty span{font-size:25px;color:var(--accent)}
+.home-empty p{color:var(--muted);font-size:12px;line-height:1.6;flex:1 1 260px;margin:0}
+.home-empty .btn{margin-left:auto}
+@media(max-width:1380px){
+  .home-reading-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:740px){
+  .home-reading-grid{grid-template-columns:1fr}
+  .home-reading-card{grid-template-columns:100px minmax(0,1fr)}
+  .home-reading-body h3{font-size:17px}
+  .home-empty{padding:15px;gap:10px}
+}
