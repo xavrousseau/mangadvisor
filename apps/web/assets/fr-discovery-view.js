@@ -30,9 +30,13 @@ export function frDiscoveryResults(data, knownISBNs, text, escape) {
   if(item?.verified_isbn!==true || !/^[0-9]{13}$/.test(String(item.isbn13??"")))return "";
   const url=safeBnfLink(item.source_url);
   const already=known.has(item.isbn13);
+  const language=["french","mixed","other","unknown"].includes(item.language_status)
+    ? item.language_status:"unknown";
+  const languageText=L("frSearchLanguage_"+language);
   return '<article class="fr-discovery-card"><div><span class="fr-discovery-label">'+
    L("frSearchRecord")+'</span><h4>'+e(item.title_fr)+'</h4>'+
    '<p>'+[item.author_fr,item.publisher_fr,item.release_date_text].filter(Boolean).map(e).join(" · ")+'</p>'+
+   '<p class="fr-discovery-language">'+L("frSearchLanguage")+': '+languageText+'</p>'+
    '<p class="edition-source">ISBN '+e(item.isbn13)+
    (url?' · <a href="'+e(url)+'" rel="noopener noreferrer" target="_blank">'+L("collectionBnfSource")+' ↗</a>':'')+
    ' · '+L("collectionSourceDate")+' '+e(String(item.source_checked_at||"").slice(0,10))+'</p></div>'+
