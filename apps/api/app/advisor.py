@@ -46,7 +46,7 @@ MOOD_PATTERNS: dict[str, tuple[str, ...]] = {
     "FANTASY": (r"\bfantastique\b",r"\bfantasy\b",r"\bfantaisie\b",r"\bmagie\b",r"\bmagique\b",r"\bimaginaire\b",r"\bheroic"),
 }
 NEGATION_BEFORE = re.compile(r"(?:pas de|pas d|sans|eviter|evite|no|without|avoid|ni)\s+(?:\w+\s+){0,2}$")
-RESET = re.compile(r"\b(recommenc|repartir de zero|nouvelle recherche|reset|start over)\b")
+RESET = re.compile(r"\b(recommenc\w*|repartir de zero|nouvelle recherche|reset|start over)\b")
 MORE = re.compile(r"\b(autres?|d.autres|encore|more|another|different)\b")
 FINISHED = re.compile(r"\b(termin\w*|fini\w*|complet\w*|finished|completed)\b")
 UNFINISHED = re.compile(r"\b(en cours de publication|ongoing|publishing|pas termine|non termine)\b")
