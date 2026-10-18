@@ -340,7 +340,7 @@ def run():
             expect(page.locator('[data-action="enrich-more"]')).to_be_visible()
             page.locator('[data-action="enrich-more"]').click()
             expect(page.locator(".enrich-candidate")).to_have_count(4,timeout=30000)
-            expect(page.locator(".enrich-format-group")).to_have_count(3)
+            expect(page.locator(".enrich-format-group")).to_have_count(4)
             expect(page.locator(".enrich-pagination")).to_contain_text("2 / 3")
             expect(page.locator('[data-action="enrich-more"]')).to_have_count(0)
             expect(page.locator('[data-action="enrich-verify-isbn"]')).to_have_count(2)
