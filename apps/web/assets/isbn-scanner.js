@@ -195,6 +195,7 @@ export function scannerMarkup(lang,escape,draft,count=0,session=[]){
 
 export function createIsbnScanner({root,request,lang,escape,onSaved}){
  let draft=null,stream=null,frame=0,epoch=0,detector=null,lastDetect=0,busy=false,handled=0,returnFocus=null;
+ let session=[],lastSeries=null,preferCamera=false;
  const isOpen=()=>Boolean(draft&&root.querySelector("#scan-overlay"));
  const t=key=>msg(lang(),key);
  function stopCamera(){
@@ -208,7 +209,7 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
  function paint(){
   if(!draft)return;
   const existing=root.querySelector("#scan-overlay");
-  if(existing)existing.outerHTML=scannerMarkup(lang(),escape,draft,handled);
+  if(existing)existing.outerHTML=scannerMarkup(lang(),escape,draft,handled,session);
   else root.insertAdjacentHTML("beforeend",scannerMarkup(lang(),escape,draft,handled));
  }
  function close(){
@@ -216,7 +217,7 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
   if(returnFocus?.isConnected)returnFocus.focus();returnFocus=null;
  }
  function open(selectedManga=null){
-  close();returnFocus=document.activeElement;handled=0;
+  close();returnFocus=document.activeElement;handled=0;session=[];lastSeries=null;preferCamera=false;
   draft={phase:"idle",isbn:"",record:null,registered:null,matches:[],selected:selectedManga?.id?
    {id:selectedManga.id,title:selectedManga.title}:null,query:"",searched:false,
    kind:"UNKNOWN",volume:"",owned:true,read:false,ack:false,camera:false,message:""};
@@ -228,11 +229,11 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
  }
  function reset(next=false){
   if(!draft)return;
-  const selected=next?null:draft.selected;
+  const selected=next?lastSeries:draft.selected;
   stopCamera();epoch++;
   draft={phase:"idle",isbn:"",record:null,registered:null,matches:[],selected,
    query:"",searched:false,kind:"UNKNOWN",volume:"",owned:true,read:false,ack:false,
-   camera:false,message:""};
+   camera:false,message:"",previousSeries:next&&Boolean(selected)};
   paint();root.querySelector("#scan-isbn-input")?.focus();
  }
  async function lookup(raw){
@@ -259,6 +260,7 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
    paint();
   }catch(err){
    if(current!==epoch||!isOpen())return;
+   session=scanSessionEntry(session,{isbn,title:isbn,status:"unresolved",error:err.message||t("noBnf")});
    draft={...draft,phase:"idle",message:err.message||t("noBnf")};
    paint();
   }
@@ -278,7 +280,7 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
     audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}
    });
    if(current!==epoch||!isOpen()){cameraStream.getTracks().forEach(track=>track.stop());return;}
-   stream=cameraStream;draft.camera=true;draft.message="";paint();
+   stream=cameraStream;draft.camera=true;preferCamera=true;draft.message="";paint();
    const video=root.querySelector("#scan-video");
    video.srcObject=stream;
    await video.play();
@@ -342,7 +344,11 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
    const result=await request("/collection/scan/confirm",{method:"POST",data:payload});
    if(current!==epoch||!isOpen())return;
    const title=result.edition?.title_fr||draft.isbn;
-   handled++;
+   const status=scanOutcome(result,draft.registered?.edition);
+   session=scanSessionEntry(session,{isbn:draft.isbn,title,status});
+   if(draft.phase==="unknown")lastSeries=draft.selected?{...draft.selected}:null;
+   else if(result.edition?.manga_id)lastSeries={id:result.edition.manga_id,title:result.edition.manga_title};
+   handled=session.filter(row=>row.status!=="unresolved").length;
    stopCamera();draft={...draft,phase:"saved",savedTitle:title,message:""};paint();
    await onSaved(result);
   }catch(err){if(current===epoch&&isOpen()){button.disabled=false;message(err.message||t("noBnf"));}}
@@ -352,7 +358,16 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
   if(!draft)return;
   if(action==="scan-start"){await startCamera();return;}
   if(action==="scan-stop"){stopCamera();paint();return;}
-  if(action==="scan-next"){reset(true);return;}
+  if(action==="scan-summary"){stopCamera();draft={...draft,phase:"summary"};paint();return;}
+  if(action==="scan-resume"){reset(false);return;}
+  if(action==="scan-next"||action==="scan-skip"){
+   reset(true);if(preferCamera)await startCamera();return;
+  }
+  if(action==="scan-retry"){
+   const isbn=normalizeScannerIsbn(button.dataset.isbn);
+   if(isbn){reset(false);await lookup(isbn);}
+   return;
+  }
   if(action==="scan-unselect"){capture();draft.selected=null;draft.matches=[];draft.searched=false;paint();return;}
   if(action==="scan-select"&&draft.phase==="unknown"){
    capture();const manga=draft.matches.find(m=>Number(m.id)===Number(button.dataset.id));
