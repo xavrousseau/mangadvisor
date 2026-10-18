@@ -1,6 +1,7 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
 import { createIsbnScanner } from "./isbn-scanner.js";
+import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js";
 import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
@@ -18,7 +19,7 @@ const state = {
   appearance: loadAppearance(window.localStorage),
   catalogPage:1, catalogQuery:"",catalogGenre:"",catalogFinished:false,
   libraryPage:1,libraryQuery:"",libraryStatus:"",
-  recMode:"library",recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
+  recMode:"mood",mood:"MYSTERY",moodLength:"ANY",moodFinished:false,moodUseLibrary:true,moodMinScore:6.5,recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,biblioCandidates:null,biblioSearchNonce:0,
@@ -532,7 +533,61 @@ async function recommendationMarkup(items,token){
   '<details class="reco-explanation" style="grid-column:1/-1"><summary>✦ '+L("why")+'</summary>'+
    recommendationExplanation(m)+'</details></article>').join("")+'</div>';
 }
+async function renderMoodRecommendations(token){
+ const html='<div class="headline-row"><div><div class="eyebrow">✧ MANGADVISOR · GUIDED DISCOVERY</div>'+
+  '<h1 class="page-title">'+L("moodPageTitle")+'</h1><p class="page-desc">'+L("moodPageIntro")+'</p></div></div>'+
+  '<div class="toggle-tabs rec-mode-tabs" role="group" aria-label="'+L("forYou")+'">'+
+  '<button class="selected" data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button>'+
+  '<button data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
+  '<button data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
+  moodFormMarkup({mood:state.mood,length:state.moodLength,onlyFinished:state.moodFinished,
+   useLibrary:state.moodUseLibrary,minScore:state.moodMinScore},L,e)+
+  '<div id="rec-results">'+(state.recResult?'':'<div class="info">'+L("moodFirstHint")+'</div>')+'</div>';
+ if(!mount(html,token))return;
+ if(state.recResult)await showMoodResults(token);
+}
+async function showMoodResults(token){
+ const target=document.querySelector("#rec-results");
+ if(!target||!state.recResult)return;
+ const result=state.recResult;
+ const personalized=result.personalized===true;
+ const banner='<div class="mood-result-summary"><div><span class="eyebrow">'+
+  L(personalized?"moodPersonalized":"moodCatalogOnly")+'</span><h2>'+L("moodYourResults")+'</h2>'+
+  '<p>'+L(personalized?"moodPersonalizedHelp":"moodCatalogHelp")+'</p></div>'+
+  '<span class="mood-count">'+e(result.count)+' '+L("moodResultsCount")+'</span></div>';
+ target.innerHTML=banner+'<div id="rec-cards">'+loadingCards(3)+'</div>'+
+  '<p class="mood-disclaimer">'+L("moodFrenchCaution")+'</p>';
+ const urls=await covers(result.recommendations||[]);
+ if(token!==renderToken || state.recMode!=="mood")return;
+ const cards=moodResultsMarkup(result.recommendations||[],{
+  L,e,tr,poster:m=>poster(m,urls),rating:m=>stars(m),
+  published:status=>e(publication(state.lang,status))
+ });
+ const group=document.querySelector("#rec-cards");
+ if(group)group.innerHTML=cards;
+}
+async function generateMoodDiscoveries(){
+ const button=document.querySelector("#rec-submit");
+ if(button){button.disabled=true;button.textContent=t(state.lang,"loading");}
+ const payload={
+  mood:state.mood,length:state.moodLength,only_finished:state.moodFinished,
+  use_library:state.moodUseLibrary,min_score:Number(state.moodMinScore),
+  limit:8
+ };
+ try{
+  const result=await request("/discovery/mood",{method:"POST",data:payload});
+  if(state.recMode!=="mood")return;
+  state.recResult=result;
+  await showMoodResults(renderToken);
+ }catch(err){
+  const node=document.querySelector("#rec-results");
+  if(node)node.innerHTML=errorBox(err);
+ }finally{
+  if(button?.isConnected){button.disabled=false;button.innerHTML='✧ '+t(state.lang,"moodFind")+' →';}
+ }
+}
 async function renderRecommendations(token){
+ if(state.recMode==="mood")return renderMoodRecommendations(token);
  const libraryMode=state.recMode==="library";
  const goalLabels={"SIMILAR_SAFE":"goalSimilar","READ_NEXT":"goalNext","SHORT_FINISHED":"goalShort"};
  const html='<div class="headline-row"><div><div class="eyebrow">✦ YOUR PERSONAL MANGA MATCH</div>'+
@@ -542,7 +597,8 @@ async function renderRecommendations(token){
  '<button class="btn btn-small btn-soft" data-go="/library">'+L("explainImproveAction")+' →</button></details>'+
  '<div class="toggle-tabs" role="group" aria-label="'+L("forYou")+'">'+
  '<button class="'+(libraryMode?'selected':'')+'" data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
- '<button class="'+(!libraryMode?'selected':'')+'" data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
+ '<button class="'+(!libraryMode?'selected':'')+'" data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button>'+
+ '<button data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button></div>'+
  '<div class="option-panel"><h2>'+L(libraryMode?"libraryMode":"manualMode")+'</h2>'+
  '<p>'+L(libraryMode?"libraryModeText":"manualModeText")+'</p>'+
  (libraryMode?'<div class="field medium"><label for="rec-goal">'+L("goal")+'</label>'+
@@ -1008,6 +1064,13 @@ root.addEventListener("click",async event=>{
   if(!state.selected.includes(button.dataset.title))state.selected.push(button.dataset.title);
   state.recResult=null;await render();return;
  }
+ if(action==="mood-select"){
+  if(MOOD_OPTIONS.some(([name])=>name===button.dataset.mood)){
+   state.mood=button.dataset.mood;state.recResult=null;await render();
+  }
+  return;
+ }
+ if(action==="generate-mood")return generateMoodDiscoveries();
  if(action==="manual-search")return manualSearch();
  if(action==="generate")return generateRecommendations();
 });
@@ -1047,6 +1110,12 @@ root.addEventListener("change",async event=>{
   const area=document.querySelector("#bulk-csv-text");if(area)area.value=state.bulkCsv;
   const out=document.querySelector("#bulk-import-result");if(out)out.innerHTML='<div class="info">'+L("bulkFileReady")+'</div>';
  }
+ if(input.id==="mood-length" && ["ANY","SHORT","LONG"].includes(input.value)){
+   state.moodLength=input.value;state.recResult=null;
+ }
+ if(input.id==="mood-finished"){state.moodFinished=input.checked;state.recResult=null;}
+ if(input.id==="mood-personal"){state.moodUseLibrary=input.checked;state.recResult=null;}
+ if(input.id==="mood-min-score"){state.moodMinScore=input.value;state.recResult=null;}
  if(input.id==="rec-goal"){state.recGoal=input.value;state.recResult=null;}
  if(input.id==="rec-balance"){state.recBalance=input.value;state.recResult=null;}
  if(input.id==="rec-min-score"){state.recMinScore=input.value;state.recResult=null;}
