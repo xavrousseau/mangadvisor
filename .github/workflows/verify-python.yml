@@ -31,7 +31,8 @@ jobs:
           node --input-type=module --check < apps/web/assets/explain.js
           node --input-type=module --check < apps/web/assets/appearance.js
           node --input-type=module --check < apps/web/assets/collection-view.js
+          node --input-type=module --check < apps/web/assets/bulk-import-view.js
       - name: Tester les sélections de l'accueil personnalisé
-        run: node --test tests/web/home.test.mjs tests/web/explain.test.mjs tests/web/appearance.test.mjs tests/web/collection.test.mjs
+        run: node --test tests/web/home.test.mjs tests/web/explain.test.mjs tests/web/appearance.test.mjs tests/web/collection.test.mjs tests/web/bulk-import.test.mjs
       - name: Tester la découverte et les couvertures
         run: python -m unittest discover -s tests -p 'test_*.py' -v
