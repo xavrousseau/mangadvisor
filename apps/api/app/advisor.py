@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from apps.api.app.mood_discovery import MOODS, match_mood, preference_overlap
+from apps.api.app.narrative_evidence import narrative_matches
 
 router = APIRouter(prefix="/advisor", tags=["Conversational manga advisor"])
 Mood = Literal["DARK", "COMFORT", "ACTION", "MYSTERY", "ROMANCE", "FANTASY"]
@@ -27,6 +28,11 @@ class AdvisorContext(BaseModel):
     french: FrenchEvidence = "ANY"
     use_library: bool = True
     avoid_romance: bool = False
+    avoid_horror: bool = False
+    avoid_gore: bool = False
+    narrative_preferences: list[Literal["INVESTIGATION","PSYCHOLOGICAL","SURVIVAL"]] = Field(
+        default_factory=list, max_length=3
+    )
     min_score: float = Field(default=6.5, ge=0, le=10)
 
 class AdvisorRequest(BaseModel):
@@ -57,6 +63,15 @@ FRENCH_REQUIRED = re.compile(r"\b(obligatoire\w*|uniquement|absolument|imperatif
 FRENCH_OPTIONAL = re.compile(r"\b(idealement|si possible|de preference|prefer|ideally|preferably)\b")
 ROMANCE = re.compile(r"\b(romance|romantique|amour|love.story)\b")
 MATURE = re.compile(r"\b(mature|adulte|adultes|seinen)\b")
+NARRATIVE_REQUESTS = {
+    "INVESTIGATION": (r"\benquet\w*\b", r"\binvestigat\w*\b", r"\bdetectiv\w*\b"),
+    "PSYCHOLOGICAL": (r"\bpsycholog\w*\b",),
+    "SURVIVAL": (r"\bsurvi\w*\b", r"\bsurviv\w*\b", r"\bsurvival\b"),
+}
+HORROR_EXCLUDE = re.compile(r"\b(?:sans|pas de|ni|no|without|avoid|eviter|evite)\s+(?:(?:l|la|the)\s+)?(?:horreur|horror)\b")
+GORE_EXCLUDE = re.compile(r"\b(?:sans|pas de|ni|no|without|avoid|eviter|evite)\s+(?:(?:le|the)\s+)?gore\b")
+HORROR_ALLOW = re.compile(r"\b(?:avec|j.accepte|autorise|allow)\s+(?:(?:l|la|the)\s+)?(?:horreur|horror)\b|\b(?:horreur|horror)\s+(?:ok|me va|is fine)\b")
+GORE_ALLOW = re.compile(r"\b(?:avec|autorise|allow)\s+(?:le\s+)?gore\b|\bgore\s+(?:ok|me va|is fine)\b")
 LIBRARY_OFF = re.compile(r"\b(sans (?:mes |ma )?(?:gouts|bibliotheque|preferences)|sans personnalisation|ignore my library|without my library)\b")
 LIBRARY_ON = re.compile(r"\b(selon mes gouts|mes preferences|ma bibliotheque|my library|my taste)\b")
 RATING = re.compile(r"\b(?:note|score|rating)\s*(?:minimum|min|de|d.au moins|>=|superieure a)?\s*(\d{1,2}(?:[.,]\d)?)\s*(?:/10)?\b")
@@ -97,6 +112,27 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
             current.mood = None
         if current.secondary_mood == "ROMANCE":
             current.secondary_mood = None
+    if HORROR_EXCLUDE.search(normalized):
+        current.avoid_horror=True;changes.append("avoid_horror")
+    elif HORROR_ALLOW.search(normalized):
+        current.avoid_horror=False;changes.append("avoid_horror")
+    if GORE_EXCLUDE.search(normalized):
+        current.avoid_gore=True;changes.append("avoid_gore")
+    elif GORE_ALLOW.search(normalized):
+        current.avoid_gore=False;changes.append("avoid_gore")
+    for concept, patterns in NARRATIVE_REQUESTS.items():
+        found_positive=False
+        for pattern in patterns:
+            for occurrence in re.finditer(pattern, normalized):
+                prefix=normalized[max(0,occurrence.start()-46):occurrence.start()]
+                if not NEGATION_BEFORE.search(prefix):
+                    found_positive=True
+                    break
+            if found_positive:
+                break
+        if found_positive and concept not in current.narrative_preferences:
+            current.narrative_preferences.append(concept)
+            changes.append("narrative_preferences")
     if SHORT.search(normalized):
         current.length = "SHORT"; changes.append("length")
     elif LONG.search(normalized):
@@ -138,6 +174,14 @@ def score_candidates(
     selected = []
     mood_list = [x for x in (context.mood,context.secondary_mood) if x]
     for item in rows:
+        tags={str(tag).casefold() for kind in ("genres","themes")
+              for tag in (item.get(kind) or [])}
+        if context.avoid_horror and "horror" in tags:
+            continue
+        if context.avoid_gore and "gore" in tags:
+            continue
+        if context.avoid_romance and "romance" in tags:
+            continue
         matches: dict[str,list[str]]={"genres":[],"themes":[]}
         hits = 0
         for mood in mood_list:
@@ -151,14 +195,21 @@ def score_candidates(
         affinity = preference_overlap(item,preferences)
         verified = int(item.get("french_record_count") or 0)>0
         french_score = 24 if context.french=="PREFER" and verified else 0
+        story_evidence=narrative_matches(item,context.narrative_preferences)
+        story_bonus=sum(16 if record["source"]=="catalog_tag" else 9
+                        for record in story_evidence)
         rank = (
             18*len(matches["genres"]) + 21*len(matches["themes"])
             + min(20, 5*len(affinity["genres"])+7*len(affinity["themes"]))
-            + french_score + 2*float(item.get("score") or 0)
+            + french_score + story_bonus + 2*float(item.get("score") or 0)
         )
         selected.append((rank,float(item.get("score") or 0),
                          -int(item.get("popularity") or 99999999),-int(item["id"]),{
-            **item,"mood_matches":matches,"affinity_matches":affinity,
+            **{k:v for k,v in item.items() if k!="synopsis"},
+            "mood_matches":matches,"affinity_matches":affinity,
+            "narrative_matches":story_evidence,
+            "narrative_unverified":[concept for concept in context.narrative_preferences
+                                    if not any(e["concept"]==concept for e in story_evidence)],
             "french_recorded":verified,
             "ranking_score":None,
         }))
@@ -189,6 +240,19 @@ def describe_context(context:AdvisorContext,lang:str)->str:
         parts.append("ISBN français enregistré souhaité" if fr else "recorded French ISBN preferred")
     if context.avoid_romance:
         parts.append("sans romance documentée" if fr else "without tagged romance")
+    if context.avoid_horror:
+        parts.append("sans horreur documentée" if fr else "without tagged horror")
+    if context.avoid_gore:
+        parts.append("sans gore documenté" if fr else "without tagged gore")
+    narrative_labels={
+        "INVESTIGATION":("enquête","investigation"),
+        "PSYCHOLOGICAL":("psychologique","psychological"),
+        "SURVIVAL":("survie","survival"),
+    }
+    if context.narrative_preferences:
+        names=[narrative_labels[key][0 if fr else 1] for key in context.narrative_preferences]
+        parts.append(("indices narratifs souhaités : " if fr else "preferred narrative clues: ")
+                     +", ".join(names))
     parts.append(("tes goûts" if fr else "your tastes") if context.use_library
                  else ("sans personnalisation" if fr else "no personalization"))
     return " · ".join(parts)
@@ -249,15 +313,23 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             conditions.append("m.volumes>=13")
         if context.french=="REQUIRE":
             conditions.append("EXISTS (SELECT 1 FROM manga_fr_edition fe WHERE fe.manga_id=m.id)")
-        if context.avoid_romance:
-            conditions.append("""NOT EXISTS (SELECT 1 FROM manga_genre rmg
-                JOIN genre rg ON rg.id=rmg.genre_id
-                WHERE rmg.manga_id=m.id AND LOWER(rg.name)='romance')""")
+        if context.avoid_romance or context.avoid_horror or context.avoid_gore:
+            excluded=[]
+            if context.avoid_romance: excluded.append("romance")
+            if context.avoid_horror: excluded.append("horror")
+            if context.avoid_gore: excluded.append("gore")
+            params["excluded_tags"]=excluded
+            conditions.append("""NOT EXISTS (SELECT 1 FROM manga_genre eg
+                JOIN genre gex ON gex.id=eg.genre_id
+                WHERE eg.manga_id=m.id AND LOWER(gex.name)=ANY(%(excluded_tags)s))""")
+            conditions.append("""NOT EXISTS (SELECT 1 FROM manga_theme et
+                JOIN theme tex ON tex.id=et.theme_id
+                WHERE et.manga_id=m.id AND LOWER(tex.name)=ANY(%(excluded_tags)s))""")
         if more and payload.seen_ids:
             conditions.append("NOT (m.id=ANY(%(seen_ids)s))")
             params["seen_ids"]=payload.seen_ids
         sql = """
-            SELECT m.id,m.title,m.status,m.volumes,m.chapters,m.score::float AS score,
+            SELECT m.id,m.title,m.status,m.volumes,m.chapters,m.synopsis,m.score::float AS score,
                 m.popularity,m.manga_type,
                 ARRAY(SELECT g.name FROM manga_genre mg JOIN genre g ON g.id=mg.genre_id
                       WHERE mg.manga_id=m.id ORDER BY g.name) AS genres,
@@ -303,10 +375,10 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             recommendations=chosen,count=len(chosen),
             personalized=personalized,
             reply=(
-                ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres et thèmes du catalogue. "
+                ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "
                  "Les ISBN français ne prouvent pas la disponibilité en magasin."
                  if is_fr else
-                 "I understood: "+interpretation+". These picks are grounded in cataloged genres and themes. "
+                 "I understood: "+interpretation+". These picks use actual catalog tags and literal synopsis clues. "
                  "Recorded French ISBNs do not confirm store availability.")
                 if chosen else
                 ("J'ai compris : "+interpretation+". Aucun titre documenté ne réunit ces critères. Essaie d'assouplir la longueur, la langue ou l'ambiance."

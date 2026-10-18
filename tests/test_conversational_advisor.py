@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from apps.api.app.advisor import (
     AdvisorContext, AdvisorRequest, interpret, match_mood, score_candidates,
 )
+from apps.api.app.narrative_evidence import narrative_matches
 
 
 class ConversationalAdvisorTests(unittest.TestCase):
@@ -91,6 +92,70 @@ class ConversationalAdvisorTests(unittest.TestCase):
         self.assertIsNone(selected[0]["ranking_score"])
         self.assertEqual(match_mood(candidates[0],"MYSTERY"),
                          {"genres":[],"themes":[]})
+
+
+    def test_natural_french_narrative_filters_and_negated_horror(self):
+        ctx, changes, more, warnings = interpret(
+            "Une enquête psychologique, sans horreur, série courte", AdvisorContext()
+        )
+        self.assertEqual(ctx.mood, "MYSTERY")
+        self.assertEqual(ctx.length, "SHORT")
+        self.assertTrue(ctx.avoid_horror)
+        self.assertEqual(ctx.narrative_preferences, ["INVESTIGATION", "PSYCHOLOGICAL"])
+        self.assertIn("avoid_horror", changes)
+        self.assertFalse(more)
+        self.assertFalse(warnings)
+
+    def test_exclusions_followups_reversible(self):
+        ctx,_,_,_=interpret("Un mystère sans horreur et sans gore",AdvisorContext())
+        self.assertTrue(ctx.avoid_horror)
+        self.assertTrue(ctx.avoid_gore)
+        next_ctx,changes,_,_=interpret("Finalement avec horreur",ctx)
+        self.assertFalse(next_ctx.avoid_horror)
+        self.assertTrue(next_ctx.avoid_gore)
+        self.assertIn("avoid_horror",changes)
+        other,_,_,_=interpret("Autorise le gore",next_ctx)
+        self.assertFalse(other.avoid_gore)
+
+    def test_narrative_clues_prove_tag_or_synopsis_not_title(self):
+        record={"genres":["Mystery"],"themes":["Psychological"],
+                "synopsis":"The detective investigates a missing person."}
+        found=narrative_matches(record,["PSYCHOLOGICAL","INVESTIGATION","SURVIVAL"])
+        self.assertEqual(found[0],{"concept":"PSYCHOLOGICAL",
+                                  "source":"catalog_tag","matched":"Psychological"})
+        self.assertEqual(found[1]["source"],"synopsis_word")
+        self.assertIn(found[1]["matched"], {"detective", "investigates"})
+        self.assertFalse(any(x["concept"]=="SURVIVAL" for x in found))
+        self.assertEqual(narrative_matches(
+            {"title":"A Psychological Investigation","genres":[],"themes":[],
+             "synopsis":"A fantasy about magic."},["INVESTIGATION","PSYCHOLOGICAL"]),[])
+
+    def test_clues_influence_rank_with_absence_honestly_labeled(self):
+        candidates=[
+            dict(id=15,title="Psychological investigation",genres=["Mystery"],
+                 themes=[],score=7.5,popularity=1,synopsis="a story of friendship"),
+            dict(id=16,title="Actual clues",genres=["Mystery"],
+                 themes=["Psychological"],score=7.4,popularity=2,
+                 synopsis="A detective investigation."),
+        ]
+        ctx=AdvisorContext(mood="MYSTERY",narrative_preferences=["INVESTIGATION","PSYCHOLOGICAL"])
+        recs=score_candidates(candidates,ctx,{"genres":set(),"themes":set()},3)
+        self.assertEqual([x["id"] for x in recs],[16,15])
+        self.assertEqual(len(recs[0]["narrative_matches"]),2)
+        self.assertEqual(recs[1]["narrative_matches"],[])
+        self.assertEqual(recs[1]["narrative_unverified"],["INVESTIGATION","PSYCHOLOGICAL"])
+        self.assertNotIn("synopsis",recs[0])
+
+    def test_excludes_horror_and_gore_from_both_tag_types(self):
+        rows=[
+            dict(id=1,genres=["Mystery","Horror"],themes=[],score=9.0,popularity=1),
+            dict(id=2,genres=["Mystery"],themes=["Gore"],score=8.5,popularity=2),
+            dict(id=3,genres=["Mystery"],themes=[],score=8.0,popularity=3),
+        ]
+        ctx=AdvisorContext(mood="MYSTERY",avoid_horror=True,avoid_gore=True)
+        self.assertEqual([x["id"] for x in score_candidates(
+            rows,ctx,{"genres":set(),"themes":set()},8)],[3])
+
 
 
 if __name__ == "__main__":

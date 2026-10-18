@@ -56,3 +56,33 @@ test("malicious titles, tags and feedback IDs are not injected",()=>{
  assert.match(html,/&lt;script&gt;/);
  assert.match(html,/&lt;svg/);
 });
+
+
+test("narrative evidence names its source and unverified clues stay explicit",()=>{
+ const manga={id:44,title:"Enquête étrange",status:"Finished",volumes:9,
+  mood_matches:{genres:["Mystery"],themes:[]},
+  affinity_matches:{genres:[],themes:[]},french_recorded:false,
+  narrative_matches:[
+   {concept:"INVESTIGATION",source:"synopsis_word",matched:"investigation"},
+   {concept:"PSYCHOLOGICAL",source:"catalog_tag",matched:"Psychological"}
+  ],
+  narrative_unverified:["SURVIVAL"]};
+ const html=advisorResultsMarkup({count:1,recommendations:[manga]},{
+  L,e,tr:e,poster:()=>'<span class="poster"></span>',rating:()=>"★",
+  published:()=>"Finished"});
+ assert.match(html,/advisor-story-chip/);
+ assert.match(html,/advisorStoryINVESTIGATION/);
+ assert.match(html,/advisorStoryTag: Psychological/);
+ assert.match(html,/advisorStorySynopsis: investigation/);
+ assert.match(html,/advisorNarrativeMissing: advisorStorySURVIVAL/);
+});
+
+test("synopsis-derived tokens remain HTML escaped",()=>{
+ const manga={id:15,title:"Safe title",mood_matches:{genres:["Mystery"]},
+  narrative_matches:[{concept:"INVESTIGATION",source:"synopsis_word",matched:'<img src=x onerror=alert(1)>'}],
+  narrative_unverified:[],affinity_matches:{},french_recorded:false};
+ const html=advisorResultsMarkup({count:1,recommendations:[manga]},{
+  L,e,tr:e,poster:()=>"Poster",rating:()=>"",published:()=>""});
+ assert.doesNotMatch(html,/<img src=x/);
+ assert.match(html,/&lt;img src=x/);
+});

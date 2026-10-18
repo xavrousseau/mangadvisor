@@ -810,3 +810,13 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .advisor-results-heading{align-items:flex-start;flex-direction:column}
  .advisor-card{grid-template-columns:96px minmax(0,1fr)}
 }
+
+
+/* Manga advisor 2.2: clearly distinguish catalog tags from synopsis clues. */
+.advisor-story-grid{display:flex;flex-wrap:wrap;gap:8px;margin:7px 0}
+.advisor-story-chip{display:inline-flex;flex-direction:column;gap:4px;min-width:0;
+ border:1px solid var(--border);border-radius:10px;background:var(--surface2);
+ padding:9px 11px;max-width:100%}
+.advisor-story-chip strong{color:var(--accent);font-size:11px}
+.advisor-story-chip small{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.advisor-unverified{color:var(--muted);font-size:11px!important;font-style:italic;margin:7px 0!important}

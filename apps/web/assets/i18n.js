@@ -217,6 +217,13 @@ export const STRINGS = {
     advisorFrenchRegistered:"✓ ISBN français enregistré",advisorFrenchUnknown:"Édition française non documentée",
     advisorFrenchCaution:"Un ISBN français enregistré est une notice bibliographique, pas une preuve de disponibilité commerciale. Les thèmes ne garantissent pas l'âge conseillé.",
 
+    advisorNarrativeEvidence:"Indices narratifs documentés",
+    advisorNarrativeMissing:"Non vérifié dans cette fiche",
+    advisorStoryINVESTIGATION:"Enquête",
+    advisorStoryPSYCHOLOGICAL:"Psychologique",
+    advisorStorySURVIVAL:"Survie",
+    advisorStoryTag:"Tag du catalogue",advisorStorySynopsis:"Mot du synopsis",
+
 
     moodMode:"Selon mon envie",
     moodPageTitle:"Qu’as-tu envie de lire aujourd’hui ?",
@@ -498,6 +505,13 @@ export const STRINGS = {
     advisorProof:"Matches your request",
     advisorFrenchRegistered:"✓ French ISBN registered",advisorFrenchUnknown:"French edition not documented",
     advisorFrenchCaution:"A registered French ISBN is a bibliographic record, not proof of commercial availability. Themes do not verify suitability for age.",
+
+    advisorNarrativeEvidence:"Documented narrative clues",
+    advisorNarrativeMissing:"Not verified in this record",
+    advisorStoryINVESTIGATION:"Investigation",
+    advisorStoryPSYCHOLOGICAL:"Psychological",
+    advisorStorySURVIVAL:"Survival",
+    advisorStoryTag:"Catalog tag",advisorStorySynopsis:"Synopsis word",
 
 
     moodMode:"Match my mood",
