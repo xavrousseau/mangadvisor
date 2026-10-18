@@ -52,6 +52,14 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
   '<div class="mood-grid">'+response.recommendations.map((m,i)=>{
    const mood=[...(m.mood_matches?.genres||[]),...(m.mood_matches?.themes||[])];
    const common=[...(m.affinity_matches?.genres||[]),...(m.affinity_matches?.themes||[])];
+   const narrative=Array.isArray(m.narrative_matches)?m.narrative_matches:[];
+   const unmatched=Array.isArray(m.narrative_unverified)?m.narrative_unverified:[];
+   const safeConcept=id=>["INVESTIGATION","PSYCHOLOGICAL","SURVIVAL"].includes(id)?id:null;
+   const storyBadges=narrative.filter(x=>safeConcept(x.concept)).map(x=>
+    '<span class="advisor-story-chip"><strong>'+L("advisorStory"+x.concept)+'</strong>'+
+    '<small>'+L(x.source==="catalog_tag"?"advisorStoryTag":"advisorStorySynopsis")+': '+
+    e(x.matched||"")+'</small></span>').join("");
+   const missingBadges=unmatched.filter(safeConcept).map(id=>L("advisorStory"+id)).join(", ");
    return '<article class="rec-card advisor-card">'+poster(m)+
     '<div class="rec-body"><span class="rec-rank">'+L("advisorPick")+' #'+(i+1)+'</span>'+
     '<h3>'+e(m.title||"Manga")+'</h3>'+
@@ -61,6 +69,9 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
     '<div class="tag-row">'+chips(mood)+'</div></div>'+
     (common.length?'<div class="mood-evidence"><strong>'+L("moodAffinity")+'</strong>'+
      '<div class="tag-row">'+chips(common)+'</div></div>':"")+
+    (storyBadges?'<div class="mood-evidence"><strong>'+L("advisorNarrativeEvidence")+'</strong>'+
+     '<div class="advisor-story-grid">'+storyBadges+'</div></div>':"")+
+    (missingBadges?'<p class="advisor-unverified">'+L("advisorNarrativeMissing")+': '+missingBadges+'</p>':"")+
     '<div class="advisor-french '+(m.french_recorded?"is-verified":"")+'">'+
        L(m.french_recorded?"advisorFrenchRegistered":"advisorFrenchUnknown")+'</div>'+
     '<div class="actions"><button class="btn btn-small btn-soft" data-go="/manga/'+e(m.id)+'">'+L("details")+' →</button></div>'+
