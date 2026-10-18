@@ -342,7 +342,7 @@ async function renderLibrary(token){
  '<textarea class="textarea" id="bulk-csv-text" rows="5" maxlength="80000" spellcheck="false" placeholder="isbn13;possede;lu">'+e(state.bulkCsv)+'</textarea></div>'+
  '<p class="muted tiny">'+L("bulkFormat")+'</p>'+
  '<button type="button" class="btn btn-primary" data-action="bulk-preview">'+L("bulkPreviewAction")+' →</button></div>'+
- '<div id="bulk-import-result">'+(state.bulkPreview?csvPreviewMarkup(state.bulkPreview,L,escapeHtml):'')+'</div>'+
+ '<div id="bulk-import-result">'+(state.bulkPreview?csvPreviewMarkup(state.bulkPreview,key=>t(state.lang,key),escapeHtml):'')+'</div>'+
  '<p class="collection-caveat">'+L("bulkSafety")+'</p>'+
  '<div class="bulk-actions"><button type="button" class="btn btn-soft" data-action="bulk-compare">'+L("bulkCompareAction")+'</button></div>'+
  '<div id="bulk-compare-result"></div></details></section>'+
@@ -714,7 +714,7 @@ async function previewBulkCsv(){
   const result=await request("/collection/import/preview",{method:"POST",data:{csv_content:content}});
   if(routeInfo().view!=="library")return;
   state.bulkPreview=result;
-  target.innerHTML=csvPreviewMarkup(result,L,escapeHtml);
+  target.innerHTML=csvPreviewMarkup(result,key=>t(state.lang,key),escapeHtml);
  }catch(error){state.bulkPreview=null;target.innerHTML=errorBox(error);}
 }
 async function applyBulkCsv(button){
@@ -746,7 +746,7 @@ async function reconcileBulkCounts(button){
  try{
   const result=await request("/collection/reconciliation");
   if(routeInfo().view!=="library")return;
-  target.innerHTML=reconciliationMarkup(result,L,escapeHtml);
+  target.innerHTML=reconciliationMarkup(result,key=>t(state.lang,key),escapeHtml);
  }catch(error){target.innerHTML=errorBox(error);}
  finally{button.disabled=false;}
 }
