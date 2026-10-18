@@ -368,3 +368,23 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .verified-equation>div{min-width:65px;padding:7px}
  .verified-equation strong{font-size:15px}
 }
+
+
+/* Modes de découverte : contrôles légers, diagnostique factuel. */
+.rec-balance-help{
+  flex:1 1 260px;max-width:460px;align-self:end;
+  font-size:11px;line-height:1.55;color:var(--muted);margin:0 0 7px;
+}
+.rec-quality{
+  display:flex;flex-wrap:wrap;align-items:center;gap:9px;
+  background:rgba(255,174,103,.06);border:1px solid #5b4b43;
+  padding:11px 14px;border-radius:11px;margin:15px 0;
+  color:var(--muted);font-size:11px;
+}
+.rec-quality strong{color:var(--accent);font-size:12px}
+.rec-quality span{padding-left:10px;border-left:1px solid #4b4651}
+@media(max-width:740px){
+  .rec-balance-help{flex-basis:100%;order:2}
+  .rec-quality{gap:7px}
+  .rec-quality span{padding-left:7px}
+}
