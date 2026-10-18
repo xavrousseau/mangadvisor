@@ -57,7 +57,7 @@ def bibliographic_language(values: list[str]) -> str:
     """Dublin Core language when supplied, otherwise explicitly unknown."""
     if not values:
         return "unknown"
-    tokens = set(re.findall(r"[\\wÀ-ÿ]+", " ".join(values).casefold()))
+    tokens = set(re.findall(r"[\wÀ-ÿ]+", " ".join(values).casefold()))
     french = bool(tokens & {"fr", "fra", "fre", "français", "french"})
     other = tokens - {"fr", "fra", "fre", "français", "french"}
     if french and not other:
