@@ -40,7 +40,7 @@ export function collectionPanel(data, library, lang, tr, escape) {
   '</div>':'';
  const form='<form class="edition-lookup" id="edition-isbn-form">'+
  '<label for="edition-isbn">'+L("collectionSearchIsbn")+'</label>'+
- '<div class="actions"><input class="input" id="edition-isbn" name="isbn" maxlength="18" required placeholder="9782871294146" inputmode="numeric" autocomplete="off">'+
+ '<div class="actions"><input class="input" id="edition-isbn" name="isbn" maxlength="18" required placeholder="ISBN-13" inputmode="numeric" autocomplete="off">'+
  '<button type="submit" class="btn btn-soft">'+L("collectionSearch")+'</button></div>'+
  '<p class="tiny muted">'+L("collectionIsbnHelp")+'</p></form><div id="edition-preview"></div>';
  return '<section class="collection-panel" id="french-collection">'+
