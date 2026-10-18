@@ -130,7 +130,10 @@ def render_recommendation_cards(
                     with cover_col:
                         display_manga_cover(item, covers)
                     with content_col:
-                        st.caption(f"SÉLECTION Nº {position + 1}")
+                        st.markdown(
+                            f'<div class="ma-rec-rank">✦ SÉLECTION Nº {position + 1}</div>',
+                            unsafe_allow_html=True,
+                        )
                         st.markdown("#### " + str(item.get("title") or "Manga inconnu"))
                         st.caption(
                             format_community_rating(item.get("score"))
@@ -245,14 +248,25 @@ def _render_manual_recommendations(
     render_cards: Callable[[list[dict[str, Any]], str], None],
 ) -> None:
     st.caption("Choisis quelques mangas que tu aimes pour obtenir des suggestions.")
-    catalogue = get_mangas(limit=500)
-    titles = list(dict.fromkeys(m.get("title") for m in catalogue if m.get("title")))
-    default_titles = [title for title in ("Naruto", "Bleach", "Hunter x Hunter") if title in titles]
+    search = st.text_input(
+        "Rechercher un titre à ajouter",
+        placeholder="Ex. Vinland Saga, Nana, Berserk…",
+        key="ma_rec_manual_search",
+    )
+    catalogue = get_mangas(search=search.strip() or None, limit=100)
+    found_titles = [m.get("title") for m in catalogue if m.get("title")]
+    # Conserver les titres déjà choisis lors d'une nouvelle recherche.
+    selected_before = st.session_state.get("ma_rec_manual_titles", [])
+    titles = list(dict.fromkeys([*selected_before, *found_titles]))
+    default_titles = [
+        title for title in ("Naruto", "Bleach", "Hunter x Hunter") if title in titles
+    ] if "ma_rec_manual_titles" not in st.session_state else []
     liked = st.multiselect(
         "Mangas que j'aime (1 à 10)",
         options=titles,
         default=default_titles,
         key="ma_rec_manual_titles",
+        help="Recherche un titre, sélectionne-le, puis cherche-en un autre.",
     )
     a, b = st.columns([1, 1])
     with a:
