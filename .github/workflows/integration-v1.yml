@@ -153,6 +153,29 @@ jobs:
             -f infra/compose/docker-compose.dev.yml exec -T api \
             python - < tests/smoke/resolve_unknown_db.py
 
+      - name: Valider HTTPS prive, certificat IP et authentification mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          HASH="$(printf 'mangadvisor-ci-password' | docker run --rm -i caddy:2.10-alpine caddy hash-password --algorithm bcrypt)"
+          printf "MANGADVISOR_LAN_IP=127.0.0.1\nMOBILE_PASSWORD_HASH='%s'\n" "$HASH" > .env.mobile
+          MOBILE="-f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml -f infra/compose/docker-compose.mobile.yml"
+          docker compose --env-file .env --env-file .env.mobile $MOBILE config --quiet
+          docker compose --env-file .env --env-file .env.mobile $MOBILE up -d mobile_https
+          HTTP=""
+          for i in $(seq 1 20); do
+            HTTP="$(curl -k -s -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/ || true)"
+            if [ "$HTTP" = "401" ]; then break; fi
+            sleep 2
+          done
+          test "$HTTP" = "401" || { echo "Expected 401 without login, got $HTTP"; exit 1; }
+          docker cp mangadvisor_mobile_https:/data/caddy/pki/authorities/local/root.crt /tmp/mangadvisor-ca.crt
+          HTTP="$(curl -s --cacert /tmp/mangadvisor-ca.crt -u manga:mangadvisor-ci-password -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/)"
+          test "$HTTP" = "200" || { echo "Expected TLS-verified login success, got $HTTP"; exit 1; }
+          HTTP="$(curl -s --cacert /tmp/mangadvisor-ca.crt -u manga:wrong-password -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/)"
+          test "$HTTP" = "401" || { echo "Expected rejection of invalid password, got $HTTP"; exit 1; }
+          echo "Mobile HTTPS: trusted local root, correct IP certificate and authentication OK"
+
       - name: Captures d'écran et diagnostic
         if: always()
         uses: actions/upload-artifact@v4
