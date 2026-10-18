@@ -87,6 +87,11 @@ class LocalAiTests(unittest.TestCase):
         self.assertIsNone(updated.preferred_edition_kind)
         self.assertFalse(updated.require_edition_kind)
         self.assertFalse(updated.avoid_horror)
+        preferred,changes,_=parse_intent_response(
+            '{"updates":{"preferred_edition_kind":"PERFECT"},'
+            '"more":false,"reset":false}',original)
+        self.assertEqual(preferred.preferred_edition_kind,"PERFECT")
+        self.assertFalse(preferred.require_edition_kind)
 
     def test_available_model_probe_is_local_and_explicit(self):
         with patch.dict(os.environ,{"OLLAMA_ENABLED":"true","OLLAMA_MODEL":"qwen2.5:3b"}):
