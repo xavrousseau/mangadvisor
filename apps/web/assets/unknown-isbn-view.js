@@ -72,7 +72,7 @@ export function resolverMarkup(state, text, escape) {
     '<div class="bulk-resolver-search"><h4>'+L("resolveStepTwo")+'</h4>'+
     '<p>'+L("resolveLinkWarning")+'</p>'+
     '<form id="bulk-resolve-search-form"><label for="bulk-resolve-query">'+L("resolveFindManga")+'</label>'+
-    '<div class="actions"><input id="bulk-resolve-query" class="input" maxlength="120" autocomplete="off" required value="'+
+    '<div class="actions"><input id="bulk-resolve-query" name="manga" class="input" maxlength="120" autocomplete="off" required value="'+
       e(state.query??titleSearchSuggestion(record.title_fr))+'">'+
     '<button type="submit" class="btn btn-soft">'+L("resolveSearchManga")+'</button></div></form>'+
     results+'</div>'+confirm+
