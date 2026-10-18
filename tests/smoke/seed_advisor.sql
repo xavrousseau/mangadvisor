@@ -22,3 +22,23 @@ INSERT INTO manga_genre(manga_id,genre_id)
 SELECT m.id,g.id FROM manga m JOIN genre g ON g.name='Horror'
 WHERE m.title='Demo CI 28'
 ON CONFLICT DO NOTHING;
+
+
+-- Synthetic registered-format examples for the same work. Each ISBN is independent.
+-- Different formats are *never* summed into a fictional complete series.
+INSERT INTO manga_fr_edition
+  (manga_id,isbn13,title_fr,author_fr,publisher_fr,edition_kind,
+   edition_kind_origin,volume_number,source_name,source_url,source_checked_at)
+SELECT m.id,edition.isbn13,edition.title_fr,'Auteur fictif',
+       edition.publisher_fr,edition.edition_kind,'USER_CONFIRMED',
+       edition.volume_number,'TEST SYNTHÉTIQUE CI',
+       'https://catalogue.bnf.fr/ark:/12148/cb12345678x',NOW()
+FROM manga m
+CROSS JOIN (VALUES
+ ('9781234567804','Demo CI 08 — Deluxe Tome 1','Éditeur Deluxe fictif','DELUXE',1),
+ ('9781234567811','Demo CI 08 — Deluxe Tome 2','Éditeur Deluxe fictif','DELUXE',2),
+ ('9781234567828','Demo CI 08 — Perfect Tome 1','Éditeur Perfect fictif','PERFECT',1),
+ ('9781234567835','Demo CI 08 — Classique Tome 3','Éditeur Classique fictif','CLASSIC',3)
+) AS edition(isbn13,title_fr,publisher_fr,edition_kind,volume_number)
+WHERE m.title='Demo CI 08'
+ON CONFLICT(isbn13) DO NOTHING;
