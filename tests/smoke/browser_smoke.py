@@ -153,7 +153,7 @@ def run():
             page.locator("#bulk-import-workspace summary").click()
             expect(page.locator("#bulk-csv-text")).to_be_visible()
             page.locator("#bulk-csv-text").fill(
-                "isbn13;possede;lu\\n9782871294146;oui;non\\n9782344074282;oui;non\\n".replace("\\\\n","\\n")
+                "isbn13;possede;lu\n9782871294146;oui;non\n9782344074282;oui;non\n"
             )
             page.locator('[data-action="bulk-preview"]').click()
             expect(page.locator(".bulk-preview")).to_be_visible(timeout=30000)
