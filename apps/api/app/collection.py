@@ -92,7 +92,7 @@ def isbn_in_identifiers(identifiers: list[str], isbn13: str) -> bool:
         # A BnF identifier may contain other identifiers and punctuation.
         # Do not construct a thirteen-digit candidate across their boundary.
         candidates = re.findall(
-            r"(?<![0-9])97[89](?:[\\s\\-\u2010-\u2015]?[0-9]){10}(?![0-9])",
+            r"(?<![0-9])97[89](?:[\s\-\u2010-\u2015]?[0-9]){10}(?![0-9])",
             label,
         )
         for candidate in candidates:
@@ -108,7 +108,7 @@ def safe_bnf_ark(value: str) -> str | None:
     """Allow only actual BnF record ARKs; never create links to arbitrary URLs."""
     raw = (value or "").strip()
     match = re.fullmatch(
-        r"(?:https?://catalogue\\.bnf\\.fr/)?(ark:/12148/cb[0-9A-Za-z]+)",
+        r"(?:https?://catalogue\.bnf\.fr/)?(ark:/12148/cb[0-9A-Za-z]+)",
         raw,
     )
     return match.group(1) if match else None
@@ -146,7 +146,7 @@ def parse_bnf_sru(xml_bytes: bytes, isbn: str) -> dict[str, Any] | None:
     if len(xml_bytes) > 1_500_000:
         raise ValueError("Notice BnF trop volumineuse.")
     # Reject entity declarations from untrusted remote XML before parsing.
-    if re.search(rb"<!\\s*(?:DOCTYPE|ENTITY)\\b", xml_bytes, re.I):
+    if re.search(rb"<!\s*(?:DOCTYPE|ENTITY)\b", xml_bytes, re.I):
         raise ValueError("La réponse XML BnF contient une déclaration interdite.")
     root = ET.fromstring(xml_bytes)
     ns = {"srw": "http://www.loc.gov/zing/srw/",
