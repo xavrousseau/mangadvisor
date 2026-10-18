@@ -1,0 +1,57 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const src=readFileSync("apps/web/assets/collection-view.js","utf8");
+const { collectionPanel, editionPreview, EDITION_KINDS }=
+  await import("data:text/javascript;charset=utf-8,"+encodeURIComponent(src));
+const escape = value => String(value??"").replace(/[&<>"']/g, ch=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[ch]));
+const texts={collectionTitle:"Éditions françaises et mes tomes",collectionOwned:"Possédé",
+  collectionRead:"Lu",collectionMissing:"Manquant",collectionTome:"Tome",
+  collectionIsbn:"ISBN",collectionBnfSource:"Notice BnF",
+  collectionSearchIsbn:"Recherche ISBN",collectionConfirm:"Confirmer",
+  collectionLegacy:"Compteurs historiques"};
+const t=(_,key)=>texts[key]||key;
+const example={manga_id:1,count:2,owned_books:1,read_books:2,missing_known_books:1,
+ editions:[
+  {id:1,title_fr:"Naruto Tome 1",edition_kind:"CLASSIC",edition_kind_origin:"USER_CONFIRMED",
+    volume_number:1,isbn13:"9782871294146",source_url:"https://catalogue.bnf.fr/ark:/12148/cb123",
+    source_checked_at:"2026-10-18T14:00:00Z",is_owned:true,is_read:true,
+    publisher_fr:"Kana",author_fr:"Masashi Kishimoto"},
+  {id:2,title_fr:"Naruto Deluxe Tome 1",edition_kind:"DELUXE",edition_kind_origin:"BNF_TITLE",
+    volume_number:1,isbn13:"9782344074282",is_owned:false,is_read:true,source_url:"https://catalogue.bnf.fr/ark:/12148/cb456"}
+ ]};
+
+test("classic and deluxe editions are distinct; owned/read values stay independent",()=>{
+ const output=collectionPanel(example,{owned_volumes:20,read_volumes:7},"fr",t,escape);
+ assert.match(output,/Naruto Deluxe Tome 1/);
+ assert.match(output,/Naruto Tome 1/);
+ assert.match(output,/9782871294146/);
+ assert.match(output,/aria-pressed="false"/);
+ assert.match(output,/aria-pressed="true"/);
+ assert.match(output,/Compteurs historiques/);
+ assert.match(output,/collection-stats/);
+ assert.equal(EDITION_KINDS.includes("PERFECT"),true);
+});
+
+test("untrusted source content is escaped and links restricted",()=>{
+ const data=structuredClone(example);
+ data.editions[0].title_fr='<img src=x onerror=alert(1)>';
+ data.editions[0].source_url="javascript:alert(1)";
+ const output=collectionPanel(data,null,"fr",t,escape);
+ assert.match(output,/&lt;img src/);
+ assert.doesNotMatch(output,/<img src/);
+ assert.doesNotMatch(output,/href="javascript:/);
+});
+
+test("confirmed ISBN preview does not auto-add a volume",()=>{
+ const preview=editionPreview({
+  title_fr:"Bleach Deluxe 1",isbn13:"9782344074282",edition_kind_suggested:"DELUXE",
+  source_url:"https://catalogue.bnf.fr/ark:/12148/cb123",
+ },"fr",t,escape);
+ assert.match(preview,/value="DELUXE" selected/);
+ assert.match(preview,/collectionConfirmTitle/);
+ assert.match(preview,/data-action="edition-confirm"/);
+ assert.doesNotMatch(preview,/data-action="volume-owned"/);
+});
