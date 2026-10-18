@@ -1,11 +1,16 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
 import { explainRecommendation, explainProfile, explainVerifiedSources } from "./explain.js";
+import {
+  PRESETS, ACCENTS, DEFAULT_APPEARANCE,
+  loadAppearance, saveAppearance, applyAppearance,
+} from "./appearance.js";
 
 const STATUS = ["READ","READING","OWNED","WANT_TO_READ","DROPPED","NOT_INTERESTED"];
-const SCREENS = ["home","discover","recommendations","library"];
+const SCREENS = ["home","discover","recommendations","library","appearance"];
 const state = {
   lang: ["fr","en"].includes(localStorage.getItem("ma-language")) ? localStorage.getItem("ma-language") : "fr",
+  appearance: loadAppearance(window.localStorage),
   catalogPage:1, catalogQuery:"",catalogGenre:"",catalogFinished:false,
   libraryPage:1,libraryQuery:"",libraryStatus:"",
   recMode:"library",recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
@@ -14,6 +19,7 @@ const state = {
 };
 let renderToken = 0, searchTimer = null;
 const root=document.querySelector("#app");
+applyAppearance(document.documentElement, state.appearance);
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[char]));
@@ -86,6 +92,7 @@ function routeInfo(){
  if(path==="/discover")return {view:"discover"};
  if(path==="/for-you")return {view:"recommendations"};
  if(path==="/library")return {view:"library"};
+ if(path==="/appearance")return {view:"appearance"};
  const match=path.match(/^\/manga\/([1-9]\d*)$/);
  if(match&&idNumber(match[1]))return {view:"detail",id:Number(match[1])};
  return {view:"not-found"};
@@ -93,7 +100,7 @@ function routeInfo(){
 function shell(){
   const active=routeInfo().view;
   document.documentElement.lang=state.lang;
-  document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="not-found"?"discover":active);
+  document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
   const navItems=[
     ["home","/","◈","home"],["discover","/discover","⌕","discover"],
     ["recommendations","/for-you","✧","forYou"],["library","/library","▤","library"]
@@ -104,8 +111,10 @@ function shell(){
     '<button class="nav-link '+(active===view?'active':'')+'" data-go="'+url+'"'+(active===view?' aria-current="page"':'')+
     '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+L(key)+'</span></button>').join("")+
   '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p><a class="legacy-link" href="http://localhost:8502" target="_blank" rel="noopener">↗ '+L("openLegacy")+'</a></div></aside>'+
-  '<div class="main"><header class="topbar"><div class="crumb">'+L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="not-found"?"discover":active)+'</div>'+
-  '<div class="topbar-right"><label class="field-label" for="app-language">'+L("language")+'</label><select id="app-language" class="locale-select" aria-label="'+L("language")+'"><option value="fr"'+(state.lang==="fr"?" selected":"")+'>🇫🇷 FR</option><option value="en"'+(state.lang==="en"?" selected":"")+'>🇬🇧 EN</option></select><div class="avatar" aria-hidden="true">M</div></div></header>'+
+  '<div class="main"><header class="topbar"><div class="crumb">'+L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active)+'</div>'+
+  '<div class="topbar-right"><label class="field-label" for="app-language">'+L("language")+'</label><select id="app-language" class="locale-select" aria-label="'+L("language")+'"><option value="fr"'+(state.lang==="fr"?" selected":"")+'>🇫🇷 FR</option><option value="en"'+(state.lang==="en"?" selected":"")+'>🇬🇧 EN</option></select>'+
+  '<button type="button" class="appearance-trigger '+(active==="appearance"?'active':'')+'" data-go="/appearance" aria-label="'+L("appearance")+'" title="'+L("appearance")+'"><span aria-hidden="true">⚙</span><span class="appearance-label">'+L("appearance")+'</span></button>'+
+  '<div class="avatar" aria-hidden="true">M</div></div></header>'+
   '<main id="content" class="main-content" tabindex="-1"><div class="skeleton"></div></main></div></div>'+
   '<div class="notice hidden" id="toast" role="status"></div>';
 }
@@ -140,8 +149,47 @@ async function view(token){
    if(view.view==="detail")return await renderDetail(token,view.id);
    if(view.view==="library")return await renderLibrary(token);
    if(view.view==="recommendations")return await renderRecommendations(token);
+   if(view.view==="appearance")return renderAppearance(token);
    mount(emptyBox("⌕",L("noResults"),L("noResultsHelp"),L("startExplore"),"/discover"),token);
  }catch(err){mount(errorBox(err),token);}
+}
+function renderAppearance(token){
+ const presetCards=PRESETS.map(preset=>
+   '<button type="button" class="theme-choice" data-action="appearance-preset" data-value="'+e(preset.id)+'"'+
+   ' aria-pressed="'+(state.appearance.preset===preset.id)+'">'+
+   '<span class="theme-thumbnail '+e(preset.id)+'" aria-hidden="true">'+
+   '<span class="sample-sidebar"></span><span class="sample-bar"></span>'+
+   '<span class="sample-hero"><span class="sample-cover"></span><span class="sample-lines"><span></span><span></span></span></span></span>'+
+   '<span class="theme-choice-name">'+L(preset.nameKey)+'</span>'+
+   '<span class="theme-choice-desc">'+L(preset.descKey)+'</span></button>'
+ ).join("");
+ const colorCards=ACCENTS.map(accent=>
+   '<button type="button" class="accent-choice" data-action="appearance-accent" data-value="'+e(accent.id)+'"'+
+   ' aria-pressed="'+(state.appearance.accent===accent.id)+'">'+
+   '<span class="accent-swatch" style="background-color:'+e(accent.hex)+'" aria-hidden="true"></span>'+
+   '<span>'+L(accent.nameKey)+'</span></button>'
+ ).join("");
+ const spacingCards=[
+  ["comfortable","densityComfortable"],["compact","densityCompact"]
+ ].map(([mode,key])=>
+   '<button type="button" class="btn" data-action="appearance-density" data-value="'+e(mode)+'"'+
+   ' aria-pressed="'+(state.appearance.density===mode)+'">'+L(key)+'</button>'
+ ).join("");
+ return mount(
+  '<div class="eyebrow">✦ MANGADVISOR · DESIGN STUDIO</div>'+
+  '<h1 class="page-title">'+L("appearanceTitle")+'</h1>'+
+  '<p class="page-desc appearance-intro">'+L("appearanceDescription")+'</p>'+
+  '<section class="appearance-section"><h2>'+L("appearancePresets")+'</h2><p>'+L("appearancePresetsHelp")+'</p>'+
+  '<div class="appearance-grid" role="group" aria-label="'+L("appearancePresets")+'">'+presetCards+'</div></section>'+
+  '<section class="appearance-section"><h2>'+L("appearanceColors")+'</h2><p>'+L("appearanceColorsHelp")+'</p>'+
+  '<div class="accent-grid" role="group" aria-label="'+L("appearanceColors")+'">'+colorCards+'</div></section>'+
+  '<section class="appearance-section"><h2>'+L("appearanceDensity")+'</h2><p>'+L("appearanceDensityHelp")+'</p>'+
+  '<div class="density-controls" role="group" aria-label="'+L("appearanceDensity")+'">'+spacingCards+'</div></section>'+
+  '<p class="appearance-note">'+L("appearanceStorage")+'</p>'+
+  '<div class="appearance-footer"><button type="button" class="btn" data-action="appearance-reset">↺ '+L("appearanceReset")+'</button>'+
+  '<button type="button" class="btn btn-primary" data-go="/">'+L("appearanceReturn")+' →</button></div>',
+  token
+ );
 }
 async function renderHome(token){
  const markup='<section class="hero"><div class="hero-decor" aria-hidden="true"></div><div class="hero-content"><div class="eyebrow">✦ '+L("eyebrow")+'</div>'+
@@ -620,6 +668,15 @@ root.addEventListener("click",async event=>{
  }
  const action=button.dataset.action;
  if(action==="refresh")return render();
+ if(["appearance-preset","appearance-accent","appearance-density","appearance-reset"].includes(action)){
+  const part={"appearance-preset":"preset","appearance-accent":"accent","appearance-density":"density"}[action];
+  const wanted=action==="appearance-reset" ? DEFAULT_APPEARANCE : {...state.appearance,[part]:button.dataset.value};
+  state.appearance=saveAppearance(window.localStorage,wanted);
+  applyAppearance(document.documentElement,state.appearance);
+  if(routeInfo().view==="appearance")renderAppearance(renderToken);
+  if(action==="appearance-reset")toast(t(state.lang,"appearanceResetSuccess"));
+  return;
+ }
  if(action==="feedback")return sendRecommendationFeedback(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
  if(action==="catalog-prev"||action==="catalog-next"){
