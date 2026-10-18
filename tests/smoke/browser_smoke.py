@@ -62,6 +62,16 @@ def run():
             if device=="desktop":
                 page.locator("#rec-submit").click()
                 expect(page.locator("#rec-results .rec-card").first).to_be_visible(timeout=60000)
+                explanation = page.locator("#rec-results .rec-card .reco-explanation").first
+                explanation.locator("summary").click()
+                expect(explanation.get_by_text("Comprendre le score")).to_be_visible(timeout=30000)
+                expect(explanation.get_by_text("Mangas pris en compte")).to_be_visible(timeout=30000)
+                page.screenshot(path=str(OUTPUT / "desktop-recommandation-expliquee.png"), full_page=True)
+                page.locator("#app-language").select_option("en")
+                explanation = page.locator("#rec-results .rec-card .reco-explanation").first
+                explanation.locator("summary").click()
+                expect(explanation.get_by_text("Understanding the score")).to_be_visible(timeout=30000)
+                page.locator("#app-language").select_option("fr")
                 page.locator("#rec-results .rec-card .btn-soft").first.click()
                 expect(page.locator(".detail-hero h1")).to_be_visible(timeout=30000)
                 page.go_back()
