@@ -174,6 +174,14 @@ def score_candidates(
     selected = []
     mood_list = [x for x in (context.mood,context.secondary_mood) if x]
     for item in rows:
+        tags={str(tag).casefold() for kind in ("genres","themes")
+              for tag in (item.get(kind) or [])}
+        if context.avoid_horror and "horror" in tags:
+            continue
+        if context.avoid_gore and "gore" in tags:
+            continue
+        if context.avoid_romance and "romance" in tags:
+            continue
         matches: dict[str,list[str]]={"genres":[],"themes":[]}
         hits = 0
         for mood in mood_list:
@@ -187,14 +195,21 @@ def score_candidates(
         affinity = preference_overlap(item,preferences)
         verified = int(item.get("french_record_count") or 0)>0
         french_score = 24 if context.french=="PREFER" and verified else 0
+        story_evidence=narrative_matches(item,context.narrative_preferences)
+        story_bonus=sum(16 if record["source"]=="catalog_tag" else 9
+                        for record in story_evidence)
         rank = (
             18*len(matches["genres"]) + 21*len(matches["themes"])
             + min(20, 5*len(affinity["genres"])+7*len(affinity["themes"]))
-            + french_score + 2*float(item.get("score") or 0)
+            + french_score + story_bonus + 2*float(item.get("score") or 0)
         )
         selected.append((rank,float(item.get("score") or 0),
                          -int(item.get("popularity") or 99999999),-int(item["id"]),{
-            **item,"mood_matches":matches,"affinity_matches":affinity,
+            **{k:v for k,v in item.items() if k!="synopsis"},
+            "mood_matches":matches,"affinity_matches":affinity,
+            "narrative_matches":story_evidence,
+            "narrative_unverified":[concept for concept in context.narrative_preferences
+                                    if not any(e["concept"]==concept for e in story_evidence)],
             "french_recorded":verified,
             "ranking_score":None,
         }))
@@ -298,15 +313,23 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             conditions.append("m.volumes>=13")
         if context.french=="REQUIRE":
             conditions.append("EXISTS (SELECT 1 FROM manga_fr_edition fe WHERE fe.manga_id=m.id)")
-        if context.avoid_romance:
-            conditions.append("""NOT EXISTS (SELECT 1 FROM manga_genre rmg
-                JOIN genre rg ON rg.id=rmg.genre_id
-                WHERE rmg.manga_id=m.id AND LOWER(rg.name)='romance')""")
+        if context.avoid_romance or context.avoid_horror or context.avoid_gore:
+            excluded=[]
+            if context.avoid_romance: excluded.append("romance")
+            if context.avoid_horror: excluded.append("horror")
+            if context.avoid_gore: excluded.append("gore")
+            params["excluded_tags"]=excluded
+            conditions.append("""NOT EXISTS (SELECT 1 FROM manga_genre eg
+                JOIN genre gex ON gex.id=eg.genre_id
+                WHERE eg.manga_id=m.id AND LOWER(gex.name)=ANY(%(excluded_tags)s))""")
+            conditions.append("""NOT EXISTS (SELECT 1 FROM manga_theme et
+                JOIN theme tex ON tex.id=et.theme_id
+                WHERE et.manga_id=m.id AND LOWER(tex.name)=ANY(%(excluded_tags)s))""")
         if more and payload.seen_ids:
             conditions.append("NOT (m.id=ANY(%(seen_ids)s))")
             params["seen_ids"]=payload.seen_ids
         sql = """
-            SELECT m.id,m.title,m.status,m.volumes,m.chapters,m.score::float AS score,
+            SELECT m.id,m.title,m.status,m.volumes,m.chapters,m.synopsis,m.score::float AS score,
                 m.popularity,m.manga_type,
                 ARRAY(SELECT g.name FROM manga_genre mg JOIN genre g ON g.id=mg.genre_id
                       WHERE mg.manga_id=m.id ORDER BY g.name) AS genres,
@@ -352,10 +375,10 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             recommendations=chosen,count=len(chosen),
             personalized=personalized,
             reply=(
-                ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres et thèmes du catalogue. "
+                ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "
                  "Les ISBN français ne prouvent pas la disponibilité en magasin."
                  if is_fr else
-                 "I understood: "+interpretation+". These picks are grounded in cataloged genres and themes. "
+                 "I understood: "+interpretation+". These picks use actual catalog tags and literal synopsis clues. "
                  "Recorded French ISBNs do not confirm store availability.")
                 if chosen else
                 ("J'ai compris : "+interpretation+". Aucun titre documenté ne réunit ces critères. Essaie d'assouplir la longueur, la langue ou l'ambiance."
