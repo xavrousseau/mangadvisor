@@ -30,7 +30,7 @@ jobs:
 
       - name: Démarrer PostgreSQL et Meilisearch
         run: |
-          docker compose -f infra/compose/docker-compose.yml \
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
             -f infra/compose/docker-compose.dev.yml up -d postgres meilisearch
 
       - name: Installer les schémas dans PostgreSQL de CI
@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 60); do
-            if docker compose -f infra/compose/docker-compose.yml \
+            if docker compose --env-file .env -f infra/compose/docker-compose.yml \
               -f infra/compose/docker-compose.dev.yml exec -T postgres \
                 pg_isready -U manga_ci -d mangadvisor_ci >/dev/null 2>&1; then break; fi
             sleep 2
@@ -51,14 +51,14 @@ jobs:
             sql/schema/007_add_user_library_tables.sql \
             tests/smoke/seed_catalog.sql; do
             echo "Base jetable seulement : $file"
-            docker compose -f infra/compose/docker-compose.yml \
+            docker compose --env-file .env -f infra/compose/docker-compose.yml \
               -f infra/compose/docker-compose.dev.yml exec -T postgres \
               psql -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci < "$file"
           done
 
       - name: Construire et démarrer API + UI
         run: |
-          docker compose -f infra/compose/docker-compose.yml \
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
             -f infra/compose/docker-compose.dev.yml up --build -d api ui
 
       - name: Tester les vraies requêtes SQL via HTTP
@@ -108,7 +108,7 @@ jobs:
       - name: Journaux Docker en cas d'erreur
         if: failure()
         run: |
-          docker compose -f infra/compose/docker-compose.yml \
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
             -f infra/compose/docker-compose.dev.yml ps
-          docker compose -f infra/compose/docker-compose.yml \
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
             -f infra/compose/docker-compose.dev.yml logs --tail=160 api ui postgres
