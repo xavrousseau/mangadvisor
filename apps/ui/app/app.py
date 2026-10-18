@@ -6,6 +6,8 @@ from typing import Any
 import requests
 import streamlit as st
 
+from apps.ui.app.discovery import render_discovery
+
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
@@ -74,11 +76,21 @@ def get_health() -> dict[str, Any]:
     return call_api_get("/health")
 
 
-def get_mangas(search: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
-    params: dict[str, Any] = {"limit": limit}
+def get_mangas(
+    search: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    genre: str | None = None,
+    only_finished: bool = False,
+) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"limit": limit, "offset": offset}
 
     if search:
         params["q"] = search
+    if genre:
+        params["genre"] = genre
+    if only_finished:
+        params["only_finished"] = True
 
     data = call_api_get("/mangas", params=params)
     return data.get("items", [])
@@ -568,77 +580,64 @@ def display_badges(label: str, values: list[str] | None) -> None:
     st.markdown(badges)
 
 
+
 def display_manga_detail(manga: dict[str, Any]) -> None:
-    """
-    Affiche une fiche manga complète.
-    """
+    """Fiche manga illustrée, réutilisée dans Découvrir et dans l'onglet Fiche manga."""
     title = manga.get("title") or "Titre inconnu"
     title_english = manga.get("title_english")
     title_japanese = manga.get("title_japanese")
     synopsis = manga.get("synopsis")
 
-    st.markdown(f"## {title}")
+    cover_column, info_column = st.columns([1, 2], gap="large")
+    with cover_column:
+        cover_urls = get_cover_urls(
+            (int(manga["id"]),) if manga.get("id") else ()
+        )
+        display_manga_cover(manga, cover_urls)
+    with info_column:
+        st.markdown(f"## {title}")
+        subtitles = []
+        if title_english and title_english != title:
+            subtitles.append(title_english)
+        if title_japanese and title_japanese != title:
+            subtitles.append(title_japanese)
+        if subtitles:
+            st.caption(" · ".join(subtitles))
 
-    subtitle_parts = []
+        st.markdown('<div class="ma-detail-kicker">L’ESSENTIEL</div>', unsafe_allow_html=True)
+        st.write(f"**Genre :** {format_list(manga.get('genres'), 'Non renseigné')}")
+        st.write(f"**Thèmes :** {format_list(manga.get('themes'), 'Non renseignés')}")
+        st.write(
+            f"**Public :** "
+            f"{format_list(manga.get('demographics'), 'Non renseigné')}"
+        )
+        st.write(f"**Statut de publication :** {manga.get('status') or 'Non renseigné'}")
+        st.write(f"**Format :** {manga.get('manga_type') or 'Non renseigné'}")
 
-    if title_english and title_english != title:
-        subtitle_parts.append(f"**Titre anglais :** {title_english}")
+    metrics = st.columns(4)
+    with metrics[0]:
+        st.metric("Note communauté /10", format_number(manga.get("score"), 2))
+    with metrics[1]:
+        st.metric("Volumes", manga.get("volumes") if manga.get("volumes") is not None else "N/A")
+    with metrics[2]:
+        st.metric("Chapitres", manga.get("chapters") if manga.get("chapters") is not None else "N/A")
+    with metrics[3]:
+        st.metric("Popularité (rang)", manga.get("popularity") if manga.get("popularity") is not None else "N/A")
 
-    if title_japanese:
-        subtitle_parts.append(f"**Titre japonais :** {title_japanese}")
-
-    if subtitle_parts:
-        st.markdown(" · ".join(subtitle_parts))
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.metric("Score", format_number(manga.get("score"), 2))
-
-    with col2:
-        st.metric("Statut", manga.get("status") or "N/A")
-
-    with col3:
-        st.metric("Type", manga.get("manga_type") or "N/A")
-
-    with col4:
-        st.metric("Popularité", manga.get("popularity") or "N/A")
-
-    col5, col6, col7, col8 = st.columns(4)
-
-    with col5:
-        st.metric("Volumes", manga.get("volumes") or "N/A")
-
-    with col6:
-        st.metric("Chapitres", manga.get("chapters") or "N/A")
-
-    with col7:
-        st.metric("Membres", format_integer(manga.get("members")))
-
-    with col8:
-        st.metric("Favoris", format_integer(manga.get("favorites")))
-
-    st.divider()
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        display_badges("Genres", manga.get("genres"))
-
-    with c2:
-        display_badges("Thèmes", manga.get("themes"))
-
-    with c3:
-        display_badges("Cible éditoriale", manga.get("demographics"))
-
-    st.divider()
-
-    st.write("**Synopsis :**")
-
+    st.markdown("### L'histoire")
     if synopsis:
         st.write(synopsis)
     else:
         st.caption("Aucun synopsis disponible pour ce manga.")
+
+    with st.expander("Informations complémentaires"):
+        st.write(f"**Membres MyAnimeList :** {format_integer(manga.get('members'))}")
+        st.write(f"**Favoris MyAnimeList :** {format_integer(manga.get('favorites'))}")
+        st.write(f"**Titre anglais :** {title_english or 'Non renseigné'}")
+        st.write(f"**Titre japonais :** {title_japanese or 'Non renseigné'}")
+        st.write(f"**Début de publication :** {manga.get('published_from') or 'Non renseigné'}")
+        st.write(f"**Fin de publication :** {manga.get('published_to') or 'Non renseignée'}")
+
 
 
 def display_recommendation_card(
@@ -817,91 +816,18 @@ tab_single, tab_profile, tab_detail, tab_library = st.tabs(
 )
 
 
+
 with tab_single:
-    st.subheader("1. Recherche un manga de référence")
-
-    search = st.text_input(
-        "Titre du manga",
-        value="Naruto",
-        help="Exemples : Naruto, One Piece, Berserk, Death Note...",
-        key="single_search",
+    render_discovery(
+        get_mangas=get_mangas,
+        get_cover_urls=get_cover_urls,
+        display_manga_cover=display_manga_cover,
+        get_manga_detail=get_manga_detail,
+        display_manga_detail=display_manga_detail,
+        get_similar_recommendations=get_similar_recommendations,
+        display_manga_recommendations=display_manga_recommendations,
+        recommendation_limit=recommendation_limit,
     )
-
-    mangas = get_mangas(search=search if search else None, limit=100)
-
-    if not mangas:
-        st.warning("Aucun manga trouvé avec cette recherche.")
-    else:
-        manga_titles = [manga["title"] for manga in mangas]
-
-        selected_title = st.selectbox(
-            "Manga sélectionné",
-            options=manga_titles,
-            key="single_selected_title",
-        )
-
-        selected_manga = next(
-            manga for manga in mangas if manga["title"] == selected_title
-        )
-
-        st.subheader("2. Manga sélectionné")
-
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            st.metric("Score manga", format_number(selected_manga.get("score"), 2))
-
-        with col2:
-            st.metric("Statut", selected_manga.get("status") or "N/A")
-
-        with col3:
-            st.metric("Volumes", selected_manga.get("volumes") or "N/A")
-
-        with col4:
-            st.metric("Popularité", selected_manga.get("popularity") or "N/A")
-
-        st.write("**Genres :**")
-        st.write(format_list(selected_manga.get("genres"), "Genres non renseignés"))
-
-        st.write("**Thèmes :**")
-        st.write(format_list(selected_manga.get("themes"), "Thèmes non renseignés"))
-
-        st.write("**Cible éditoriale :**")
-        st.write(
-            format_list(
-                selected_manga.get("demographics"),
-                "Cible éditoriale non renseignée",
-            )
-        )
-
-        with st.expander("Voir la fiche complète du manga sélectionné"):
-            selected_manga_detail = get_manga_detail(int(selected_manga["id"]))
-            display_manga_detail(selected_manga_detail)
-
-        st.divider()
-
-        st.subheader("3. Recommandations")
-
-        if st.button("Me recommander des mangas similaires", type="primary"):
-            result = get_similar_recommendations(
-                title=selected_title,
-                limit=recommendation_limit,
-            )
-
-            source = result.get("source", {})
-            recommendations = result.get("recommendations", [])
-
-            st.write(
-                f"Recommandations à partir de : **{source.get('title', selected_title)}**"
-            )
-
-            if not recommendations:
-                st.warning("Aucune recommandation trouvée.")
-            else:
-                display_manga_recommendations(recommendations)
-
-        else:
-            st.info("Clique sur le bouton pour générer les recommandations.")
 
 
 with tab_profile:
