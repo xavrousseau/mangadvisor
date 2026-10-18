@@ -710,3 +710,51 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .scan-report-row .scan-report-badge{grid-column:1/-1}
  .scan-report-row strong{grid-column:1/-1}
 }
+
+
+/* Mangadvisor 2.0 — guided mood discovery */
+.rec-mode-tabs{max-width:100%;flex-wrap:wrap}
+.mood-studio{border:1px solid var(--border);background:var(--surface);border-radius:19px;padding:30px;
+ margin:22px 0 19px;box-shadow:var(--shadow)}
+.mood-studio-title h2{font:800 clamp(23px,3vw,32px)/1.16 'Outfit',sans-serif;margin:9px 0}
+.mood-studio-title p{font-size:13px;line-height:1.65;color:var(--muted);max-width:650px}
+.mood-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}
+.mood-choice{display:flex;align-items:center;gap:13px;min-width:0;padding:18px 16px;border:1px solid var(--border);
+ background:var(--surface2);border-radius:12px;color:var(--text);text-align:left;cursor:pointer;
+ transition:border-color .16s ease,transform .16s ease}
+.mood-choice:hover{border-color:var(--accent);transform:translateY(-2px)}
+.mood-choice.selected{border-color:var(--accent);background:var(--accent-tint);box-shadow:0 0 0 1px var(--accent)}
+.mood-choice strong{font-size:13px;line-height:1.35}
+.mood-choice-icon{display:grid;place-items:center;flex:0 0 38px;height:38px;background:rgba(125,127,138,.13);
+ border-radius:10px;color:var(--accent);font-size:23px}
+.mood-controls{display:flex;align-items:end;gap:17px 20px;flex-wrap:wrap;margin:20px 0 13px}
+.mood-controls .field{min-width:170px}
+.mood-controls .check{margin-bottom:13px}
+.mood-disclaimer{font-size:11px;line-height:1.65;color:var(--muted);margin:14px 0}
+.mood-submit{margin-top:9px}
+.mood-result-summary{display:flex;align-items:center;justify-content:space-between;gap:15px;
+ margin:29px 0 17px;border-top:1px solid var(--border);padding-top:23px}
+.mood-result-summary h2{font:800 clamp(22px,3vw,28px)/1.2 'Outfit',sans-serif;margin:7px 0}
+.mood-result-summary p{max-width:570px;font-size:12px;line-height:1.7;color:var(--muted);margin:0}
+.mood-count{white-space:nowrap;border:1px solid var(--border);border-radius:100px;padding:10px 14px;
+ color:var(--accent);font-size:12px;font-weight:750}
+.mood-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.mood-card{min-height:255px}
+.mood-card-meta{font-size:11px!important;margin:3px 0 13px!important;color:var(--muted)}
+.mood-evidence{margin:9px 0 5px}
+.mood-evidence strong{display:block;font-size:10px;letter-spacing:.04em;color:var(--muted);margin-bottom:8px}
+.mood-evidence .tag-row{gap:5px;margin-bottom:5px}
+.mood-evidence .pill{font-size:10px;padding:4px 8px}
+.mood-card-hint{font-size:10px!important;font-style:italic}
+@media(max-width:1100px){.mood-picker{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .mood-grid{grid-template-columns:1fr}}
+@media(max-width:740px){.mood-studio{padding:19px 16px;border-radius:14px}
+ .mood-picker{gap:8px}.mood-choice{padding:12px 9px;gap:8px;align-items:flex-start;flex-direction:column}
+ .mood-choice-icon{flex:0 0 34px;height:34px;width:34px;font-size:21px}
+ .mood-choice strong{font-size:11px}
+ .mood-controls{gap:13px}.mood-controls .field{width:100%}
+ .mood-controls .check{margin-bottom:3px}
+ .mood-submit{width:100%}
+ .mood-result-summary{align-items:flex-start;flex-direction:column}
+ .mood-grid .rec-card{grid-template-columns:99px minmax(0,1fr)}
+}
