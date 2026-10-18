@@ -388,3 +388,46 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
   .rec-quality{gap:7px}
   .rec-quality span{padding-left:7px}
 }
+
+
+
+/* Mangadvisor 1.2: editions FR and per-book reading. Compatible with 3 designs. */
+.collection-panel{margin:32px 0;padding:2px 0;border-top:1px solid var(--border)}
+.collection-panel .section-header{margin-top:28px}
+.collection-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+.collection-stats span{
+ display:flex;flex-direction:column;gap:5px;border:1px solid var(--border);
+ border-radius:12px;padding:14px;color:var(--muted);background:var(--surface);font-size:12px
+}
+.collection-stats strong{font:800 25px 'Outfit',sans-serif;color:var(--accent)}
+.collection-legacy,.collection-caveat{font-size:11px;color:var(--muted);line-height:1.7;margin:13px 0}
+.edition-list{display:grid;gap:12px}
+.edition-item{border:1px solid var(--border);background:var(--surface);border-radius:13px;
+ padding:16px 18px;display:flex;justify-content:space-between;gap:15px;align-items:center}
+.edition-main{min-width:0;flex:1}
+.edition-main h3{font-size:16px;margin:7px 0;overflow-wrap:anywhere}
+.edition-main p,.edition-preview p{font-size:12px;line-height:1.6;color:var(--muted);margin:7px 0}
+.edition-topline{display:flex;align-items:center;gap:11px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.edition-type{border:1px solid var(--accent);color:var(--accent);background:var(--accent-tint);
+ border-radius:999px;padding:5px 10px;font-weight:800}
+.edition-source{word-break:break-word}
+.edition-source a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.edition-user{display:inline-block;margin-top:5px;font-size:11px;color:var(--muted)}
+.edition-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.edition-actions .btn{min-width:95px}
+.edition-lookup,.edition-preview{margin:19px 0;padding:20px;background:var(--surface);
+ border:1px solid var(--border);border-radius:13px;max-width:880px}
+.edition-lookup label{display:block;margin-bottom:11px}
+.edition-lookup .input{flex:1 1 240px}
+.edition-preview{border-color:var(--accent)}
+.edition-preview h3{font-size:20px;margin:8px 0}
+.edition-preview .form-grid{margin:20px 0}
+.edition-verified{color:var(--accent);font-weight:800;font-size:12px}
+@media(max-width:740px){
+ .edition-item{align-items:stretch;flex-direction:column;padding:13px}
+ .edition-actions .btn{flex:1}
+ .collection-stats{gap:8px}
+ .collection-stats span{padding:11px}
+ .collection-stats strong{font-size:19px}
+ .edition-lookup,.edition-preview{padding:15px}
+}

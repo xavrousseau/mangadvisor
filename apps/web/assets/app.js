@@ -1,4 +1,5 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
+import { collectionPanel, editionPreview } from "./collection-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
 import { explainRecommendation, explainProfile, explainVerifiedSources } from "./explain.js";
 import {
@@ -16,6 +17,7 @@ const state = {
   recMode:"library",recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
+  frenchCollection:null,editionPreview:null,
 };
 let renderToken = 0, searchTimer = null;
 const root=document.querySelector("#app");
@@ -366,14 +368,15 @@ async function renderDetail(token,id){
  try{
   const manga=state.detailCache[id]||await request("/mangas/"+id);
   state.detailCache[id]=manga;state.currentDetail=manga;
-  const [urls,libraryItem,translation]=await Promise.all([
+  const [urls,libraryItem,translation,frCollection]=await Promise.all([
     covers([manga]),readLibraryItem(manga),
     state.lang==="fr"&&manga.synopsis?request("/localization/synopsis",{
       method:"POST",data:{manga_id:id,lang:"fr"}
-    }).catch(()=>null):Promise.resolve(null)
+    }).catch(()=>null):Promise.resolve(null),
+    request("/collection/mangas/"+id+"/editions").catch(()=>null)
   ]);
   if(token!==renderToken)return;
-  state.libraryDetail=libraryItem;
+  state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.editionPreview=null;
   const synopsis=translation?.text||manga.synopsis||"";
   const reallyTranslated=state.lang==="fr"&&Boolean(translation?.translated);
   const elements='<section class="detail-hero">'+
@@ -405,6 +408,8 @@ async function renderDetail(token,id){
     '<div class="form-action-row"><label class="check"><input type="checkbox" name="favorite"'+(libraryItem?.is_favorite?' checked':'')+'>'+L("favorite")+'</label>'+
     '<div class="actions">'+(libraryItem?'<button type="button" data-action="remove-library" class="btn btn-small">'+L("removeLibrary")+'</button>':'')+
     '<button class="btn btn-primary" type="submit">'+L(libraryItem?"updateLibrary":"addLibrary")+'</button></div></div></form>'+
+   '<div id="collection-book-panel">'+(frCollection?collectionPanel(frCollection,libraryItem,state.lang,t,escapeHtml):
+     '<div class="home-empty">'+L("collectionLookupError")+'</div>')+'</div>'+
    '<div class="section-header" id="similar-heading"><h2 class="section-title">'+L("similarTitle")+'</h2></div>'+
    '<p class="page-desc">'+L("similarHelp")+'</p><div id="similar-results">'+
     (state.similar[id]?await recommendationMarkup(state.similar[id].recommendations||[],token):'<button class="btn btn-soft" data-action="similar">✧ '+L("similar")+'</button>')+'</div>';
@@ -623,6 +628,65 @@ async function sendRecommendationFeedback(button){
 }
 
 
+async function refreshFrenchCollection(){
+ const manga=state.currentDetail;
+ if(!manga)return;
+ const target=document.querySelector("#collection-book-panel");
+ if(!target)return;
+ try{
+  const result=await request("/collection/mangas/"+manga.id+"/editions");
+  if(routeInfo().view!=="detail"||Number(routeInfo().id)!==Number(manga.id))return;
+  state.frenchCollection=result;
+  target.innerHTML=collectionPanel(result,state.libraryDetail,state.lang,t,escapeHtml);
+ }catch(error){toast(error?.message||t(state.lang,"error"));}
+}
+async function searchFrenchIsbn(form){
+ const manga=state.currentDetail;if(!manga)return;
+ const input=String(new FormData(form).get("isbn")||"").trim();
+ const preview=document.querySelector("#edition-preview");if(!preview)return;
+ state.editionPreview=null;
+ preview.innerHTML='<div class="info">'+L("loading")+'</div>';
+ try{
+  const record=await request("/collection/isbn/"+encodeURIComponent(input));
+  if(Number(state.currentDetail?.id)!==Number(manga.id))return;
+  state.editionPreview=record;
+  preview.innerHTML=editionPreview(record,state.lang,t,escapeHtml);
+ }catch(error){preview.innerHTML='<div class="message">'+e(error.message||t(state.lang,"collectionLookupError"))+'</div>';}
+}
+async function confirmFrenchEdition(button){
+ const manga=state.currentDetail, preview=state.editionPreview;
+ if(!manga||!preview)return;
+ const edition_kind=document.querySelector("#edition-type")?.value;
+ const volume_number=Number(document.querySelector("#edition-number")?.value);
+ if(!Number.isInteger(volume_number)||volume_number<1||volume_number>9999)return;
+ button.disabled=true;
+ try{
+  await request("/collection/mangas/"+manga.id+"/editions",{
+    method:"POST",data:{isbn13:preview.isbn13,edition_kind,volume_number}
+  });
+  state.editionPreview=null;
+  await refreshFrenchCollection();
+  toast(t(state.lang,"collectionSaved"));
+ }catch(error){button.disabled=false;toast(error.message||t(state.lang,"error"));}
+}
+async function updateFrenchVolume(button){
+ const id=idNumber(button.dataset.editionId);
+ if(!id)return;
+ const previousOwned=button.dataset.owned==="true";
+ const previousRead=button.dataset.read==="true";
+ const action=button.dataset.action;
+ button.disabled=true;
+ try{
+  await request("/collection/volumes/"+id,{
+    method:"PUT",data:{
+      is_owned:action==="volume-owned"?!previousOwned:previousOwned,
+      is_read:action==="volume-read"?!previousRead:previousRead,
+    }
+  });
+  await refreshFrenchCollection();
+  toast(t(state.lang,"collectionVolumeSaved"));
+ }catch(error){button.disabled=false;toast(error.message||t(state.lang,"error"));}
+}
 async function saveLibrary(form){
  const manga=state.currentDetail;if(!manga)return;
  const fd=new FormData(form);
@@ -678,6 +742,8 @@ root.addEventListener("click",async event=>{
   return;
  }
  if(action==="feedback")return sendRecommendationFeedback(button);
+ if(action==="edition-confirm")return confirmFrenchEdition(button);
+ if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
  if(action==="catalog-prev"||action==="catalog-next"){
   state.catalogPage=Math.max(1,state.catalogPage+(action.endsWith("next")?1:-1));
@@ -715,6 +781,7 @@ async function manualSearch(){
 }
 root.addEventListener("submit",event=>{
  if(event.target.id==="library-editor"){event.preventDefault();saveLibrary(event.target);}
+ if(event.target.id==="edition-isbn-form"){event.preventDefault();searchFrenchIsbn(event.target);}
 });
 root.addEventListener("change",async event=>{
  const input=event.target;

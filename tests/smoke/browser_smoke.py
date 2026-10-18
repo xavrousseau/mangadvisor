@@ -150,6 +150,27 @@ def run():
             expect(page.locator(".manga-card").first).to_be_visible(timeout=30000)
             page.screenshot(path=str(OUTPUT / f"{device}-bibliotheque.png"), full_page=True)
 
+            # V1.2 : fiche française sur un livre distinct du manga canonique.
+            page.goto(BASE+"/manga/1",wait_until="domcontentloaded",timeout=60000)
+            expect(page.locator("#french-collection")).to_be_visible(timeout=40000)
+            expect(page.locator(".edition-item")).to_have_count(1,timeout=30000)
+            expect(page.locator(".edition-item")).to_contain_text("Naruto")
+            expect(page.locator(".edition-item")).to_contain_text("9782871294146")
+            expect(page.locator(".edition-item .edition-actions button")).to_have_count(2)
+            # La page conserve l'ancienne fiche et ses données.
+            expect(page.locator("#library-editor")).to_be_visible()
+            page.screenshot(path=str(OUTPUT / f"{device}-collection-fr.png"),full_page=True)
+            if device=="desktop":
+                edition_item=page.locator(".edition-item").first
+                edition_item.locator('[data-action="volume-owned"]').click()
+                expect(page.locator(".collection-stats")).to_contain_text("1")
+                expect(page.locator('[data-action="volume-owned"]').first).to_have_attribute("aria-pressed","true")
+                page.reload()
+                expect(page.locator('[data-action="volume-owned"]').first).to_have_attribute("aria-pressed","true",timeout=30000)
+                page.locator("#app-language").select_option("en")
+                expect(page.get_by_role("heading",name="French editions and my volumes")).to_be_visible(timeout=30000)
+                page.locator("#app-language").select_option("fr")
+
             assert not errors, f"Erreurs navigateur {device}: {errors}"
             page.close()
         browser.close()
