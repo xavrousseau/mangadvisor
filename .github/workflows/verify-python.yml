@@ -27,5 +27,8 @@ jobs:
         run: |
           node --input-type=module --check < apps/web/assets/i18n.js
           node --input-type=module --check < apps/web/assets/app.js
+          node --input-type=module --check < apps/web/assets/home.js
+      - name: Tester les sélections de l'accueil personnalisé
+        run: node --test tests/web/home.test.mjs
       - name: Tester la découverte et les couvertures
         run: python -m unittest discover -s tests -p 'test_*.py' -v

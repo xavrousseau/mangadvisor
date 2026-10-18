@@ -1,4 +1,5 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
+import { readingNow, personalPicks, recommendationSources } from "./home.js";
 
 const STATUS = ["READ","READING","OWNED","WANT_TO_READ","DROPPED","NOT_INTERESTED"];
 const SCREENS = ["home","discover","recommendations","library"];
@@ -150,17 +151,90 @@ async function renderHome(token){
  '<div class="quick-actions">'+[
   ["⌕","discover","browseHelp","/discover"],["✧","forYou","recommendationsHelp","/for-you"],["▤","library","libraryHelp","/library"]
  ].map(([icon,title,subtitle,target])=>'<button class="quick-card" data-go="'+target+'"><span class="quick-symbol" aria-hidden="true">'+icon+'</span><span class="quick-arrow">↗</span><h3>'+L(title)+'</h3><p>'+L(subtitle)+'</p></button>').join("")+'</div>'+
- '<div class="section-header"><h2 class="section-title">'+L("recentPicks")+'</h2><button class="btn-link" data-go="/discover">'+L("seeAll")+' →</button></div>'+
- '<div id="home-cards">'+loadingCards(5)+'</div>'+
+ '<section aria-labelledby="home-continue-title"><div class="section-header"><div><h2 class="section-title" id="home-continue-title">'+L("homeContinue")+'</h2>'+
+ '<p class="section-caption">'+L("homeContinueDesc")+'</p></div><button class="btn-link" data-go="/library">'+L("homeContinueAction")+' →</button></div>'+
+ '<div id="home-continue">'+loadingCards(4)+'</div></section>'+
+ '<section aria-labelledby="home-personal-title"><div class="section-header"><div><div class="eyebrow">✦ MANGADVISOR MATCH</div>'+
+ '<h2 class="section-title" id="home-personal-title">'+L("homePersonalTitle")+'</h2><p class="section-caption">'+L("homePersonalDesc")+'</p></div>'+
+ '<button class="btn-link" data-go="/for-you">'+L("homePersonalAction")+' →</button></div>'+
+ '<div id="home-personal"><div class="info">'+L("homePersonalLoading")+'</div>'+loadingCards(2)+'</div></section>'+
+ '<section aria-labelledby="home-explore-title"><div class="section-header"><div><h2 class="section-title" id="home-explore-title">'+L("homeExploreTitle")+'</h2>'+
+ '<p class="section-caption">'+L("homeExploreDesc")+'</p></div><button class="btn-link" data-go="/discover">'+L("homeExploreAction")+' →</button></div>'+
+ '<div id="home-cards">'+loadingCards(5)+'</div></section>'+
  '<div class="section-header"><h2 class="section-title">'+L("quickStart")+'</h2></div>'+
  '<div class="steps">'+[1,2,3].map(i=>'<div class="step"><span class="step-count">'+i+'</span><div><h3>'+L("step"+i)+'</h3><p>'+L("step"+i+"Desc")+'</p></div></div>').join("")+'</div>';
  if(!mount(markup,token))return;
- try{
-  const res=await request("/mangas?limit=5");
-  const urls=await covers(res.items||[]);
-  if(token!==renderToken)return;
-  document.querySelector("#home-cards").innerHTML=(res.items||[]).length?'<div class="manga-grid">'+res.items.map(m=>card(m,urls)).join("")+'</div>':emptyBox("📚",L("noResults"),L("noResultsHelp"));
- }catch(err){if(token===renderToken)document.querySelector("#home-cards").innerHTML=errorBox(err);}
+
+ // Chargement indépendant des trois espaces : un moteur lent n'empêche pas
+ // l'utilisateur de parcourir les autres sections.
+ const stillHere=()=>token===renderToken&&routeInfo().view==="home";
+ const readingTask=(async()=>{
+  const target=document.querySelector("#home-continue");
+  try{
+   const result=await request("/library?status=READING&limit=4");
+   const items=readingNow(result.items||[]);
+   const urls=await covers(items);
+   if(!stillHere()||!target)return;
+   target.innerHTML=items.length?'<div class="home-reading-grid">'+items.map(item=>{
+     const total=item.volumes??item.owned_volumes;
+     const progress=item.read_volumes!=null&&total!=null
+       ?'<div class="home-progress">'+e(item.read_volumes)+' / '+e(total)+' '+L("homeProgress")+'</div>':'';
+     return '<article class="home-reading-card">'+poster(item,urls)+
+       '<div class="home-reading-body"><span class="pill accent">'+e(libraryStatus(state.lang,item.library_status))+'</span>'+
+       '<h3>'+e(item.title||"Manga")+'</h3>'+progress+
+       '<button class="card-open" data-go="/manga/'+e(item.manga_id)+'">'+L("details")+' →</button></div></article>';
+   }).join("")+'</div>':
+    '<div class="home-empty"><span aria-hidden="true">▤</span><p>'+L("homeContinueMissing")+'</p>'+
+    '<button class="btn btn-small btn-soft" data-go="/discover">'+L("startExplore")+' →</button></div>';
+  }catch(error){if(stillHere()&&target)target.innerHTML=errorBox(error);}
+ })();
+ const browseTask=(async()=>{
+  const target=document.querySelector("#home-cards");
+  try{
+   const result=await request("/mangas?limit=5");
+   const items=result.items||[];
+   const urls=await covers(items);
+   if(!stillHere()||!target)return;
+   target.innerHTML=items.length?'<div class="manga-grid">'+items.map(item=>card(item,urls)).join("")+'</div>':
+     emptyBox("📚",L("noResults"),L("noResultsHelp"));
+  }catch(error){if(stillHere()&&target)target.innerHTML=errorBox(error);}
+ })();
+ const personalizedTask=(async()=>{
+  const target=document.querySelector("#home-personal");
+  try{
+   // Ne pas présenter une sélection générique comme une recommandation.
+   const library=await request("/library?limit=1");
+   if(!stillHere()||!target)return;
+   if(!(library.items||[]).length){
+     target.innerHTML=emptyBox("✧",L("homePersonalTitle"),L("homePersonalMissing"),
+       L("startExplore"),"/discover");
+     return;
+   }
+   const result=await request("/recommendations/library",{
+     method:"POST",data:{
+       limit:6,min_score:6.8,only_finished:false,
+       exclude_sensitive_mismatches:false,recommendation_goal:"SIMILAR_SAFE"
+     }
+   });
+   const picks=personalPicks(result.recommendations||[],[],4);
+   if(!stillHere()||!target)return;
+   if(!picks.length){
+     target.innerHTML=emptyBox("✧",L("homePersonalTitle"),L("homePersonalNoMatch"),
+       L("homePersonalAction"),"/for-you");
+     return;
+   }
+   const sources=recommendationSources(result);
+   const intro=sources.length?
+     '<p class="home-source">'+L("homePersonalBecause")+' <strong>'+sources.map(e).join(" · ")+'</strong></p>':'';
+   const cards=await recommendationMarkup(picks,token);
+   if(stillHere()&&target)target.innerHTML=intro+cards;
+  }catch(error){
+   if(stillHere()&&target)target.innerHTML=
+     '<div class="home-empty"><p>'+L("homePersonalMissing")+'</p>'+
+     '<button class="btn btn-small btn-soft" data-go="/for-you">'+L("homePersonalAction")+' →</button></div>';
+  }
+ })();
+ await Promise.allSettled([readingTask,browseTask,personalizedTask]);
 }
 async function renderDiscover(token){
  const opts=GENRES.map(([value,label])=>'<option value="'+e(value)+'"'+(state.catalogGenre===value?' selected':'')+'>'+
