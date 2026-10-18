@@ -1,6 +1,7 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
+import { unknownIsbnWizardMarkup, EDITION_CHOICES } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
 import { explainRecommendation, explainProfile, explainVerifiedSources } from "./explain.js";
 import {
@@ -19,7 +20,7 @@ const state = {
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,
-  bulkPreview:null,bulkCsv:"",
+  bulkPreview:null,bulkCsv:"",bulkResolver:null,
 };
 let renderToken = 0, searchTimer = null;
 const root=document.querySelector("#app");
@@ -334,7 +335,8 @@ async function renderLibrary(token){
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
  '<div id="library-results">'+loadingCards(10)+'</div>'+
- '<section class="bulk-workspace"><details id="bulk-import-workspace"><summary>⌑ '+L("bulkTitle")+'</summary>'+
+ '<section class="bulk-workspace"><details id="bulk-import-workspace"'+
+ (state.bulkPreview||state.bulkResolver?' open':'')+'><summary>⌑ '+L("bulkTitle")+'</summary>'+
  '<p class="page-desc">'+L("bulkIntro")+'</p>'+
  '<div class="bulk-steps"><div class="field"><label for="bulk-csv-file">'+L("bulkFile")+'</label>'+
  '<input id="bulk-csv-file" class="input" type="file" accept=".csv,text/csv,text/plain"></div>'+
@@ -343,6 +345,7 @@ async function renderLibrary(token){
  '<p class="muted tiny">'+L("bulkFormat")+'</p>'+
  '<button type="button" class="btn btn-primary" data-action="bulk-preview">'+L("bulkPreviewAction")+' →</button></div>'+
  '<div id="bulk-import-result">'+(state.bulkPreview?csvPreviewMarkup(state.bulkPreview,key=>t(state.lang,key),escapeHtml):'')+'</div>'+
+ '<div id="bulk-resolver">'+(state.bulkResolver?unknownIsbnWizardMarkup(state.bulkResolver,key=>t(state.lang,key),escapeHtml):'')+'</div>'+
  '<p class="collection-caveat">'+L("bulkSafety")+'</p>'+
  '<div class="bulk-actions"><button type="button" class="btn btn-soft" data-action="bulk-compare">'+L("bulkCompareAction")+'</button></div>'+
  '<div id="bulk-compare-result"></div></details></section>'+
@@ -702,13 +705,98 @@ async function updateFrenchVolume(button){
   toast(t(state.lang,"collectionVolumeSaved"));
  }catch(error){button.disabled=false;toast(error.message||t(state.lang,"error"));}
 }
+function drawUnknownResolver(){
+ const target=document.querySelector("#bulk-resolver");
+ if(target)target.innerHTML=state.bulkResolver ?
+   unknownIsbnWizardMarkup(state.bulkResolver,key=>t(state.lang,key),escapeHtml) : "";
+}
+async function resolveUnknownIsbn(button){
+ const isbn=String(button.dataset.isbn||"");
+ if(!/^\d{13}$/.test(isbn)||!state.bulkPreview?.items?.some(
+   row=>row.isbn13===isbn&&row.match==="UNKNOWN"))return;
+ const wizard={isbn,record:null,matches:[],query:"",selectedId:null,
+               searched:false,loading:true,error:""};
+ state.bulkResolver=wizard;drawUnknownResolver();
+ document.querySelector("#bulk-resolver")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+ try{
+  const record=await request("/collection/isbn/"+encodeURIComponent(isbn));
+  if(state.bulkResolver!==wizard||routeInfo().view!=="library")return;
+  if(record.isbn13!==isbn||record.verified_isbn!==true)throw Error(t(state.lang,"resolveLookupFail"));
+  wizard.record=record;
+ }catch(error){
+  if(state.bulkResolver!==wizard)return;
+  wizard.error=error.message||t(state.lang,"resolveLookupFail");
+ }finally{
+  if(state.bulkResolver===wizard){wizard.loading=false;drawUnknownResolver();}
+ }
+}
+async function searchUnknownSeries(){
+ const wizard=state.bulkResolver;
+ if(!wizard?.record)return;
+ const query=String(document.querySelector("#resolve-manga-query")?.value||"").trim().slice(0,120);
+ wizard.query=query;
+ wizard.selectedId=null;
+ wizard.matches=[];wizard.searched=false;
+ if(query.length<2){wizard.error=t(state.lang,"resolveSearchRequired");drawUnknownResolver();return;}
+ wizard.error="";wizard.loading=true;drawUnknownResolver();
+ try{
+  const result=await request("/mangas?"+new URLSearchParams({q:query,limit:"15"}));
+  if(state.bulkResolver!==wizard||routeInfo().view!=="library")return;
+  wizard.matches=(result.items||[]).filter(m=>idNumber(m.id)).slice(0,15);
+  wizard.searched=true;
+ }catch(error){
+  if(state.bulkResolver!==wizard)return;
+  wizard.error=error.message||t(state.lang,"error");
+ }finally{
+  if(state.bulkResolver===wizard){wizard.loading=false;drawUnknownResolver();}
+ }
+}
+function selectUnknownSeries(button){
+ const wizard=state.bulkResolver;
+ if(!wizard?.record)return;
+ const id=idNumber(button.dataset.mangaId);
+ if(!id||!wizard.matches.some(x=>Number(x.id)===id))return;
+ wizard.selectedId=id;wizard.error="";drawUnknownResolver();
+}
+async function confirmUnknownEdition(button){
+ const wizard=state.bulkResolver;
+ if(!wizard?.record||wizard.loading)return;
+ const manga_id=wizard.selectedId;
+ if(!idNumber(manga_id)||!wizard.matches.some(m=>Number(m.id)===manga_id)){
+  wizard.error=t(state.lang,"resolveSelectFirst");drawUnknownResolver();return;
+ }
+ const edition_kind=document.querySelector("#resolve-edition-kind")?.value;
+ const rawNumber=document.querySelector("#resolve-volume-number")?.value?.trim();
+ const volume_number=Number(rawNumber);
+ if(!EDITION_CHOICES.includes(edition_kind)||!rawNumber||!Number.isInteger(volume_number)
+   ||volume_number<1||volume_number>9999){
+  wizard.error=t(state.lang,"collectionConfirmTitle");drawUnknownResolver();return;
+ }
+ wizard.kind=edition_kind;wizard.volumeNumber=volume_number;
+ button.disabled=true;wizard.loading=true;wizard.error="";
+ try{
+  // The API RE-VALIDATES ISBN against BnF. User-picked series is explicit.
+  await request("/collection/mangas/"+manga_id+"/editions",{
+   method:"POST",data:{isbn13:wizard.isbn,edition_kind,volume_number}
+  });
+  if(state.bulkResolver!==wizard)return;
+  state.bulkResolver=null;drawUnknownResolver();
+  // Re-run the same original CSV; status flags are still NOT written.
+  await previewBulkCsv();
+  toast(t(state.lang,"resolveLinked"));
+ }catch(error){
+  if(state.bulkResolver!==wizard)return;
+  wizard.loading=false;wizard.error=error.message||t(state.lang,"error");
+  drawUnknownResolver();
+ }
+}
 async function previewBulkCsv(){
  const input=document.querySelector("#bulk-csv-text");
  if(!input)return;
  const content=input.value.trim();
  if(!content){toast(t(state.lang,"bulkFormat"));return;}
  const target=document.querySelector("#bulk-import-result");if(!target)return;
- state.bulkCsv=content;state.bulkPreview=null;
+ state.bulkCsv=content;state.bulkPreview=null;state.bulkResolver=null;drawUnknownResolver();
  target.innerHTML='<div class="info">'+L("loading")+'</div>';
  try{
   const result=await request("/collection/import/preview",{method:"POST",data:{csv_content:content}});
@@ -808,6 +896,11 @@ root.addEventListener("click",async event=>{
  if(action==="bulk-preview")return previewBulkCsv();
  if(action==="bulk-apply")return applyBulkCsv(button);
  if(action==="bulk-compare")return reconcileBulkCounts(button);
+ if(action==="resolve-unknown")return resolveUnknownIsbn(button);
+ if(action==="resolve-cancel"){state.bulkResolver=null;drawUnknownResolver();return;}
+ if(action==="resolve-search-series")return searchUnknownSeries();
+ if(action==="resolve-select-series")return selectUnknownSeries(button);
+ if(action==="resolve-confirm-edition")return confirmUnknownEdition(button);
  if(action==="edition-confirm")return confirmFrenchEdition(button);
  if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
@@ -861,7 +954,7 @@ root.addEventListener("change",async event=>{
   const file=input.files[0];
   if(file.size>80000){toast(t(state.lang,"bulkFormat"));input.value="";return;}
   state.bulkCsv=await file.text();
-  state.bulkPreview=null;
+  state.bulkPreview=null;state.bulkResolver=null;drawUnknownResolver();
   const area=document.querySelector("#bulk-csv-text");if(area)area.value=state.bulkCsv;
   const out=document.querySelector("#bulk-import-result");if(out)out.innerHTML='<div class="info">'+L("bulkFileReady")+'</div>';
  }
@@ -873,6 +966,16 @@ root.addEventListener("change",async event=>{
 });
 root.addEventListener("input",event=>{
  const id=event.target.id;
+ if(id==="bulk-csv-text"){
+  const newValue=event.target.value.trim();
+  if(newValue!==state.bulkCsv){
+   state.bulkCsv=newValue;state.bulkPreview=null;state.bulkResolver=null;
+   drawUnknownResolver();
+   const out=document.querySelector("#bulk-import-result");
+   if(out)out.innerHTML='<div class="info">'+L("bulkChanged")+'</div>';
+  }
+ }
+
  if(id==="catalog-query"||id==="lib-query"){
   const val=event.target.value.trim().slice(0,120);
   clearTimeout(searchTimer);
@@ -884,6 +987,7 @@ root.addEventListener("input",event=>{
 });
 root.addEventListener("keydown",event=>{
  if(event.key==="Enter"&&event.target.id==="manual-search"){event.preventDefault();manualSearch();}
+ if(event.key==="Enter"&&event.target.id==="resolve-manga-query"){event.preventDefault();searchUnknownSeries();}
 });
 window.addEventListener("popstate",()=>render());
 render();
