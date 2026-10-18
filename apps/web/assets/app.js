@@ -1,5 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
+import { renderRecommendationExplanation } from "./explanations.js";
 
 const STATUS = ["READ","READING","OWNED","WANT_TO_READ","DROPPED","NOT_INTERESTED"];
 const SCREENS = ["home","discover","recommendations","library"];
@@ -384,9 +385,12 @@ async function recommendationMarkup(items,token){
   '<button type="button" class="feedback-btn" data-action="feedback" data-feedback="ALREADY_READ" data-manga-id="'+e(m.id)+'">✓ '+L("feedbackRead")+'</button>'+
   '<button type="button" class="feedback-btn dislike" data-action="feedback" data-feedback="NOT_FOR_ME" data-manga-id="'+e(m.id)+'">× '+L("feedbackDislike")+'</button>'+
   '</div></div>'+
-  '<details class="reco-explanation" style="grid-column:1/-1"><summary>'+L("why")+'</summary><p>'+
-   e(m.reason||t(state.lang,"whyNone"))+'</p>'+
-   (m.sensitive_mismatches?.length?'<p>⚠ '+L("differences")+': '+m.sensitive_mismatches.map(tr).join(", ")+'</p>':'')+
+  '<details class="reco-explanation" style="grid-column:1/-1"><summary>✦ '+L("explainTitle")+'</summary>'+
+  renderRecommendationExplanation(m, {
+    text:key=>t(state.lang,key),
+    translateTag:value=>tag(state.lang,value),
+    escape:escapeHtml,
+  })+
   '</details></article>').join("")+'</div>';
 }
 async function renderRecommendations(token){
@@ -394,6 +398,9 @@ async function renderRecommendations(token){
  const goalLabels={"SIMILAR_SAFE":"goalSimilar","READ_NEXT":"goalNext","SHORT_FINISHED":"goalShort"};
  const html='<div class="headline-row"><div><div class="eyebrow">✦ YOUR PERSONAL MANGA MATCH</div>'+
  '<h1 class="page-title">'+L("personalizedTitle")+'</h1><p class="page-desc">'+L("personalizedIntro")+'</p></div></div>'+
+ '<details class="improve-panel"><summary>✧ '+L("explainImprove")+'</summary>'+
+ '<ul><li>'+L("explainImproveRead")+'</li><li>'+L("explainImproveReact")+'</li><li>'+L("explainImproveGoal")+'</li></ul>'+
+ '<button class="btn btn-small btn-soft" data-go="/library">'+L("homeContinueAction")+' →</button></details>'+
  '<div class="toggle-tabs" role="group" aria-label="'+L("forYou")+'">'+
  '<button class="'+(libraryMode?'selected':'')+'" data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
  '<button class="'+(!libraryMode?'selected':'')+'" data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
