@@ -210,7 +210,7 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
   if(!draft)return;
   const existing=root.querySelector("#scan-overlay");
   if(existing)existing.outerHTML=scannerMarkup(lang(),escape,draft,handled,session);
-  else root.insertAdjacentHTML("beforeend",scannerMarkup(lang(),escape,draft,handled));
+  else root.insertAdjacentHTML("beforeend",scannerMarkup(lang(),escape,draft,handled,session));
  }
  function close(){
   epoch++;stopCamera();draft=null;root.querySelector("#scan-overlay")?.remove();
