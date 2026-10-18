@@ -272,7 +272,7 @@ async function renderDetail(token,id){
    '<div class="tag-row">'+badges([...(manga.genres||[]),...(manga.themes||[])],30)+'</div>'+
    '<div class="section-header" id="save-section"><h2 class="section-title">'+L("library")+'</h2></div>'+
    '<form class="library-editor" id="library-editor">'+
-    '<div class="form-grid"><div class="field"><label for="edit-status">'+L("status")+'</label><select class="select" id="edit-status" name="status">'+
+    '<div class="form-grid"><div class="field"><label for="edit-status">'+L("readingStatus")+'</label><select class="select" id="edit-status" name="status">'+
     STATUS.map(value=>'<option value="'+value+'"'+(libraryItem?.library_status===value?' selected':'')+'>'+e(libraryStatus(state.lang,value))+'</option>').join("")+'</select></div>'+
     '<div class="field"><label for="edit-rating">'+L("myRating")+'</label>'+
     '<input type="number" class="input" min="0" max="10" step="0.5" id="edit-rating" name="rating" value="'+e(libraryItem?.user_score??"")+'"></div></div>'+
