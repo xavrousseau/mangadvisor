@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
 from apps.api.app.recommendation_explanations import add_explanations
+from apps.api.app.recommendation_quality import choose_balanced
 
 
 app = FastAPI(
@@ -16,7 +17,14 @@ app = FastAPI(
 )
 
 
+RecommendationBalance = Literal["CLOSE", "BALANCED", "EXPLORE"]
+
+
 class ProfileRecommendationRequest(BaseModel):
+    recommendation_balance: RecommendationBalance = Field(
+        default="CLOSE",
+        description="CLOSE preserve l'ancien classement. BALANCED/EXPLORE rééquilibrent les candidats.",
+    )
     liked_titles: list[str] = Field(
         ...,
         min_length=1,
@@ -124,6 +132,10 @@ class LibraryImportCsvRequest(BaseModel):
 
 
 class LibraryRecommendationRequest(BaseModel):
+    recommendation_balance: RecommendationBalance = Field(
+        default="CLOSE",
+        description="Mode de sélection : CLOSE, BALANCED ou EXPLORE.",
+    )
     limit: int = Field(
         default=5,
         ge=1,
@@ -2021,6 +2033,7 @@ def recommend_from_library(
                 or recommendation_goal == "SHORT_FINISHED"
             ),
             exclude_sensitive_mismatches=payload.exclude_sensitive_mismatches,
+            recommendation_balance="CLOSE",  # Pool SQL dans l'ordre historique.
         )
     )
 
@@ -2083,7 +2096,9 @@ def recommend_from_library(
         reverse=True,
     )
 
-    recommendations = recommendations[: payload.limit]
+    recommendations, quality_diagnostic = choose_balanced(
+        recommendations, payload.limit, mode=payload.recommendation_balance
+    )
     add_explanations(
         recommendations, positive_sources_used,
         origin="library", connection_factory=get_connection,
@@ -2135,6 +2150,8 @@ def recommend_from_library(
         "positive_sources_available": positive_sources_available,
         "positive_sources": positive_sources_used,
         "excluded_library_manga_count": len(library_manga_ids),
+        "recommendation_balance": payload.recommendation_balance,
+        "quality_diagnostic": quality_diagnostic,
         "count": len(recommendations),
         "recommendations": recommendations,
     }
@@ -2435,7 +2452,6 @@ def recommend_similar(
               SELECT 1 FROM user_manga_library skipped
               WHERE skipped.user_id = %(user_id)s
                 AND skipped.manga_id = m.id
-                AND skipped.library_status IN ('NOT_INTERESTED', 'DROPPED')
           )
           AND COALESCE(m.score, 0) >= 6.8
           AND (
@@ -3296,7 +3312,6 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
                   SELECT 1 FROM user_manga_library skipped
                   WHERE skipped.user_id = %(user_id)s
                     AND skipped.manga_id = m.id
-                    AND skipped.library_status IN ('NOT_INTERESTED', 'DROPPED')
               )
               AND COALESCE(m.score, 0) >= %(min_score)s
               AND m.manga_type IN ('Manga', 'Manhwa', 'Manhua', 'One-shot')
@@ -3496,7 +3511,7 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
                 {
                     "source_ids": source_ids,
                     "user_id": DEFAULT_USER_ID,
-                    "limit": payload.limit,
+                    "limit": 20,  # Pool permettant une sélection de top N plus variée.
                     "min_score": payload.min_score,
                     "only_finished": payload.only_finished,
                     "exclude_sensitive_mismatches": payload.exclude_sensitive_mismatches,
@@ -3570,6 +3585,9 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
         row["reason"] = reason
         recommendations.append(row)
 
+    recommendations, quality_diagnostic = choose_balanced(
+        recommendations, payload.limit, mode=payload.recommendation_balance
+    )
     add_explanations(
         recommendations, sources,
         origin="manual", connection_factory=get_connection,
@@ -3577,6 +3595,8 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
 
     return {
         "sources": sources,
+        "recommendation_balance": payload.recommendation_balance,
+        "quality_diagnostic": quality_diagnostic,
         "count": len(recommendations),
         "recommendations": recommendations,
     }
