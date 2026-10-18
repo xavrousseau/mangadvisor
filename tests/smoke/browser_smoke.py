@@ -60,7 +60,13 @@ def run():
             page.locator('[data-go="/for-you"]').first.click()
             expect(page).to_have_url(BASE+"/for-you")
             expect(page.locator("#rec-submit")).to_be_visible(timeout=30000)
+            expect(page.locator("#rec-balance")).to_have_value("BALANCED")
             if device=="desktop":
+                page.locator("#rec-balance").select_option("EXPLORE")
+                page.locator("#rec-submit").click()
+                expect(page.locator("#rec-results .rec-quality")).to_be_visible(timeout=60000)
+                expect(page.locator("#rec-results .rec-quality")).to_contain_text("Diagnostic de la sélection")
+                page.locator("#rec-balance").select_option("BALANCED")
                 page.locator("#rec-submit").click()
                 expect(page.locator("#rec-results .rec-card").first).to_be_visible(timeout=60000)
                 expect(page.locator("#rec-results .profile-context")).to_be_visible(timeout=30000)
