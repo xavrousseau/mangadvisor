@@ -335,7 +335,7 @@ async function renderLibrary(token){
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
  '<div id="library-results">'+loadingCards(10)+'</div>'+
- '<section class="bulk-workspace"><details id="bulk-import-workspace"><summary>⌑ '+L("bulkTitle")+'</summary>'+
+ '<section class="bulk-workspace"><details id="bulk-import-workspace"'+(state.bulkResolver?' open':'')+'><summary>⌑ '+L("bulkTitle")+'</summary>'+
  '<p class="page-desc">'+L("bulkIntro")+'</p>'+
  '<div class="bulk-steps"><div class="field"><label for="bulk-csv-file">'+L("bulkFile")+'</label>'+
  '<input id="bulk-csv-file" class="input" type="file" accept=".csv,text/csv,text/plain"></div>'+
@@ -350,6 +350,7 @@ async function renderLibrary(token){
  '<div class="section-header"><span class="muted tiny">'+L("importLegacy")+'</span>'+
  '<a href="http://localhost:8502" class="btn-link" target="_blank" rel="noopener">'+L("openLegacy")+' ↗</a></div>';
  if(!mount(html,token))return;
+ if(state.bulkResolver)drawBulkResolver();
  await updateLibrary(token);
 }
 async function updateLibrary(token){
@@ -981,6 +982,11 @@ root.addEventListener("change",async event=>{
 });
 root.addEventListener("input",event=>{
  const id=event.target.id;
+ if(id==="bulk-csv-text" && state.bulkPreview && event.target.value.trim()!==state.bulkCsv){
+  state.bulkPreview=null;state.bulkResolver=null;
+  const output=document.querySelector("#bulk-import-result");
+  if(output)output.innerHTML='<div class="info">'+L("bulkPreviewAction")+'</div>';
+ }
  if(id==="catalog-query"||id==="lib-query"){
   const val=event.target.value.trim().slice(0,120);
   clearTimeout(searchTimer);
