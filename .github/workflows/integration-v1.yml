@@ -157,7 +157,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          HASH="$(printf 'mangadvisor-ci-password' | docker run --rm -i caddy:2.10-alpine caddy hash-password --algorithm bcrypt)"
+          HASH="$(printf '%s\n' 'mangadvisor-ci-password' | docker run --rm -i caddy:2.10-alpine caddy hash-password --algorithm bcrypt)"
           printf "MANGADVISOR_LAN_IP=127.0.0.1\nMOBILE_PASSWORD_HASH='%s'\n" "$HASH" > .env.mobile
           MOBILE="-f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml -f infra/compose/docker-compose.mobile.yml"
           docker compose --env-file .env --env-file .env.mobile $MOBILE config --quiet
