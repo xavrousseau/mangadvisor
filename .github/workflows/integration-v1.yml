@@ -59,7 +59,7 @@ jobs:
       - name: Construire et démarrer API + UI
         run: |
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.dev.yml up --build -d api ui
+            -f infra/compose/docker-compose.dev.yml up --build -d api ui web
 
       - name: Tester les vraies requêtes SQL via HTTP
         run: |
@@ -106,7 +106,13 @@ jobs:
               'exclude_sensitive_mismatches':False,'recommendation_goal':'READ_NEXT',
           })
           assert 'recommendations' in library_reco,library_reco
-          print('OK : catalogue, filtres, couvertures, bibliothèque, fiche et TROIS moteurs de recommandations.')
+          payload=json.dumps({'manga_id':1,'lang':'fr'}).encode('utf-8')
+          req=urllib.request.Request('http://127.0.0.1:8000/localization/synopsis',
+              data=payload,headers={'Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(req,timeout=20) as response:
+              translation=json.load(response)
+          assert 'text' in translation and translation['translated'] is False,translation
+          print('OK : catalogue, filtres, couvertures, bibliothèque, fiche, traduction FR/EN et TROIS moteurs de recommandations.')
           PY
 
       - name: Installer Playwright Chromium

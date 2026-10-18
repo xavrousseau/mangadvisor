@@ -49,6 +49,8 @@ services:
       MEILI_PORT: 7700
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
       API_PORT: ${API_PORT}
+      LIBRETRANSLATE_URL: ${LIBRETRANSLATE_URL:-}
+      LIBRETRANSLATE_API_KEY: ${LIBRETRANSLATE_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,8 +67,21 @@ services:
       dockerfile: infra/docker/ui/Dockerfile
     container_name: mangadvisor_ui
     environment:
-      API_BASE_URL: http://api:${API_PORT}
+      API_BASE_URL: http://api:8000
       UI_PORT: ${UI_PORT}
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - mangadvisor_network
+
+  # Nouvelle application Mangadvisor : HTML/CSS/JS + proxy API via Nginx.
+  # Elle devient l'interface par défaut sur le port UI_PORT.
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web/Dockerfile
+    container_name: mangadvisor_web
     depends_on:
       api:
         condition: service_started
