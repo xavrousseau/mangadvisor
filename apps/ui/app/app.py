@@ -1,3 +1,4 @@
+import html
 import os
 from pathlib import Path
 from typing import Any
@@ -139,8 +140,9 @@ def get_library(
     status: str | None = None,
     search: str | None = None,
     limit: int = 200,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
-    params: dict[str, Any] = {"limit": limit}
+    params: dict[str, Any] = {"limit": limit, "offset": offset}
 
     if status:
         params["status"] = status
@@ -424,63 +426,86 @@ def display_library_profile(profile: dict[str, Any]) -> None:
                 )
 
 
-def display_library_item_card(item: dict[str, Any]) -> None:
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_cover_urls(manga_ids: tuple[int, ...]) -> dict[int, str]:
+    """Charge les couvertures par lot sans bloquer l'application en cas d'échec."""
+    ids = tuple(dict.fromkeys(int(value) for value in manga_ids if value))
+    covers: dict[int, str] = {}
+    for start in range(0, len(ids), 50):
+        try:
+            response = requests.get(
+                f"{API_BASE_URL}/covers/mangas",
+                params={"ids": ",".join(map(str, ids[start:start + 50]))},
+                timeout=10,
+            )
+            response.raise_for_status()
+            for item in response.json().get("covers", []):
+                if item.get("image_url"):
+                    covers[int(item["manga_id"])] = item["image_url"]
+        except (requests.RequestException, ValueError, KeyError, TypeError):
+            continue
+    return covers
+
+
+def display_manga_cover(manga: dict[str, Any], urls: dict[int, str] | None = None) -> None:
+    """Couverture officielle déjà présente en source, sinon repli décoratif."""
+    manga_id = manga.get("manga_id") or manga.get("id")
+    url = (urls or {}).get(int(manga_id)) if manga_id else None
+    if url:
+        st.image(url, use_container_width=True)
+    else:
+        title = html.escape(str(manga.get("title") or "Manga"), quote=True)
+        st.markdown(
+            '<div class="ma-cover-placeholder" role="img" '
+            f'aria-label="Couverture indisponible pour {title}">'
+            '<span class="ma-cover-lines" aria-hidden="true"></span>'
+            f'<span class="ma-cover-name">{title}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+
+def display_manga_recommendations(recommendations: list[dict[str, Any]]) -> None:
+    """Préserve le classement exact du moteur et ajoute ses couvertures."""
+    covers = get_cover_urls(tuple(int(m["id"]) for m in recommendations if m.get("id")))
+    for rank, manga in enumerate(recommendations, start=1):
+        display_recommendation_card(manga, rank, covers)
+
+
+def display_library_item_card(
+    item: dict[str, Any],
+    cover_urls: dict[int, str] | None = None,
+) -> None:
+    """Vignette courte ; toutes les actions existantes restent dans les détails."""
     title = item.get("title") or "Titre inconnu"
-    status = item.get("library_status")
-    status_label = LIBRARY_STATUS_LABELS.get(status, status or "N/A")
-
+    status_label = LIBRARY_STATUS_LABELS.get(
+        item.get("library_status"), item.get("library_status") or "N/A"
+    )
+    manga_id = item.get("manga_id")
     with st.container(border=True):
-        st.markdown(f"### {title}")
-
-        c1, c2, c3, c4 = st.columns(4)
-
-        with c1:
-            st.metric("Statut bibliothèque", status_label)
-
-        with c2:
-            st.metric("Note perso", format_number(item.get("user_score"), 1))
-
-        with c3:
-            st.metric("Score manga", format_number(item.get("manga_score"), 2))
-
-        with c4:
-            st.metric("Type", item.get("manga_type") or "N/A")
-
-        c5, c6, c7, c8 = st.columns(4)
-
-        with c5:
-            st.metric("Volumes possédés", item.get("owned_volumes") or "N/A")
-
-        with c6:
-            st.metric("Volumes lus", item.get("read_volumes") or "N/A")
-
-        with c7:
-            st.metric("Statut série", item.get("status") or "N/A")
-
-        with c8:
-            st.metric("Favori", "Oui" if item.get("is_favorite") else "Non")
-
-        st.write("**Genres :**")
-        st.write(format_list(item.get("genres"), "Genres non renseignés"))
-
-        st.write("**Thèmes :**")
-        st.write(format_list(item.get("themes"), "Thèmes non renseignés"))
-
-        st.write("**Cible éditoriale :**")
-        st.write(format_list(item.get("demographics"), "Cible non renseignée"))
-
-        notes = item.get("notes")
-
-        if notes:
-            st.write("**Notes :**")
-            st.write(notes)
-
-        manga_id = item.get("manga_id")
-
-        if manga_id:
-            if st.button(
-                "Retirer de ma bibliothèque",
-                key=f"delete_library_item_{manga_id}",
+        display_manga_cover(item, cover_urls)
+        st.write(title)
+        st.caption(f"{status_label} · {item.get('manga_type') or 'Manga'}")
+        st.caption(
+            f"★ {format_number(item.get('user_score'), 1)} / 10 · "
+            f"{'♥ Favori' if item.get('is_favorite') else 'Collection'}"
+        )
+        with st.expander("Fiche et gestion"):
+            st.write(f"**Statut bibliothèque :** {status_label}")
+            st.write(f"**Note personnelle :** {format_number(item.get('user_score'), 1)}")
+            st.write(f"**Score manga :** {format_number(item.get('manga_score'), 2)}")
+            st.write(f"**Type :** {item.get('manga_type') or 'Non renseigné'}")
+            owned, read = item.get("owned_volumes"), item.get("read_volumes")
+            st.write(f"**Volumes possédés :** {owned if owned is not None else 'N/A'}")
+            st.write(f"**Volumes lus :** {read if read is not None else 'N/A'}")
+            st.write(f"**Statut de la série :** {item.get('status') or 'N/A'}")
+            st.write(f"**Genres :** {format_list(item.get('genres'), 'Non renseignés')}")
+            st.write(f"**Thèmes :** {format_list(item.get('themes'), 'Non renseignés')}")
+            st.write(f"**Cible éditoriale :** {format_list(item.get('demographics'), 'Non renseignée')}")
+            if item.get("notes"):
+                st.write(f"**Notes :** {item['notes']}")
+            if manga_id and st.button(
+                "Retirer de ma bibliothèque", key=f"delete_library_item_{manga_id}"
             ):
                 delete_library_item(int(manga_id))
                 st.success(f"{title} a été retiré de ta bibliothèque.")
