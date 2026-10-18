@@ -1,6 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
-import { bibliographyResults } from "./bibliography-view.js";
+import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
@@ -427,7 +427,8 @@ async function renderDetail(token,id){
     '<div class="form-action-row"><label class="check"><input type="checkbox" name="favorite"'+(libraryItem?.is_favorite?' checked':'')+'>'+L("favorite")+'</label>'+
     '<div class="actions">'+(libraryItem?'<button type="button" data-action="remove-library" class="btn btn-small">'+L("removeLibrary")+'</button>':'')+
     '<button class="btn btn-primary" type="submit">'+L(libraryItem?"updateLibrary":"addLibrary")+'</button></div></div></form>'+
-   '<div id="collection-book-panel">'+(frCollection?collectionPanel(frCollection,libraryItem,state.lang,t,escapeHtml,manga.title):
+   '<div id="collection-book-panel">'+(frCollection?collectionPanel(frCollection,libraryItem,state.lang,t,escapeHtml)+
+       bibliographyPanel(escapeHtml,t,state.lang,manga.title):
      '<div class="home-empty">'+L("collectionLookupError")+'</div>')+'</div>'+
    '<div class="section-header" id="similar-heading"><h2 class="section-title">'+L("similarTitle")+'</h2></div>'+
    '<p class="page-desc">'+L("similarHelp")+'</p><div id="similar-results">'+
@@ -656,7 +657,8 @@ async function refreshFrenchCollection(){
   const result=await request("/collection/mangas/"+manga.id+"/editions");
   if(routeInfo().view!=="detail"||Number(routeInfo().id)!==Number(manga.id))return;
   state.frenchCollection=result;
-  target.innerHTML=collectionPanel(result,state.libraryDetail,state.lang,t,escapeHtml,manga.title);
+  target.innerHTML=collectionPanel(result,state.libraryDetail,state.lang,t,escapeHtml)+
+   bibliographyPanel(escapeHtml,t,state.lang,manga.title);
   if(state.biblioCandidates)showBibliographyResults();
  }catch(error){toast(error?.message||t(state.lang,"error"));}
 }
