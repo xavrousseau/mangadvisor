@@ -30,7 +30,9 @@ def run():
             ready(page)
             page.screenshot(path=str(OUTPUT / f"{device}-discover.png"), full_page=True)
             if device == "desktop":
-                page.get_by_placeholder("Berserk, Nana, Monster...").fill("Monster")
+                search = page.get_by_placeholder("Berserk, Nana, Monster...")
+                search.fill("Monster")
+                search.press("Enter")  # Streamlit valide les text_input lors de la soumission.
                 expect(page.get_by_role("button", name="Voir la fiche →")).to_have_count(1, timeout=40000)
                 page.get_by_role("button", name="Voir la fiche →").click()
                 expect(page.get_by_text("L'histoire", exact=True)).to_be_visible(timeout=30000)
