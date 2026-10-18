@@ -19,6 +19,21 @@ export function enrichmentPanel(escape,t,lang){
   '<div id="fr-enrichment-results" aria-live="polite"></div></section>';
 }
 
+/** Reflect confirmed ISBN associations after a saved book, without rerunning BnF. */
+export function reconcileEnrichment(data,editions){
+ if(!data||!Array.isArray(data.items))return data;
+ const known=new Set((Array.isArray(editions)?editions:[]).map(x=>String(x.isbn13||"")));
+ const items=data.items.map(item=>
+   known.has(item.isbn13)&&item.registration_status==="TO_VERIFY"
+    ?{...item,registration_status:"REGISTERED_HERE",
+      registered_manga_id:data.manga_id}:item);
+ return {...data,items,
+  to_verify_count:items.filter(x=>x.registration_status==="TO_VERIFY").length,
+  registered_here_count:items.filter(x=>x.registration_status==="REGISTERED_HERE").length,
+  registered_other_count:items.filter(x=>x.registration_status==="REGISTERED_OTHER").length,
+ };
+}
+
 export function enrichmentResults(data,escape,t,lang){
  const e=s=>escape(String(s??"")),L=k=>e(t(lang,k));
  const candidates=(Array.isArray(data?.items)?data.items:[])
