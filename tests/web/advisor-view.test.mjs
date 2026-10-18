@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
-const file=readFileSync("apps/web/assets/advisor-view.js","utf8");
+const editionSource=readFileSync("apps/web/assets/advisor-editions.js","utf8");
+const editionUrl="data:text/javascript;charset=utf-8,"+encodeURIComponent(editionSource);
+const file=readFileSync("apps/web/assets/advisor-view.js","utf8")
+ .replace('from "./advisor-editions.js"', 'from "'+editionUrl+'"');
 const {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS}=
  await import("data:text/javascript;charset=utf-8,"+encodeURIComponent(file));
 const e=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
