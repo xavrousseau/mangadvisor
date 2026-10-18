@@ -1,4 +1,5 @@
 /** Conversational advisor UI: safe, bounded and catalogue-grounded. */
+import {advisorFrenchEditionsMarkup} from "./advisor-editions.js";
 export const ADVISOR_PROMPTS={
  fr:[
   "Je veux une enquête psychologique sans horreur ni gore, pas trop longue, idéalement en français.",
@@ -7,7 +8,7 @@ export const ADVISOR_PROMPTS={
   "Je cherche un manga de mystère terminé avec une édition française obligatoire."
  ],
  en:[
-  "I want a dark mystery, not too long, finished, ideally with a French edition.",
+  "I want a mystery, preferably in a Deluxe French edition, not too long.",
   "Something cozy and comforting.",
   "A long fantasy adventure.",
   "A finished mystery with a required French edition."
@@ -74,6 +75,7 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
     (missingBadges?'<p class="advisor-unverified">'+L("advisorNarrativeMissing")+': '+missingBadges+'</p>':"")+
     '<div class="advisor-french '+(m.french_recorded?"is-verified":"")+'">'+
        L(m.french_recorded?"advisorFrenchRegistered":"advisorFrenchUnknown")+'</div>'+
+    advisorFrenchEditionsMarkup(m.french_editions,{L,e})+
     '<div class="actions"><button class="btn btn-small btn-soft" data-go="/manga/'+e(m.id)+'">'+L("details")+' →</button></div>'+
     '<div class="feedback-actions" role="group" aria-label="'+L("feedbackInfo")+'">'+
      '<button class="feedback-btn" data-action="feedback" data-feedback="INTERESTED" data-manga-id="'+e(m.id)+'">♡ '+L("feedbackInterested")+'</button>'+
