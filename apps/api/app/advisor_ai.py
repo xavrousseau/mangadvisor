@@ -96,6 +96,10 @@ def parse_intent_response(
         fields["mood"] = None
     if fields.get("avoid_romance") and fields.get("secondary_mood") == "ROMANCE":
         fields["secondary_mood"] = None
+    # A new format preference must not inherit a previously *required* format.
+    # Only an explicit "mandatory" update can keep this strict SQL exclusion.
+    if "preferred_edition_kind" in updates and "require_edition_kind" not in updates:
+        fields["require_edition_kind"] = False
     if not fields.get("preferred_edition_kind"):
         fields["require_edition_kind"] = False
     try:
