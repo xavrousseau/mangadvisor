@@ -36,6 +36,12 @@ test("only an explicitly selected manga enables a gated final confirmation",()=>
  assert.match(html,/editionDELUXE/);
  assert.equal(EDITION_OPTIONS.includes("PERFECT"),true);
 });
+test("the volume number is never guessed or pre-filled when missing",()=>{
+ const html=resolverMarkup({...base,volume:null,selected:{id:2,title:"Monster"},
+   matches:[{id:2,title:"Monster"}],searched:true},texts,escape);
+ assert.match(html,/id="bulk-resolve-volume"[^>]*value=""/);
+ assert.match(html,/data-action="bulk-resolve-confirm" disabled/);
+});
 test("the BnF lookup must match the exact verified ISBN",()=>{
  assert.equal(isVerifiedIsbnRecord(record,record.isbn13),true);
  assert.equal(isVerifiedIsbnRecord({...record,isbn13:"9782871294146"},record.isbn13),false);
