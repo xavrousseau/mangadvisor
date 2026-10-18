@@ -7,7 +7,7 @@ from apps.api.app.edition_discovery import (
     search_bnf_by_title, edition_discovery_router,
 )
 
-SAMPLE=b"""<?xml version="1.0" encoding="utf-8"?>
+SAMPLE="""<?xml version="1.0" encoding="utf-8"?>
 <srw:searchRetrieveResponse xmlns:srw="http://www.loc.gov/zing/srw/"
  xmlns:dc="http://purl.org/dc/elements/1.1/">
  <srw:numberOfRecords>384</srw:numberOfRecords>
@@ -24,7 +24,7 @@ SAMPLE=b"""<?xml version="1.0" encoding="utf-8"?>
     <dc:identifier>ISBN 9782344074282</dc:identifier>
    </dc:dc></srw:recordData></srw:record>
  </srw:records>
-</srw:searchRetrieveResponse>"""
+</srw:searchRetrieveResponse>""".encode("utf-8")
 
 
 class FakeCursor:
