@@ -34,6 +34,11 @@ ON CONFLICT DO NOTHING;
 INSERT INTO user_manga_library(user_id,manga_id,library_status,user_score,is_favorite)
 SELECT 1,m.id,'READ',9.0,TRUE FROM manga m WHERE m.title IN ('Naruto','Monster')
 ON CONFLICT(user_id,manga_id) DO NOTHING;
+-- Une lecture en cours pour vérifier l'accueil personnel (base CI uniquement).
+INSERT INTO user_manga_library(user_id,manga_id,library_status,user_score,is_favorite,read_volumes,owned_volumes)
+SELECT 1,m.id,'READING',8.0,FALSE,3,12 FROM manga m
+WHERE m.title = 'Vinland Saga'
+ON CONFLICT(user_id,manga_id) DO NOTHING;
 DO $$
 BEGIN
   IF (SELECT count(*) FROM manga) < 30 THEN
