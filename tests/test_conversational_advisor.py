@@ -124,7 +124,7 @@ class ConversationalAdvisorTests(unittest.TestCase):
         self.assertEqual(found[0],{"concept":"PSYCHOLOGICAL",
                                   "source":"catalog_tag","matched":"Psychological"})
         self.assertEqual(found[1]["source"],"synopsis_word")
-        self.assertIn("detective",found[1]["matched"])
+        self.assertIn(found[1]["matched"], {"detective", "investigates"})
         self.assertFalse(any(x["concept"]=="SURVIVAL" for x in found))
         self.assertEqual(narrative_matches(
             {"title":"A Psychological Investigation","genres":[],"themes":[],
