@@ -166,15 +166,15 @@ jobs:
           docker compose --env-file .env --env-file .env.mobile $MOBILE logs --no-color --tail=100 mobile_https
           HTTP=""
           for i in $(seq 1 20); do
-            HTTP="$(curl -k -s -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/ || true)"
+            HTTP="$(curl --noproxy '*' -k --connect-timeout 3 --max-time 6 -s -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/ || true)"
             if [ "$HTTP" = "401" ]; then break; fi
             sleep 2
           done
-          test "$HTTP" = "401" || { docker compose --env-file .env --env-file .env.mobile $MOBILE logs --no-color --tail=100 mobile_https; echo "Expected 401 without login, got $HTTP"; exit 1; }
+          test "$HTTP" = "401" || { docker compose --env-file .env --env-file .env.mobile $MOBILE logs --no-color --tail=100 mobile_https; curl -kv --noproxy "*" --connect-timeout 3 --max-time 6 https://127.0.0.1:8443/ || true; echo "Expected 401 without login, got $HTTP"; exit 1; }
           docker cp mangadvisor_mobile_https:/data/caddy/pki/authorities/local/root.crt /tmp/mangadvisor-ca.crt
-          HTTP="$(curl -s --cacert /tmp/mangadvisor-ca.crt -u manga:mangadvisor-ci-password -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/)"
+          HTTP="$(curl --noproxy '*' -s --connect-timeout 3 --max-time 6 --cacert /tmp/mangadvisor-ca.crt -u manga:mangadvisor-ci-password -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/)"
           test "$HTTP" = "200" || { echo "Expected TLS-verified login success, got $HTTP"; exit 1; }
-          HTTP="$(curl -s --cacert /tmp/mangadvisor-ca.crt -u manga:wrong-password -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/)"
+          HTTP="$(curl --noproxy '*' -s --connect-timeout 3 --max-time 6 --cacert /tmp/mangadvisor-ca.crt -u manga:wrong-password -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/)"
           test "$HTTP" = "401" || { echo "Expected rejection of invalid password, got $HTTP"; exit 1; }
           echo "Mobile HTTPS: trusted local root, correct IP certificate and authentication OK"
 
