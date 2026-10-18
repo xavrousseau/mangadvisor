@@ -228,6 +228,9 @@ export const STRINGS = {
     personalizedTitle:"Des histoires choisies pour toi",
     personalizedIntro:"Mangadvisor analyse ce que tu aimes et t'explique pourquoi il te recommande chaque œuvre.",
 
+    advisorAIActive:"IA locale active · demandes comprises par le modèle, mangas vérifiés dans le catalogue",
+    advisorAIGuided:"Mode guidé · pour activer l’IA locale : mangadvisor.cmd, option 15",
+    advisorAIFallback:"IA locale indisponible · mode guidé actif, aucune recommandation inventée",
     advisorMode:"Mon conseiller",advisorTitle:"Ton conseiller manga",
     advisorPageIntro:"Décris ton envie avec tes mots, puis affine au fil de la conversation.",
     advisorGreeting:"Une envie de lecture particulière ?",
@@ -553,6 +556,9 @@ export const STRINGS = {
     cancel:"Cancel",personalizedTitle:"Stories picked for you",
     personalizedIntro:"Mangadvisor analyzes what you love and explains why it recommends each story.",
 
+    advisorAIActive:"Local AI active · the model interprets requests; manga picks come from the catalog",
+    advisorAIGuided:"Guided mode · enable local AI using mangadvisor.cmd option 15",
+    advisorAIFallback:"Local AI unavailable · guided mode active, no invented recommendations",
     advisorMode:"My advisor",advisorTitle:"Your manga advisor",
     advisorPageIntro:"Describe what you feel like reading in your own words, then refine your request as you chat.",
     advisorGreeting:"Looking for something special?",
