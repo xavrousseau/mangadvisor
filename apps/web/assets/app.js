@@ -1,6 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
-import { explainRecommendation, explainProfile } from "./explain.js";
+import { explainRecommendation, explainProfile, explainVerifiedSources } from "./explain.js";
 
 const STATUS = ["READ","READING","OWNED","WANT_TO_READ","DROPPED","NOT_INTERESTED"];
 const SCREENS = ["home","discover","recommendations","library"];
@@ -369,6 +369,25 @@ function recEvidence(m){
   L(x.label)+": "+x.values.slice(0,2).map(tr).join(", ")
  ).join(" · ");
 }
+function verifiedSourceExplanation(m) {
+ const info=explainVerifiedSources(m);
+ if(!info.references.length && !info.matches.length)return "";
+ const matches=info.matches.length?info.matches.map(source=>
+  '<div class="verified-source"><strong>'+e(source.title)+'</strong>'+
+  '<div class="why-factor-tags">'+
+  [...source.genres,...source.themes,...source.demographics].map(v=>'<span class="pill">'+tr(v)+'</span>').join("")+
+  '</div></div>'
+ ).join(""):'<p class="muted tiny">'+L("explainVerifiedNone")+'</p>';
+ const sc=info.score;
+ const equation=sc&&sc.base!==null&&sc.bonus!==null&&sc.final!==null?
+  '<div class="why-section"><h4>'+L("explainScoreEquation")+'</h4>'+
+  '<div class="verified-equation"><div><small>'+L("explainInitialScore")+'</small><strong>'+e(sc.base.toFixed(1))+'</strong></div>'+
+  '<span>＋</span><div><small>'+L("explainGoalBonus")+'</small><strong>'+e((sc.bonus>=0?"+":"")+sc.bonus.toFixed(1))+'</strong></div>'+
+  '<span>＝</span><div class="verified-total"><small>'+L("explainFinalScore")+'</small><strong>'+e(sc.final.toFixed(1))+'</strong></div></div>'+
+  '<p class="why-note">'+L("explainComponentsNote")+'</p></div>' : "";
+ return '<div class="why-section"><h4>'+L("explainVerified")+'</h4>'+matches+
+  '<p class="why-note">'+L("explainVerifiedNote")+'</p></div>'+equation;
+}
 function recommendationExplanation(m){
  const info=explainRecommendation(m);
  const factors=info.factors.length?info.factors.map(x=>
@@ -389,7 +408,8 @@ function recommendationExplanation(m){
    '<details class="why-original"><summary>'+L("explainOriginal")+'</summary>'+
    (state.lang==="en"?'<p class="why-note">'+L("explainOriginalFrench")+'</p>':'')+
    '<p>'+e(info.originalReason)+'</p></details>':'';
- return '<div class="why-explainer"><div class="why-section"><h4>'+L("explainEvidence")+'</h4>'+
+ return '<div class="why-explainer">'+verifiedSourceExplanation(m)+
+  '<div class="why-section"><h4>'+L("explainEvidence")+'</h4>'+
    factors+'</div>'+components+warnings+original+'</div>';
 }
 function recommendationProfileContext(response){
@@ -436,6 +456,9 @@ async function renderRecommendations(token){
  const goalLabels={"SIMILAR_SAFE":"goalSimilar","READ_NEXT":"goalNext","SHORT_FINISHED":"goalShort"};
  const html='<div class="headline-row"><div><div class="eyebrow">✦ YOUR PERSONAL MANGA MATCH</div>'+
  '<h1 class="page-title">'+L("personalizedTitle")+'</h1><p class="page-desc">'+L("personalizedIntro")+'</p></div></div>'+
+ '<details class="improve-panel"><summary>✧ '+L("explainImprove")+'</summary>'+
+ '<p>'+L("explainImproveText")+'</p>'+
+ '<button class="btn btn-small btn-soft" data-go="/library">'+L("explainImproveAction")+' →</button></details>'+
  '<div class="toggle-tabs" role="group" aria-label="'+L("forYou")+'">'+
  '<button class="'+(libraryMode?'selected':'')+'" data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
  '<button class="'+(!libraryMode?'selected':'')+'" data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
