@@ -149,6 +149,21 @@ def run():
             expect(page).to_have_url(BASE+"/library")
             expect(page.locator(".manga-card").first).to_be_visible(timeout=30000)
             page.screenshot(path=str(OUTPUT / f"{device}-bibliotheque.png"), full_page=True)
+            # Batch import: preview must match only ISBNs already verified in the catalog.
+            page.locator("#bulk-import-workspace summary").click()
+            expect(page.locator("#bulk-csv-text")).to_be_visible()
+            page.locator("#bulk-csv-text").fill(
+                "isbn13;possede;lu\\n9782871294146;oui;non\\n9782344074282;oui;non\\n".replace("\\\\n","\\n")
+            )
+            page.locator('[data-action="bulk-preview"]').click()
+            expect(page.locator(".bulk-preview")).to_be_visible(timeout=30000)
+            expect(page.locator(".bulk-preview")).to_contain_text("ISBN reconnu")
+            expect(page.locator(".bulk-preview")).to_contain_text("ISBN non référencé")
+            expect(page.locator(".bulk-preview [data-action='bulk-apply']")).to_be_visible()
+            page.screenshot(path=str(OUTPUT / f"{device}-import-csv-apercu.png"), full_page=True)
+            page.locator('[data-action="bulk-compare"]').click()
+            expect(page.locator(".bulk-reconcile")).to_be_visible(timeout=30000)
+            expect(page.locator(".bulk-reconcile")).to_contain_text("Compteurs historiques")
 
             # V1.2 : fiche française sur un livre distinct du manga canonique.
             page.goto(BASE+"/manga/1",wait_until="domcontentloaded",timeout=60000)
