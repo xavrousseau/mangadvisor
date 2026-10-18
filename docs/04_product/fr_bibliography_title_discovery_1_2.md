@@ -17,7 +17,9 @@ de la Bibliothèque nationale de France :
 https://api.bnf.fr/fr/api-sru-catalogue-general
 
 Les métadonnées Dublin Core sont transmises avec leur ISBN-13,
-titre de notice, auteur, éditeur, date telle que renseignée et lien ARK.
+titre de notice, auteur, éditeur, date telle que renseignée, langue déclarée
+(français, multiple, autre ou inconnue) et lien ARK. Une notice au
+Catalogue général **ne suffit pas à prouver qu'un livre est en français**.
 
 L'interface affiche clairement :
 
