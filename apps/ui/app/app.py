@@ -644,12 +644,22 @@ def display_manga_detail(manga: dict[str, Any]) -> None:
 def display_recommendation_card(
     recommendation: dict[str, Any],
     index: int,
+    cover_urls: dict[int, str] | None = None,
 ) -> None:
     """
     Affiche une carte de recommandation.
     """
     with st.container(border=True):
-        st.markdown(f"### {index}. {recommendation.get('title')}")
+        cover_column, info_column = st.columns([1, 3], gap="medium")
+        with cover_column:
+            display_manga_cover(recommendation, cover_urls)
+        with info_column:
+            st.markdown(f"### {index}. {recommendation.get('title')}")
+            st.caption(
+                f"★ {format_number(recommendation.get('score'), 2)} / 10 · "
+                f"{recommendation.get('status') or 'Statut non renseigné'}"
+            )
+            st.write(recommendation.get("reason") or "Pas d'explication disponible.")
 
         c1, c2, c3, c4 = st.columns(4)
 
@@ -888,8 +898,7 @@ with tab_single:
             if not recommendations:
                 st.warning("Aucune recommandation trouvée.")
             else:
-                for index, recommendation in enumerate(recommendations, start=1):
-                    display_recommendation_card(recommendation, index)
+                display_manga_recommendations(recommendations)
 
         else:
             st.info("Clique sur le bouton pour générer les recommandations.")
@@ -972,8 +981,7 @@ with tab_profile:
             if not recommendations:
                 st.warning("Aucune recommandation trouvée pour ce profil.")
             else:
-                for index, recommendation in enumerate(recommendations, start=1):
-                    display_recommendation_card(recommendation, index)
+                display_manga_recommendations(recommendations)
 
     else:
         st.info("Clique sur le bouton pour générer des recommandations selon ton profil.")
@@ -1289,19 +1297,44 @@ with tab_library:
     if library_status_filter_label != "Tous":
         selected_status_filter = LIBRARY_STATUS_OPTIONS[library_status_filter_label]
 
-    library_items = get_library(
+    # Pagination API : on n'affiche jamais plus de 24 couvertures par écran.
+    active_filter = (selected_status_filter, library_text_filter.strip().casefold())
+    if st.session_state.get("ma_library_filter") != active_filter:
+        st.session_state["ma_library_filter"] = active_filter
+        st.session_state["ma_library_page"] = 1
+
+    library_page = int(st.session_state.get("ma_library_page", 1))
+    requested_items = get_library(
         status=selected_status_filter,
         search=library_text_filter.strip() if library_text_filter.strip() else None,
-        limit=200,
+        limit=25,
+        offset=(library_page - 1) * 24,
     )
-
-    st.write(f"Nombre de mangas dans la bibliothèque : **{len(library_items)}**")
+    library_items = requested_items[:24]
+    has_next_page = len(requested_items) > 24
+    st.caption(f"Page {library_page} · {len(library_items)} mangas affichés")
 
     if not library_items:
         st.info("Ta bibliothèque est vide ou aucun manga ne correspond aux filtres.")
     else:
-        for item in library_items:
-            display_library_item_card(item)
+        cover_urls = get_cover_urls(
+            tuple(int(m["manga_id"]) for m in library_items if m.get("manga_id"))
+        )
+        for start in range(0, len(library_items), 3):
+            columns = st.columns(3, gap="medium")
+            for column, manga in zip(columns, library_items[start:start + 3]):
+                with column:
+                    display_library_item_card(manga, cover_urls)
+
+    previous_column, next_column = st.columns(2)
+    with previous_column:
+        if st.button("← Page précédente", disabled=library_page <= 1):
+            st.session_state["ma_library_page"] = library_page - 1
+            rerun_app()
+    with next_column:
+        if st.button("Page suivante →", disabled=not has_next_page):
+            st.session_state["ma_library_page"] = library_page + 1
+            rerun_app()
 
     st.divider()
 
@@ -1413,8 +1446,7 @@ with tab_library:
         if not recommendations:
             st.warning("Aucune recommandation trouvée depuis ta bibliothèque.")
         else:
-            for index, recommendation in enumerate(recommendations, start=1):
-                display_recommendation_card(recommendation, index)
+            display_manga_recommendations(recommendations)
     else:
         st.info("Ajoute quelques mangas à ta bibliothèque, puis lance une recommandation.")
 
