@@ -1,6 +1,7 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
+import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
 import { explainRecommendation, explainProfile, explainVerifiedSources } from "./explain.js";
 import {
@@ -19,7 +20,7 @@ const state = {
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,
-  bulkPreview:null,bulkCsv:"",
+  bulkPreview:null,bulkCsv:"",bulkResolver:null,
 };
 let renderToken = 0, searchTimer = null;
 const root=document.querySelector("#app");
@@ -334,7 +335,7 @@ async function renderLibrary(token){
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
  '<div id="library-results">'+loadingCards(10)+'</div>'+
- '<section class="bulk-workspace"><details id="bulk-import-workspace"><summary>⌑ '+L("bulkTitle")+'</summary>'+
+ '<section class="bulk-workspace"><details id="bulk-import-workspace"'+(state.bulkResolver?' open':'')+'><summary>⌑ '+L("bulkTitle")+'</summary>'+
  '<p class="page-desc">'+L("bulkIntro")+'</p>'+
  '<div class="bulk-steps"><div class="field"><label for="bulk-csv-file">'+L("bulkFile")+'</label>'+
  '<input id="bulk-csv-file" class="input" type="file" accept=".csv,text/csv,text/plain"></div>'+
@@ -349,6 +350,7 @@ async function renderLibrary(token){
  '<div class="section-header"><span class="muted tiny">'+L("importLegacy")+'</span>'+
  '<a href="http://localhost:8502" class="btn-link" target="_blank" rel="noopener">'+L("openLegacy")+' ↗</a></div>';
  if(!mount(html,token))return;
+ if(state.bulkResolver)drawBulkResolver();
  await updateLibrary(token);
 }
 async function updateLibrary(token){
@@ -702,13 +704,120 @@ async function updateFrenchVolume(button){
   toast(t(state.lang,"collectionVolumeSaved"));
  }catch(error){button.disabled=false;toast(error.message||t(state.lang,"error"));}
 }
+function currentBulkResolver(isbn){
+ return routeInfo().view==="library" && state.bulkResolver?.isbn===isbn &&
+  Boolean(state.bulkPreview?.items?.some(row=>row.isbn13===isbn && row.match==="UNKNOWN"));
+}
+function drawBulkResolver(){
+ const target=document.querySelector("#bulk-resolver-slot");
+ if(!target)return;
+ target.innerHTML=state.bulkResolver
+  ?resolverMarkup(state.bulkResolver,key=>t(state.lang,key),escapeHtml):"";
+}
+async function startBulkResolution(button){
+ const isbn=String(button.dataset.isbn||"");
+ if(!/^[0-9]{13}$/.test(isbn)||
+    !state.bulkPreview?.items?.some(row=>row.isbn13===isbn&&row.match==="UNKNOWN"))return;
+ state.bulkResolver={isbn,record:null,query:"",matches:[],searched:false,selected:null,
+   kind:"UNKNOWN",volume:null};
+ drawBulkResolver();
+ document.querySelector("#bulk-resolver-slot")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+ try{
+  const record=await request("/collection/isbn/"+isbn);
+  if(!currentBulkResolver(isbn))return;
+  if(!isVerifiedIsbnRecord(record,isbn))throw Error(t(state.lang,"resolveNoRecord"));
+  state.bulkResolver.record=record;
+  state.bulkResolver.query="";
+  state.bulkResolver.kind=EDITION_OPTIONS.includes(record.edition_kind_suggested)
+   ?record.edition_kind_suggested:"UNKNOWN";
+  drawBulkResolver();
+ }catch(error){
+  if(!currentBulkResolver(isbn))return;
+  const slot=document.querySelector("#bulk-resolver-slot");
+  if(slot)slot.innerHTML='<section class="bulk-resolver" id="bulk-resolver" role="alert">'+
+   '<div class="bulk-resolver-head"><h3>'+L("resolveTitle")+'</h3>'+
+   '<button type="button" class="btn btn-small" data-action="bulk-resolve-close">'+L("resolveCancel")+'</button></div>'+
+   '<p>'+L("resolveNoRecord")+'</p><p class="muted">'+e(error.message||"")+'</p>'+
+   '<button type="button" class="btn btn-soft" data-action="bulk-resolve" data-isbn="'+e(isbn)+'">'+
+    L("resolveSearchAgain")+'</button></section>';
+ }
+}
+async function searchBulkManga(form){
+ const resolver=state.bulkResolver;
+ if(!resolver||!currentBulkResolver(resolver.isbn)||!isVerifiedIsbnRecord(resolver.record,resolver.isbn))return;
+ const search=String(new FormData(form).get("manga")||"").trim().slice(0,120);
+ if(!search)return;
+ resolver.query=search;resolver.selected=null;resolver.matches=[];resolver.searched=false;
+ const slot=document.querySelector("#bulk-resolver-slot");
+ if(slot)slot.insertAdjacentHTML("beforeend",'<p class="info">'+L("resolveSearching")+'</p>');
+ try{
+  const result=await request("/mangas?"+new URLSearchParams({q:search,limit:"12"}));
+  if(!currentBulkResolver(resolver.isbn)||resolver!==state.bulkResolver||resolver.query!==search)return;
+  resolver.matches=(result.items||[]).slice(0,12);
+  resolver.searched=true;
+  drawBulkResolver();
+ }catch(error){
+  if(resolver!==state.bulkResolver)return;
+  if(slot)slot.innerHTML+='<p class="message">'+e(error.message||"")+'</p>';
+ }
+}
+function selectBulkManga(button){
+ const resolver=state.bulkResolver;if(!resolver||!currentBulkResolver(resolver.isbn))return;
+ const id=idNumber(button.dataset.id);
+ const manga=resolver.matches.find(row=>Number(row.id)===id);
+ if(!manga)return;
+ resolver.selected={id,title:manga.title};
+ drawBulkResolver();
+ document.querySelector(".bulk-resolver-confirm")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+function syncBulkConfirmation(){
+ const btn=document.querySelector('[data-action="bulk-resolve-confirm"]');
+ if(!btn)return;
+ const raw=String(document.querySelector("#bulk-resolve-volume")?.value??"").trim();
+ const number=Number(raw);
+ btn.disabled=!(document.querySelector("#bulk-resolve-ack")?.checked && raw &&
+   Number.isInteger(number) && number>=1 && number<=9999);
+}
+async function confirmBulkAssociation(button){
+ const draft=state.bulkResolver;if(!draft||!currentBulkResolver(draft.isbn)||
+    !isVerifiedIsbnRecord(draft.record,draft.isbn)||!draft.selected)return;
+ const checkbox=document.querySelector("#bulk-resolve-ack");
+ const edition_kind=document.querySelector("#bulk-resolve-kind")?.value;
+ const volume_number=Number(document.querySelector("#bulk-resolve-volume")?.value);
+ const mangaId=idNumber(draft.selected.id);
+ if(!checkbox?.checked || !String(document.querySelector("#bulk-resolve-volume")?.value??"").trim() ||
+    !EDITION_OPTIONS.includes(edition_kind)||
+    !mangaId||!Number.isInteger(volume_number)||volume_number<1||volume_number>9999){
+  toast(t(state.lang,"resolveInputNeeded"));return;
+ }
+ button.disabled=true;
+ try{
+  await request("/collection/mangas/"+mangaId+"/editions",{
+   method:"POST",data:{isbn13:draft.isbn,edition_kind,volume_number},
+  });
+  if(!currentBulkResolver(draft.isbn))return;
+  // The original CSV is deliberately retained; the server recomputes its
+  // confirmed ISBNs and a NEW approval token before any owned/read write.
+  await previewBulkCsv();
+  const target=document.querySelector("#bulk-import-result");
+  if(target?.querySelector(".bulk-preview")){
+   target.insertAdjacentHTML("afterbegin",'<div class="info">✓ '+L("resolveSuccess")+'</div>');
+   target.querySelector(".bulk-preview")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
+  toast(t(state.lang,"resolveSuccess"));
+ }catch(error){
+  button.disabled=false;
+  toast(error.message||t(state.lang,"error"));
+ }
+}
+
 async function previewBulkCsv(){
  const input=document.querySelector("#bulk-csv-text");
  if(!input)return;
  const content=input.value.trim();
  if(!content){toast(t(state.lang,"bulkFormat"));return;}
  const target=document.querySelector("#bulk-import-result");if(!target)return;
- state.bulkCsv=content;state.bulkPreview=null;
+ state.bulkCsv=content;state.bulkPreview=null;state.bulkResolver=null;
  target.innerHTML='<div class="info">'+L("loading")+'</div>';
  try{
   const result=await request("/collection/import/preview",{method:"POST",data:{csv_content:content}});
@@ -806,6 +915,10 @@ root.addEventListener("click",async event=>{
  }
  if(action==="feedback")return sendRecommendationFeedback(button);
  if(action==="bulk-preview")return previewBulkCsv();
+ if(action==="bulk-resolve")return startBulkResolution(button);
+ if(action==="bulk-resolve-close"){state.bulkResolver=null;drawBulkResolver();return;}
+ if(action==="bulk-resolve-select")return selectBulkManga(button);
+ if(action==="bulk-resolve-confirm")return confirmBulkAssociation(button);
  if(action==="bulk-apply")return applyBulkCsv(button);
  if(action==="bulk-compare")return reconcileBulkCounts(button);
  if(action==="edition-confirm")return confirmFrenchEdition(button);
@@ -848,6 +961,7 @@ async function manualSearch(){
 root.addEventListener("submit",event=>{
  if(event.target.id==="library-editor"){event.preventDefault();saveLibrary(event.target);}
  if(event.target.id==="edition-isbn-form"){event.preventDefault();searchFrenchIsbn(event.target);}
+ if(event.target.id==="bulk-resolve-search-form"){event.preventDefault();searchBulkManga(event.target);}
 });
 root.addEventListener("change",async event=>{
  const input=event.target;
@@ -857,11 +971,12 @@ root.addEventListener("change",async event=>{
  if(input.id==="catalog-genre"){state.catalogGenre=input.value;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="catalog-finished"){state.catalogFinished=input.checked;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="lib-status"){state.libraryStatus=input.value;state.libraryPage=1;await updateLibrary(renderToken);}
+ if(input.id==="bulk-resolve-ack")syncBulkConfirmation();
  if(input.id==="bulk-csv-file"&&input.files?.[0]){
   const file=input.files[0];
   if(file.size>80000){toast(t(state.lang,"bulkFormat"));input.value="";return;}
   state.bulkCsv=await file.text();
-  state.bulkPreview=null;
+  state.bulkPreview=null;state.bulkResolver=null;
   const area=document.querySelector("#bulk-csv-text");if(area)area.value=state.bulkCsv;
   const out=document.querySelector("#bulk-import-result");if(out)out.innerHTML='<div class="info">'+L("bulkFileReady")+'</div>';
  }
@@ -873,6 +988,12 @@ root.addEventListener("change",async event=>{
 });
 root.addEventListener("input",event=>{
  const id=event.target.id;
+ if(id==="bulk-resolve-volume")syncBulkConfirmation();
+ if(id==="bulk-csv-text" && state.bulkPreview && event.target.value.trim()!==state.bulkCsv){
+  state.bulkPreview=null;state.bulkResolver=null;
+  const output=document.querySelector("#bulk-import-result");
+  if(output)output.innerHTML='<div class="info">'+L("bulkPreviewAction")+'</div>';
+ }
  if(id==="catalog-query"||id==="lib-query"){
   const val=event.target.value.trim().slice(0,120);
   clearTimeout(searchTimer);
