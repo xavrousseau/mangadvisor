@@ -248,6 +248,45 @@ def run():
             expect(page.locator(".edition-item .edition-actions button")).to_have_count(2)
             # La page conserve l'ancienne fiche et ses données.
             expect(page.locator("#library-editor")).to_be_visible()
+            # BnF title-search response mocked in Chromium only (CI offline).
+            candidate_record={
+                "isbn13":"9782344074282","title_fr":"Naruto Perfect, tome 1",
+                "author_fr":"Masashi Kishimoto","publisher_fr":"Éditeur fictif CI",
+                "release_date_text":"2025","language_recorded":"français",
+                "source_name":"Bibliothèque nationale de France — Catalogue général",
+                "source_url":"https://catalogue.bnf.fr/ark:/12148/cb12345678x",
+                "source_checked_at":"2026-10-18T14:00:00Z",
+                "status":"CANDIDATE_UNCONFIRMED","manga_match_verified":False,
+                "edition_kind_suggested":"PERFECT",
+            }
+            def title_mock(route):
+                assert "Naruto" in route.request.url,route.request.url
+                route.fulfill(status=200,content_type="application/json",
+                  body=json.dumps({
+                    "manga_id":1,"searched_title":"Naruto",
+                    "items":[candidate_record],"count":1,
+                    "candidate_only":True,"exhaustive":False,
+                    "search_scope":"first_page_title_search_only",
+                  }))
+            def isbn_exact_mock(route):
+                record={**candidate_record,"verified_isbn":True}
+                route.fulfill(status=200,content_type="application/json",body=json.dumps(record))
+            page.route("**/api/collection/mangas/1/discover?*",title_mock)
+            page.route("**/api/collection/isbn/9782344074282",isbn_exact_mock)
+            expect(page.locator("#fr-bibliography")).to_be_visible()
+            page.locator("#fr-bibliography-query").fill("Naruto")
+            page.locator('#fr-bibliography-form button[type="submit"]').click()
+            expect(page.locator(".biblio-candidate")).to_have_count(1,timeout=30000)
+            expect(page.locator(".biblio-candidate")).to_contain_text("association non vérifiée")
+            expect(page.locator(".biblio-notice")).to_contain_text("non exhaustifs")
+            page.locator('[data-action="biblio-verify-isbn"]').click()
+            expect(page.locator("#edition-preview .edition-preview")).to_be_visible(timeout=30000)
+            expect(page.locator("#edition-number")).to_have_value("")
+            expect(page.locator(".edition-item")).to_have_count(1)
+            # The preview is not a write; the user must still choose the volume.
+            page.screenshot(path=str(OUTPUT / f"{device}-recherche-bnf-titre.png"),full_page=True)
+            page.unroute("**/api/collection/mangas/1/discover?*")
+            page.unroute("**/api/collection/isbn/9782344074282")
             page.screenshot(path=str(OUTPUT / f"{device}-collection-fr.png"),full_page=True)
             if device=="desktop":
                 edition_item=page.locator(".edition-item").first
