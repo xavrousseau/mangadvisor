@@ -287,6 +287,44 @@ def run():
             expect(page.locator(".edition-item")).to_have_count(1)
             # The preview is not a write; the user must still choose the volume.
             page.screenshot(path=str(OUTPUT / f"{device}-recherche-bnf-titre.png"),full_page=True)
+            # Assisted enrichment is read-only and never auto-confirms a series association.
+            enriched=[{
+                **candidate_record,"registration_status":"TO_VERIFY",
+                "title_clue":"TITLE_WORDS_PRESENT","title_clue_rank":2,
+                "registered_manga_id":None
+            },{
+                **candidate_record,"isbn13":"9782871294146",
+                "title_fr":"Naruto. Tome 1","registration_status":"REGISTERED_HERE",
+                "registered_manga_id":1,"registered_edition_kind":"CLASSIC",
+                "registered_volume_number":1,"title_clue":"TITLE_WORDS_PRESENT"
+            },{
+                **candidate_record,"isbn13":"9781234567897",
+                "title_fr":"Naruto inconnu","registration_status":"REGISTERED_OTHER",
+                "registered_manga_id":2,"title_clue":"SOME_TITLE_WORDS"
+            }]
+            def enrichment_mock(route):
+                route.fulfill(status=200,content_type="application/json",
+                    body=json.dumps({
+                       "manga_id":1,"searched_titles":["Naruto"],
+                       "items":enriched,"count":3,
+                       "to_verify_count":1,"registered_here_count":1,
+                       "registered_other_count":1,
+                       "candidate_only":True,"exhaustive":False,
+                       "first_page_per_title_only":True,"writes_performed":False,
+                       "search_errors":[],
+                    }))
+            page.route("**/api/collection/mangas/1/enrichment",enrichment_mock)
+            expect(page.locator("#fr-enrichment")).to_be_visible()
+            page.locator('[data-action="enrich-discover"]').click()
+            expect(page.locator(".enrich-candidate")).to_have_count(3,timeout=30000)
+            expect(page.locator('[data-action="enrich-verify-isbn"]')).to_have_count(1)
+            expect(page.locator(".enrich-stats")).to_contain_text("Déjà lié ailleurs")
+            page.locator('[data-action="enrich-verify-isbn"]').click()
+            expect(page.locator("#edition-preview .edition-preview")).to_be_visible(timeout=30000)
+            expect(page.locator("#edition-number")).to_have_value("")
+            expect(page.locator(".edition-item")).to_have_count(1)
+            page.screenshot(path=str(OUTPUT / f"{device}-atelier-enrichissement-fr.png"),full_page=True)
+            page.unroute("**/api/collection/mangas/1/enrichment")
             page.unroute("**/api/collection/mangas/1/discover?*")
             page.unroute("**/api/collection/isbn/9782344074282")
             page.screenshot(path=str(OUTPUT / f"{device}-collection-fr.png"),full_page=True)

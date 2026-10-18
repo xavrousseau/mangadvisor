@@ -12,6 +12,7 @@ from apps.api.app.collection import create_collection_router, ensure_collection_
 from apps.api.app.collection_bulk import collection_import_router
 from apps.api.app.collection_scan import scan_router
 from apps.api.app.edition_discovery import edition_discovery_router
+from apps.api.app.edition_enrichment import create_enrichment_router
 from apps.api.app.mood_discovery import make_discovery_router
 from apps.api.app.advisor import make_advisor_router
 
@@ -3670,5 +3671,6 @@ app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
 app.include_router(collection_import_router(get_connection, DEFAULT_USER_ID))
 app.include_router(scan_router(get_connection, DEFAULT_USER_ID))
 app.include_router(edition_discovery_router(get_connection))
+app.include_router(create_enrichment_router(get_connection))
 app.include_router(make_discovery_router(get_connection, DEFAULT_USER_ID))
 app.include_router(make_advisor_router(get_connection, DEFAULT_USER_ID))

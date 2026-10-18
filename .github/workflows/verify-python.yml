@@ -38,7 +38,8 @@ jobs:
           node --input-type=module --check < apps/web/assets/bulk-import-view.js
           node --input-type=module --check < apps/web/assets/unknown-isbn-view.js
           node --input-type=module --check < apps/web/assets/bibliography-view.js
+          node --input-type=module --check < apps/web/assets/enrichment-view.js
       - name: Tester les sélections de l'accueil personnalisé
-        run: node --test tests/web/home.test.mjs tests/web/explain.test.mjs tests/web/appearance.test.mjs tests/web/collection.test.mjs tests/web/bulk-import.test.mjs tests/web/unknown-isbn.test.mjs tests/web/bibliography.test.mjs tests/web/isbn-scanner.test.mjs tests/web/mood-view.test.mjs tests/web/advisor-view.test.mjs tests/web/advisor-editions.test.mjs
+        run: node --test tests/web/home.test.mjs tests/web/explain.test.mjs tests/web/appearance.test.mjs tests/web/collection.test.mjs tests/web/bulk-import.test.mjs tests/web/unknown-isbn.test.mjs tests/web/bibliography.test.mjs tests/web/enrichment.test.mjs tests/web/isbn-scanner.test.mjs tests/web/mood-view.test.mjs tests/web/advisor-view.test.mjs tests/web/advisor-editions.test.mjs
       - name: Tester la découverte et les couvertures
         run: python -m unittest discover -s tests -p 'test_*.py' -v

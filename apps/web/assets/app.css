@@ -850,3 +850,36 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 .advisor-edition-isbn a{color:var(--accent);text-decoration:underline}
 .advisor-editions-caution{margin:0!important;border-top:1px solid var(--border);
  font-size:10px!important;line-height:1.6!important;padding:11px!important;color:var(--muted)!important}
+
+
+/* Manga 2.4 — French bibliographic enrichment, no automatic association. */
+.enrichment-panel{margin:24px 0;padding:24px;border-radius:17px;border:1px solid var(--border);
+ background:var(--surface);box-shadow:var(--shadow)}
+.enrichment-head{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.enrichment-head h3{font:800 23px/1.2 'Outfit',sans-serif;margin:7px 0}
+.enrichment-head p{color:var(--muted);font-size:12px;line-height:1.65;max-width:620px}
+.enrichment-head .btn{flex-shrink:0}
+.enrich-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:14px 0}
+.enrich-stats>span{padding:13px;border-radius:11px;background:var(--surface2);border:1px solid var(--border);
+ font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.enrich-stats strong{font:800 25px/1 'Outfit',sans-serif;color:var(--accent)}
+.enrich-warning{font-size:11px;line-height:1.65;color:var(--muted);margin:11px 0}
+.enrich-candidates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:14px}
+.enrich-candidate{background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+ padding:16px;display:flex;flex-direction:column;gap:12px;justify-content:space-between;min-width:0}
+.enrich-item-main{min-width:0}
+.enrich-item-main h4{font-size:13px;line-height:1.45;margin:9px 0 6px;overflow-wrap:anywhere}
+.enrich-item-main p{font-size:11px;line-height:1.5;overflow-wrap:anywhere;margin:5px 0}
+.enrich-labels{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.enrich-status,.enrich-clue{border-radius:100px;padding:4px 9px;font-size:10px;font-weight:700;border:1px solid var(--border)}
+.enrich-status.fresh{color:var(--accent);border-color:var(--accent)}
+.enrich-status.registered{color:var(--muted)}
+.enrich-clue{font-weight:500;color:var(--muted)}
+.enrich-done{font-size:19px;color:var(--muted)}
+.enrich-candidate>.btn{align-self:flex-start}
+@media(max-width:800px){.enrichment-panel{padding:17px 14px}
+ .enrichment-head{align-items:stretch;flex-direction:column}
+ .enrichment-head .btn{align-self:flex-start}
+ .enrich-candidates{grid-template-columns:1fr}
+}
+@media(max-width:430px){.enrich-stats{gap:6px}.enrich-stats>span{padding:9px;font-size:10px}.enrich-stats strong{font-size:21px}}
