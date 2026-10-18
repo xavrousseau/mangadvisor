@@ -68,3 +68,40 @@ export function explainProfile(response) {
     : [];
   return { sources, genres: tags("top_genres"), themes: tags("top_themes") };
 }
+
+/**
+ * Candidate-specific similarities. Each tag is verified by the API against
+ * BOTH manga's catalog metadata, unlike global profile sources.
+ * No contribution-to-score claim is inferred from these intersections.
+ */
+export function explainVerifiedSources(item) {
+  const explanation = item?.explanation;
+  if (!explanation || typeof explanation !== "object") {
+    return { references: [], matches: [], score: null };
+  }
+  const strings = values => Array.isArray(values)
+    ? values.filter(v => typeof v === "string" && v.trim()).slice(0, 8)
+    : [];
+  const matches = (Array.isArray(explanation.source_matches) ? explanation.source_matches : [])
+    .filter(x => x && typeof x.title === "string" && x.title.trim())
+    .slice(0, 5)
+    .map(source => ({
+      title: source.title,
+      genres: strings(source.genres),
+      themes: strings(source.themes),
+      demographics: strings(source.demographics),
+    }))
+    .filter(source => source.genres.length || source.themes.length || source.demographics.length);
+  const raw = explanation.score || {};
+  const numeric = value => value === null || value === undefined || value === ""
+    ? null : Number.isFinite(Number(value)) ? Number(value) : null;
+  const score = {
+    base: numeric(raw.base),
+    bonus: numeric(raw.goal_bonus),
+    final: numeric(raw.final),
+  };
+  return {
+    references: strings(explanation.reference_titles),
+    matches, score,
+  };
+}
