@@ -883,3 +883,22 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .enrich-candidates{grid-template-columns:1fr}
 }
 @media(max-width:430px){.enrich-stats{gap:6px}.enrich-stats>span{padding:9px;font-size:10px}.enrich-stats strong{font-size:21px}}
+
+
+/* Mangadvisor 2.5 — French title aliases, page navigation, grouped edition notices. */
+.enrich-query{margin:12px 0 15px;display:grid;gap:6px}
+.enrich-query>label{font-weight:700;font-size:12px}
+.enrich-query>.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.enrich-query .input{min-width:170px;flex:1 1 230px}
+.enrich-query .btn{flex-shrink:0}
+.enrich-formats{display:grid;gap:20px;margin-top:17px}
+.enrich-format-group{min-width:0}
+.enrich-format-header{display:flex;align-items:center;justify-content:space-between;
+ gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:9px;margin-bottom:12px}
+.enrich-format-header h4{font-size:15px;font-weight:800;margin:0}
+.enrich-format-header span{font-size:11px;color:var(--muted)}
+.enrich-format-group .enrich-candidates{margin-top:0}
+.enrich-pagination{margin:14px 0 0;padding-top:14px;border-top:1px solid var(--border);
+ display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center}
+.enrich-pagination p{font-size:11px;color:var(--muted);line-height:1.6;margin:0;overflow-wrap:anywhere}
+@media(max-width:520px){.enrich-query .btn{width:100%}.enrich-pagination .btn{width:100%}}
