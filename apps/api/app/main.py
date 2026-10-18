@@ -5,6 +5,7 @@ import psycopg
 from fastapi import FastAPI, HTTPException, Query
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
+from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
 
 
 app = FastAPI(
@@ -441,6 +442,13 @@ def get_manga(manga_id: int) -> dict[str, Any]:
         )
 
     return row
+
+
+@app.post("/localization/synopsis")
+def get_localized_manga_synopsis(payload: SynopsisTranslationRequest) -> dict[str, Any]:
+    """Traduire uniquement le synopsis public, si un prestataire est configuré."""
+    manga = get_manga(payload.manga_id)
+    return localized_synopsis(manga.get("synopsis"), payload.lang)
 
 
 DEFAULT_USER_ID = 1
