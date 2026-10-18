@@ -69,10 +69,18 @@ def run():
                 page.locator("#rec-results .rec-card .reco-explanation > summary").first.click()
                 expect(page.locator("#rec-results .rec-card .why-explainer").first).to_be_visible()
                 expect(page.locator("#rec-results .rec-card .why-factor").first).to_be_visible()
+                expect(page.locator("#rec-results .rec-card").first.get_by_text(
+                    "Ressemblances vérifiées avec tes mangas"
+                )).to_be_visible()
+                expect(page.locator("#rec-results .rec-card .why-explainer").first).to_contain_text(
+                    "Ces attributs sont partagés"
+                )
+                page.screenshot(path=str(OUTPUT / "desktop-preuves-verifiees.png"), full_page=True)
                 page.locator("#app-language").select_option("en")
                 expect(page.locator("#rec-results .profile-context")).to_be_visible(timeout=30000)
                 page.locator("#rec-results .rec-card .reco-explanation > summary").first.click()
                 expect(page.get_by_text("What this manga shares with your taste").first).to_be_visible()
+                expect(page.get_by_text("Verified similarities with your manga").first).to_be_visible()
                 page.locator("#app-language").select_option("fr")
                 expect(page.locator("#rec-results .rec-card").first).to_be_visible(timeout=30000)
                 page.locator("#rec-results .rec-card .btn-soft").first.click()
