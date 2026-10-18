@@ -431,3 +431,48 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .collection-stats strong{font-size:19px}
  .edition-lookup,.edition-preview{padding:15px}
 }
+
+
+/* Mangadvisor 1.2: bulk book import + explicit reconciliation, all themes. */
+.bulk-workspace{margin:34px 0;border:1px solid var(--border);border-radius:15px;
+ background:var(--surface);padding:5px 19px 23px}
+.bulk-workspace details>summary{font-weight:850;color:var(--accent);font-size:16px;
+ cursor:pointer;padding:20px 0}
+.bulk-workspace details[open]>summary{border-bottom:1px solid var(--border);margin-bottom:20px}
+.bulk-workspace .page-desc{margin:9px 0 19px;font-size:13px}
+.bulk-steps{display:grid;gap:13px;max-width:780px}
+.bulk-steps .field{display:grid;gap:7px}
+.bulk-steps .field label{font-size:12px;font-weight:800}
+.bulk-steps input[type=file]{height:auto;padding:11px}
+.bulk-steps textarea{min-height:100px;font-family:monospace;font-size:12px;line-height:1.6}
+.bulk-preview,.bulk-reconcile{border:1px solid var(--border);border-radius:12px;
+ margin:17px 0;padding:16px;background:var(--surface2)}
+.bulk-preview h3,.bulk-reconcile h3{font-size:17px;margin:2px 0 9px}
+.bulk-preview>p{font-size:12px;color:var(--muted);line-height:1.6}
+.bulk-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:16px 0}
+.bulk-stats span{padding:10px;background:var(--surface);border:1px solid var(--border);
+ border-radius:9px;display:grid;gap:5px;font-size:11px;color:var(--muted)}
+.bulk-stats strong{font-size:22px;color:var(--accent)}
+.bulk-table-wrap{max-width:100%;overflow:auto;border:1px solid var(--border);border-radius:10px;margin:14px 0}
+.bulk-table{border-collapse:collapse;width:100%;min-width:590px;font-size:12px}
+.bulk-table th,.bulk-table td{border-bottom:1px solid var(--border);padding:10px 12px;text-align:left}
+.bulk-table th{font-size:11px;color:var(--muted);background:var(--surface)}
+.bulk-table tr:last-child td{border:0}
+.bulk-isbn{font-family:monospace;color:var(--text)}
+.bulk-status{font-weight:800;font-size:11px}
+.bulk-status.matched{color:var(--accent)}
+.bulk-status.pending{color:var(--muted)}
+.bulk-errors{color:var(--muted);font-size:12px;margin:13px 0}
+.bulk-errors summary{cursor:pointer;font-size:12px;padding:5px 0}
+.bulk-errors li{margin:5px 0;word-break:break-word}
+.bulk-preview>.btn{margin-top:10px}
+.bulk-actions{margin-top:18px}
+.bulk-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.bulk-compare>div{background:var(--surface);border-radius:10px;padding:14px;border:1px solid var(--border)}
+.bulk-compare h4{font-size:12px;color:var(--accent);margin:0 0 9px}
+.bulk-compare p{font-size:12px;color:var(--text);line-height:1.6}
+@media(max-width:740px){
+ .bulk-workspace{padding:4px 13px 18px}
+ .bulk-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .bulk-compare{grid-template-columns:1fr}
+}

@@ -1,5 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
+import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
 import { explainRecommendation, explainProfile, explainVerifiedSources } from "./explain.js";
 import {
@@ -18,6 +19,7 @@ const state = {
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,
+  bulkPreview:null,bulkCsv:"",
 };
 let renderToken = 0, searchTimer = null;
 const root=document.querySelector("#app");
@@ -331,7 +333,20 @@ async function renderLibrary(token){
  '<div class="field medium"><label for="lib-status">'+L("status")+'</label><select id="lib-status" class="select">'+
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
- '<div id="library-results">'+loadingCards(10)+'</div><div class="section-header"><span class="muted tiny">'+L("importLegacy")+'</span>'+
+ '<div id="library-results">'+loadingCards(10)+'</div>'+
+ '<section class="bulk-workspace"><details id="bulk-import-workspace"><summary>⌑ '+L("bulkTitle")+'</summary>'+
+ '<p class="page-desc">'+L("bulkIntro")+'</p>'+
+ '<div class="bulk-steps"><div class="field"><label for="bulk-csv-file">'+L("bulkFile")+'</label>'+
+ '<input id="bulk-csv-file" class="input" type="file" accept=".csv,text/csv,text/plain"></div>'+
+ '<div class="field"><label for="bulk-csv-text">'+L("bulkPaste")+'</label>'+
+ '<textarea class="textarea" id="bulk-csv-text" rows="5" maxlength="80000" spellcheck="false" placeholder="isbn13;possede;lu">'+e(state.bulkCsv)+'</textarea></div>'+
+ '<p class="muted tiny">'+L("bulkFormat")+'</p>'+
+ '<button type="button" class="btn btn-primary" data-action="bulk-preview">'+L("bulkPreviewAction")+' →</button></div>'+
+ '<div id="bulk-import-result">'+(state.bulkPreview?csvPreviewMarkup(state.bulkPreview,key=>t(state.lang,key),escapeHtml):'')+'</div>'+
+ '<p class="collection-caveat">'+L("bulkSafety")+'</p>'+
+ '<div class="bulk-actions"><button type="button" class="btn btn-soft" data-action="bulk-compare">'+L("bulkCompareAction")+'</button></div>'+
+ '<div id="bulk-compare-result"></div></details></section>'+
+ '<div class="section-header"><span class="muted tiny">'+L("importLegacy")+'</span>'+
  '<a href="http://localhost:8502" class="btn-link" target="_blank" rel="noopener">'+L("openLegacy")+' ↗</a></div>';
  if(!mount(html,token))return;
  await updateLibrary(token);
@@ -687,6 +702,54 @@ async function updateFrenchVolume(button){
   toast(t(state.lang,"collectionVolumeSaved"));
  }catch(error){button.disabled=false;toast(error.message||t(state.lang,"error"));}
 }
+async function previewBulkCsv(){
+ const input=document.querySelector("#bulk-csv-text");
+ if(!input)return;
+ const content=input.value.trim();
+ if(!content){toast(t(state.lang,"bulkFormat"));return;}
+ const target=document.querySelector("#bulk-import-result");if(!target)return;
+ state.bulkCsv=content;state.bulkPreview=null;
+ target.innerHTML='<div class="info">'+L("loading")+'</div>';
+ try{
+  const result=await request("/collection/import/preview",{method:"POST",data:{csv_content:content}});
+  if(routeInfo().view!=="library")return;
+  state.bulkPreview=result;
+  target.innerHTML=csvPreviewMarkup(result,key=>t(state.lang,key),escapeHtml);
+ }catch(error){state.bulkPreview=null;target.innerHTML=errorBox(error);}
+}
+async function applyBulkCsv(button){
+ const preview=state.bulkPreview;
+ if(!preview||!state.bulkCsv)return;
+ button.disabled=true;
+ try{
+  const result=await request("/collection/import/apply",{method:"POST",data:{
+    csv_content:state.bulkCsv,confirmation_token:preview.confirmation_token,
+  }});
+  state.bulkPreview=null;
+  const target=document.querySelector("#bulk-import-result");
+  if(target)target.innerHTML='<div class="info">✓ '+L("bulkSaved")+' · '+
+    e(result.processed)+' '+L("bulkToUpdate")+'. '+e(result.unknown)+' '+L("bulkUnknown")+
+    '<p>'+L("bulkImportHint")+'</p></div>';
+  state.recResult=null;
+  toast(t(state.lang,"bulkSaved"));
+ }catch(error){
+  button.disabled=false;
+  if(error?.message?.includes("409")){
+    state.bulkPreview=null;
+  }
+  toast(error.message||t(state.lang,"bulkChanged"));
+ }
+}
+async function reconcileBulkCounts(button){
+ const target=document.querySelector("#bulk-compare-result");if(!target)return;
+ button.disabled=true;target.innerHTML='<div class="info">'+L("loading")+'</div>';
+ try{
+  const result=await request("/collection/reconciliation");
+  if(routeInfo().view!=="library")return;
+  target.innerHTML=reconciliationMarkup(result,key=>t(state.lang,key),escapeHtml);
+ }catch(error){target.innerHTML=errorBox(error);}
+ finally{button.disabled=false;}
+}
 async function saveLibrary(form){
  const manga=state.currentDetail;if(!manga)return;
  const fd=new FormData(form);
@@ -742,6 +805,9 @@ root.addEventListener("click",async event=>{
   return;
  }
  if(action==="feedback")return sendRecommendationFeedback(button);
+ if(action==="bulk-preview")return previewBulkCsv();
+ if(action==="bulk-apply")return applyBulkCsv(button);
+ if(action==="bulk-compare")return reconcileBulkCounts(button);
  if(action==="edition-confirm")return confirmFrenchEdition(button);
  if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
@@ -791,6 +857,14 @@ root.addEventListener("change",async event=>{
  if(input.id==="catalog-genre"){state.catalogGenre=input.value;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="catalog-finished"){state.catalogFinished=input.checked;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="lib-status"){state.libraryStatus=input.value;state.libraryPage=1;await updateLibrary(renderToken);}
+ if(input.id==="bulk-csv-file"&&input.files?.[0]){
+  const file=input.files[0];
+  if(file.size>80000){toast(t(state.lang,"bulkFormat"));input.value="";return;}
+  state.bulkCsv=await file.text();
+  state.bulkPreview=null;
+  const area=document.querySelector("#bulk-csv-text");if(area)area.value=state.bulkCsv;
+  const out=document.querySelector("#bulk-import-result");if(out)out.innerHTML='<div class="info">'+L("bulkFileReady")+'</div>';
+ }
  if(input.id==="rec-goal"){state.recGoal=input.value;state.recResult=null;}
  if(input.id==="rec-balance"){state.recBalance=input.value;state.recResult=null;}
  if(input.id==="rec-min-score"){state.recMinScore=input.value;state.recResult=null;}
