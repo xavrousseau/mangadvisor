@@ -32,12 +32,32 @@ def run():
             if device == "desktop":
                 search = page.get_by_placeholder("Berserk, Nana, Monster...")
                 search.fill("Monster")
-                search.press("Enter")  # Streamlit valide les text_input lors de la soumission.
-                expect(page.get_by_role("button", name="Voir la fiche →")).to_have_count(1, timeout=40000)
-                page.get_by_role("button", name="Voir la fiche →").click()
-                expect(page.get_by_text("L'histoire", exact=True)).to_be_visible(timeout=30000)
-                page.screenshot(path=str(OUTPUT / "desktop-fiche-manga.png"), full_page=True)
-                expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+                search.press("Enter")
+                expect(page.get_by_role("button", name="Voir la fiche →")).to_have_count(
+                    1, timeout=40000
+                )
+            # La fiche doit être immédiatement visible AU PREMIER PLAN,
+            # pas ajoutée après les 12 cartes loin du bouton cliqué.
+            page.get_by_role("button", name="Voir la fiche →").first.click()
+            dialog = page.get_by_role("dialog")
+            expect(dialog).to_be_visible(timeout=30000)
+            if device == "desktop":
+                expect(dialog.get_by_role("heading", name="Monster")).to_be_visible(
+                    timeout=30000
+                )
+                dialog.get_by_role(
+                    "button", name="✨ Trouver des mangas similaires"
+                ).click()
+                expect(dialog.get_by_text("Et si tu aimais aussi…")).to_be_visible(
+                    timeout=30000
+                )
+            expect(dialog.get_by_text("L'histoire", exact=True)).to_be_visible(
+                timeout=30000
+            )
+            page.screenshot(path=str(OUTPUT / f"{device}-fiche-manga.png"), full_page=True)
+            expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+            page.keyboard.press("Escape")
+            expect(dialog).not_to_be_visible(timeout=10000)
             page.get_by_role("tab", name="✨ Pour moi").click()
             expect(page.get_by_text("Des mangas faits pour toi")).to_be_visible(timeout=30000)
             if device == "desktop":
