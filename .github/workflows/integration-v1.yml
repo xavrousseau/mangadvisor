@@ -1,0 +1,134 @@
+name: Validation intégrée Mangadvisor 1.0
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  docker-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configuration de test jetable
+        shell: bash
+        run: |
+          cat > .env <<'EOF'
+          POSTGRES_DB=mangadvisor_ci
+          POSTGRES_USER=manga_ci
+          POSTGRES_PASSWORD=only-for-disposable-github-runner
+          POSTGRES_PORT=5432
+          MEILI_MASTER_KEY=disposable-ci-key-long-enough-2026
+          MEILI_PORT=7700
+          API_PORT=8000
+          UI_PORT=8501
+          EMBEDDING_MODEL=none
+          ENABLE_TRANSLATION=false
+          ENABLE_OLLAMA=false
+          OLLAMA_PORT=11434
+          EOF
+
+      - name: Démarrer PostgreSQL et Meilisearch
+        run: |
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml up -d postgres meilisearch
+
+      - name: Installer les schémas dans PostgreSQL de CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if docker compose --env-file .env -f infra/compose/docker-compose.yml \
+              -f infra/compose/docker-compose.dev.yml exec -T postgres \
+                pg_isready -U manga_ci -d mangadvisor_ci >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          for file in \
+            sql/schema/001_jikan_source_tables.sql \
+            sql/schema/002_canonical_manga_tables.sql \
+            sql/schema/004_add_theme_demographic_tables.sql \
+            sql/schema/006_add_jikan_recommendation_tables.sql \
+            sql/schema/007_add_user_library_tables.sql \
+            tests/smoke/seed_catalog.sql; do
+            echo "Base jetable seulement : $file"
+            docker compose --env-file .env -f infra/compose/docker-compose.yml \
+              -f infra/compose/docker-compose.dev.yml exec -T postgres \
+              psql -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci < "$file"
+          done
+
+      - name: Construire et démarrer API + UI
+        run: |
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml up --build -d api ui
+
+      - name: Tester les vraies requêtes SQL via HTTP
+        run: |
+          python - <<'PY'
+          import json, time, urllib.request
+          def fetch(path):
+              with urllib.request.urlopen('http://127.0.0.1:8000'+path,timeout=20) as r:
+                  return json.load(r)
+          for i in range(60):
+              try:
+                  if fetch('/health').get('status') == 'ok': break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise RuntimeError('API non disponible')
+          assert fetch('/mangas?limit=12')['count'] == 12
+          filtered=fetch('/mangas?q=Naruto&genre=Adventure&only_finished=true')
+          assert filtered['count']==1 and filtered['items'][0]['title']=='Naruto',filtered
+          cover=fetch('/covers/mangas?ids=1,2')
+          assert cover['count']==2,cover
+          library=fetch('/library?limit=20')
+          assert len(library['items'])==2,library
+          detail=fetch('/mangas/1')
+          assert detail['title']=='Naruto' and detail['genres'],detail
+          similar=fetch('/recommendations/similar?title=Naruto&limit=3')
+          assert 'recommendations' in similar,similar
+          def post(path, payload):
+              req=urllib.request.Request(
+                  'http://127.0.0.1:8000'+path,
+                  data=json.dumps(payload).encode('utf-8'),
+                  headers={'Content-Type':'application/json'},
+                  method='POST',
+              )
+              with urllib.request.urlopen(req,timeout=40) as response:
+                  return json.load(response)
+          profile=post('/recommendations/profile',{
+              'liked_titles':['Naruto','Monster'], 'limit':3,
+              'min_score':6.8,'only_finished':False,
+              'exclude_sensitive_mismatches':False,
+          })
+          assert 'recommendations' in profile,profile
+          library_reco=post('/recommendations/library',{
+              'limit':3,'min_score':6.8,'only_finished':False,
+              'exclude_sensitive_mismatches':False,'recommendation_goal':'READ_NEXT',
+          })
+          assert 'recommendations' in library_reco,library_reco
+          print('OK : catalogue, filtres, couvertures, bibliothèque, fiche et TROIS moteurs de recommandations.')
+          PY
+
+      - name: Installer Playwright Chromium
+        run: |
+          python -m pip install playwright requests pillow
+          python -m playwright install --with-deps chromium
+
+      - name: Contrôler Streamlit ordinateur et mobile
+        run: python tests/smoke/browser_smoke.py
+
+      - name: Captures d'écran et diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangadvisor-v1-desktop-mobile
+          path: tests/smoke/screenshots/
+          if-no-files-found: ignore
+
+      - name: Journaux Docker en cas d'erreur
+        if: failure()
+        run: |
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml ps
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml logs --tail=160 api ui postgres
