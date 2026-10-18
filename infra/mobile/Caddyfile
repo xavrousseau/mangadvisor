@@ -1,0 +1,21 @@
+{
+    # No public ACME / no HTTP redirects: this site exists only on the LAN.
+    auto_https disable_redirects
+    admin off
+}
+
+https://{$MANGADVISOR_LAN_IP}:8443 {
+    tls internal
+
+    basic_auth {
+        manga {$MOBILE_PASSWORD_HASH}
+    }
+
+    reverse_proxy web:80
+
+    header {
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "same-origin"
+        Cache-Control "no-store"
+    }
+}
