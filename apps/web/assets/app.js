@@ -1,5 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
+import { bibliographyResults } from "./bibliography-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
@@ -19,7 +20,7 @@ const state = {
   recMode:"library",recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
-  frenchCollection:null,editionPreview:null,
+  frenchCollection:null,editionPreview:null,biblioCandidates:null,biblioSearchNonce:0,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
 };
 let renderToken = 0, searchTimer = null;
@@ -394,6 +395,7 @@ async function renderDetail(token,id){
   ]);
   if(token!==renderToken)return;
   state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.editionPreview=null;
+  state.biblioCandidates=null;state.biblioSearchNonce++;
   const synopsis=translation?.text||manga.synopsis||"";
   const reallyTranslated=state.lang==="fr"&&Boolean(translation?.translated);
   const elements='<section class="detail-hero">'+
@@ -425,7 +427,7 @@ async function renderDetail(token,id){
     '<div class="form-action-row"><label class="check"><input type="checkbox" name="favorite"'+(libraryItem?.is_favorite?' checked':'')+'>'+L("favorite")+'</label>'+
     '<div class="actions">'+(libraryItem?'<button type="button" data-action="remove-library" class="btn btn-small">'+L("removeLibrary")+'</button>':'')+
     '<button class="btn btn-primary" type="submit">'+L(libraryItem?"updateLibrary":"addLibrary")+'</button></div></div></form>'+
-   '<div id="collection-book-panel">'+(frCollection?collectionPanel(frCollection,libraryItem,state.lang,t,escapeHtml):
+   '<div id="collection-book-panel">'+(frCollection?collectionPanel(frCollection,libraryItem,state.lang,t,escapeHtml,manga.title):
      '<div class="home-empty">'+L("collectionLookupError")+'</div>')+'</div>'+
    '<div class="section-header" id="similar-heading"><h2 class="section-title">'+L("similarTitle")+'</h2></div>'+
    '<p class="page-desc">'+L("similarHelp")+'</p><div id="similar-results">'+
@@ -654,8 +656,56 @@ async function refreshFrenchCollection(){
   const result=await request("/collection/mangas/"+manga.id+"/editions");
   if(routeInfo().view!=="detail"||Number(routeInfo().id)!==Number(manga.id))return;
   state.frenchCollection=result;
-  target.innerHTML=collectionPanel(result,state.libraryDetail,state.lang,t,escapeHtml);
+  target.innerHTML=collectionPanel(result,state.libraryDetail,state.lang,t,escapeHtml,manga.title);
+  if(state.biblioCandidates)showBibliographyResults();
  }catch(error){toast(error?.message||t(state.lang,"error"));}
+}
+function showBibliographyResults(){
+ const target=document.querySelector("#fr-bibliography-results");
+ if(!target)return;
+ if(state.biblioCandidates){
+   target.innerHTML=bibliographyResults(state.biblioCandidates,escapeHtml,t,state.lang);
+ }
+}
+async function searchFrenchBibliography(form){
+ const manga=state.currentDetail;
+ if(!manga||routeInfo().view!=="detail")return;
+ const query=String(new FormData(form).get("title")||"").trim();
+ if(!query)return;
+ const nonce=++state.biblioSearchNonce;
+ state.biblioCandidates=null;
+ const target=document.querySelector("#fr-bibliography-results");
+ if(!target)return;
+ target.innerHTML='<div class="info">'+L("loading")+'</div>';
+ try{
+  const data=await request("/collection/mangas/"+manga.id+"/discover?"+
+    new URLSearchParams({title:query}));
+  if(nonce!==state.biblioSearchNonce||routeInfo().view!=="detail"||
+    Number(routeInfo().id)!==Number(manga.id))return;
+  state.biblioCandidates=data;
+  showBibliographyResults();
+ }catch(error){
+  if(nonce!==state.biblioSearchNonce)return;
+  target.innerHTML='<div class="message">'+e(error.message||t(state.lang,"biblioSearchError"))+'</div>';
+ }
+}
+async function verifyBibliographyCandidate(button){
+ const isbn=String(button.dataset.isbn||"");
+ if(!/^[0-9]{13}$/.test(isbn))return;
+ const item=state.biblioCandidates?.items?.find(entry=>
+   entry.isbn13===isbn&&entry.status==="CANDIDATE_UNCONFIRMED");
+ if(!item||routeInfo().view!=="detail")return;
+ const form=document.querySelector("#edition-isbn-form");
+ const input=document.querySelector("#edition-isbn");
+ if(!form||!input)return;
+ input.value=isbn;
+ await searchFrenchIsbn(form); // Existing endpoint RECHECKS the ISBN, no write.
+ const panel=document.querySelector("#edition-preview");
+ if(panel?.querySelector(".edition-preview")){
+   panel.insertAdjacentHTML("afterbegin",'<p class="collection-caveat">'+
+      L("biblioVerifyInstruction")+'</p>');
+ }
+ panel?.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 async function searchFrenchIsbn(form){
  const manga=state.currentDetail;if(!manga)return;
@@ -922,6 +972,7 @@ root.addEventListener("click",async event=>{
  if(action==="bulk-apply")return applyBulkCsv(button);
  if(action==="bulk-compare")return reconcileBulkCounts(button);
  if(action==="edition-confirm")return confirmFrenchEdition(button);
+ if(action==="biblio-verify-isbn")return verifyBibliographyCandidate(button);
  if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
  if(action==="catalog-prev"||action==="catalog-next"){
@@ -961,6 +1012,7 @@ async function manualSearch(){
 root.addEventListener("submit",event=>{
  if(event.target.id==="library-editor"){event.preventDefault();saveLibrary(event.target);}
  if(event.target.id==="edition-isbn-form"){event.preventDefault();searchFrenchIsbn(event.target);}
+ if(event.target.id==="fr-bibliography-form"){event.preventDefault();searchFrenchBibliography(event.target);}
  if(event.target.id==="bulk-resolve-search-form"){event.preventDefault();searchBulkManga(event.target);}
 });
 root.addEventListener("change",async event=>{
