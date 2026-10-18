@@ -70,7 +70,7 @@ def run(page, size):
 
     page.locator('[data-action="scan-next"]').click()
     expect(page.locator("#scan-isbn-input")).to_have_value("")
-    page.locator('[data-action="scan-close"]').click()
+    page.locator('.scan-success [data-action="scan-close"]').click()
     expect(page.locator("#scan-dialog")).to_have_count(0)
 
     page.unroute("**/api/collection/scan/status/" + ISBN)
@@ -109,7 +109,7 @@ def run(page, size):
     assert len(sent) == 2, sent
     assert sent[1] == {"isbn13": ISBN, "confirmed": True,
                        "is_owned": True, "is_read": True}, sent
-    page.locator('[data-action="scan-close"]').click()
+    page.locator('.scan-success [data-action="scan-close"]').click()
     page.unroute("**/api/collection/isbn/" + ISBN)
     page.unroute("**/api/collection/scan/status/" + ISBN)
     page.unroute("**/api/collection/scan/confirm")
