@@ -28,6 +28,19 @@ jobs:
           OLLAMA_PORT=11434
           EOF
 
+      - name: Vérifier la configuration Docker du modèle IA facultatif
+        shell: bash
+        run: |
+          # No heavyweight model download in CI: validate profiles and
+          # ensure plain Docker startup cannot implicitly enable Ollama.
+          BASE="docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml"
+          $BASE config --services | grep -Fx api
+          if $BASE config --services | grep -Fx ollama; then
+            echo "Ollama must NOT start without explicit AI profile"
+            exit 1
+          fi
+          $BASE --profile ai config --services | grep -Fx ollama
+
       - name: Démarrer PostgreSQL et Meilisearch
         run: |
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
