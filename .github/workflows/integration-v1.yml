@@ -141,6 +141,12 @@ jobs:
       - name: Tester la qualité des recommandations
         run: python tests/smoke/quality_smoke.py
 
+      - name: Vérifier la découverte guidée contre PostgreSQL jetable
+        run: python tests/smoke/mood_discovery_smoke.py
+
+      - name: Valider la découverte selon l’envie sur ordinateur et mobile
+        run: python tests/smoke/mood_discovery_browser.py
+
       - name: Vérifier la persistance des réactions et les exclusions
         run: python tests/smoke/feedback_smoke.py
 
