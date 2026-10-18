@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS manga_fr_edition (
   title_fr TEXT NOT NULL,
   author_fr TEXT,
   publisher_fr TEXT,
+  edition_kind_origin TEXT NOT NULL CHECK (edition_kind_origin IN ('BNF_TITLE','USER_CONFIRMED')),
   edition_kind TEXT NOT NULL CHECK (edition_kind IN
     ('CLASSIC','DELUXE','PERFECT','COLLECTOR','INTEGRAL','OTHER','UNKNOWN')),
   volume_number INTEGER NOT NULL CHECK (volume_number BETWEEN 1 AND 9999),
@@ -192,7 +193,7 @@ def create_collection_router(
                     raise HTTPException(status_code=404, detail="Manga inconnu.")
                 cur.execute("""
                     SELECT ed.id, ed.manga_id, ed.isbn13, ed.title_fr, ed.author_fr,
-                      ed.publisher_fr, ed.edition_kind, ed.volume_number,
+                      ed.publisher_fr, ed.edition_kind, ed.edition_kind_origin, ed.volume_number,
                       ed.release_date_text, ed.source_name, ed.source_url,
                       ed.source_checked_at::text AS source_checked_at,
                       COALESCE(st.is_owned, FALSE) AS is_owned,
@@ -241,11 +242,11 @@ def create_collection_router(
                 cur.execute("""
                     INSERT INTO manga_fr_edition (
                       manga_id, isbn13, title_fr, author_fr, publisher_fr,
-                      edition_kind, volume_number, release_date_text,
+                      edition_kind, edition_kind_origin, volume_number, release_date_text,
                       source_name, source_url, source_checked_at
                     ) VALUES (
                       %(manga_id)s, %(isbn13)s, %(title_fr)s, %(author_fr)s,
-                      %(publisher_fr)s, %(edition_kind)s, %(volume_number)s,
+                      %(publisher_fr)s, %(edition_kind)s, %(edition_kind_origin)s, %(volume_number)s,
                       %(release_date_text)s, %(source_name)s, %(source_url)s,
                       %(source_checked_at)s
                     ) RETURNING id;
