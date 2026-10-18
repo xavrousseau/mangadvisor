@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync("apps/web/assets/explain.js", "utf8");
-const { explainRecommendation, explainProfile } =
+const { explainRecommendation, explainProfile, explainVerifiedSources } =
   await import("data:text/javascript;charset=utf-8," + encodeURIComponent(source));
 
 test("the explanation uses only tags returned by the recommendation engine", () => {
@@ -86,4 +86,36 @@ test("manual recommendations use only source titles present in the API response"
   assert.deepEqual(p.sources.map(x => x.title), ["Nana"]);
   assert.deepEqual(explainProfile({}), { sources: [], genres: [], themes: [] });
   assert.deepEqual(explainProfile(null), { sources: [], genres: [], themes: [] });
+});
+
+
+test("candidate-specific source matches use only API-provided verified overlaps", () => {
+  const original = {
+    explanation: {
+      reference_titles: ["Monster", "Berserk"],
+      source_matches: [
+        { title: "Monster", genres: ["Drama"], themes: ["Psychological"], demographics: [] },
+        { title: "Berserk", genres: [], themes: [], demographics: [] },
+      ],
+      score: { base: 75, goal_bonus: -5, final: 70 },
+    },
+  };
+  const snapshot = structuredClone(original);
+  const result=explainVerifiedSources(original);
+  assert.deepEqual(result.references, ["Monster", "Berserk"]);
+  assert.deepEqual(result.matches.map(x => x.title), ["Monster"]);
+  assert.deepEqual(result.matches[0].genres, ["Drama"]);
+  assert.deepEqual(result.score, { base: 75, bonus: -5, final: 70 });
+  assert.deepEqual(original, snapshot);
+});
+
+test("candidate-specific evidence cannot fabricate matches or missing scores",()=>{
+  assert.deepEqual(explainVerifiedSources(null), { references: [], matches: [], score: null });
+  assert.deepEqual(explainVerifiedSources({explanation:{
+    reference_titles:["Nana"],
+    source_matches:[{title:"Nana",themes:[],genres:[],demographics:[]}],
+    score:{base:null, goal_bonus:"", final:25},
+  }}),{
+    references:["Nana"], matches:[],score:{base:null,bonus:null,final:25},
+  });
 });
