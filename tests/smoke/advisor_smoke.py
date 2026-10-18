@@ -35,6 +35,45 @@ def main():
     # The one synthetic registered French ISBN should rank high when preferred.
     assert second["recommendations"][0]["title"]=="Demo CI 08",second
     assert second["recommendations"][0]["french_recorded"] is True,second
+    snapshot=second["recommendations"][0]["french_editions"]
+    assert snapshot["scope"]=="registered_isbns_only",snapshot
+    assert snapshot["registered_isbn_count"]==5,snapshot
+    assert snapshot["complete_french_series"] is None,snapshot
+    assert snapshot["published_total_known"] is False,snapshot
+    assert snapshot["availability_checked"] is False,snapshot
+    by_type={x["edition_kind"]:x for x in snapshot["registered_formats"]}
+    assert set(by_type)=={"CLASSIC","DELUXE","PERFECT","UNKNOWN"},snapshot
+    assert by_type["DELUXE"]["known_volume_numbers"]==[1,2],snapshot
+    assert by_type["PERFECT"]["known_volume_numbers"]==[1],snapshot
+    assert by_type["CLASSIC"]["known_volume_numbers"]==[3],snapshot
+    assert by_type["UNKNOWN"]["known_volume_numbers"]==[1],snapshot
+    assert by_type["DELUXE"]["registered_isbn_count"]==2,snapshot
+    assert set(book["isbn13"] for book in by_type["DELUXE"]["books_shown"])=={
+        "9781234567804","9781234567811"},snapshot
+    assert by_type["DELUXE"]["publishers_fr"]==["Éditeur Deluxe fictif"],snapshot
+    assert all(x["french_editions"]["registered_isbn_count"]==0
+               for x in second["recommendations"][1:]),second
+
+    soft_format=request("Je préfère une édition Deluxe",second["context"])
+    assert soft_format["context"]["preferred_edition_kind"]=="DELUXE",soft_format
+    assert soft_format["context"]["require_edition_kind"] is False,soft_format
+    assert soft_format["recommendations"][0]["title"]=="Demo CI 08",soft_format
+    assert soft_format["recommendations"][0]["preferred_format_recorded"],soft_format
+
+    required_format=request("Édition Deluxe obligatoire",soft_format["context"])
+    assert required_format["context"]["require_edition_kind"] is True,required_format
+    assert required_format["count"]==1,required_format
+    assert required_format["recommendations"][0]["title"]=="Demo CI 08",required_format
+
+    strict_perfect=request("En édition Perfect uniquement",required_format["context"])
+    assert strict_perfect["context"]["preferred_edition_kind"]=="PERFECT",strict_perfect
+    assert strict_perfect["count"]==1,strict_perfect
+    assert strict_perfect["recommendations"][0]["french_editions"]["registered_formats"],strict_perfect
+
+    none_collectors=request("Collector obligatoire",required_format["context"])
+    assert none_collectors["context"]["preferred_edition_kind"]=="COLLECTOR",none_collectors
+    assert none_collectors["status"]=="empty" and none_collectors["count"]==0,none_collectors
+
 
     narrative=request("Une enquête psychologique, sans horreur et sans gore",second["context"])
     assert narrative["context"]["mood"]=="MYSTERY",narrative
