@@ -3464,3 +3464,54 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
         "count": len(recommendations),
         "recommendations": recommendations,
     }
+
+@app.get("/covers/mangas")
+def get_manga_covers(
+    ids: str = Query(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Identifiants Mangadvisor séparés par des virgules (50 maximum).",
+    ),
+) -> dict[str, Any]:
+    """Renvoie les couvertures à partir du JSON Jikan déjà enregistré.
+
+    Requête de lecture seule : aucune mutation, aucun nouvel appel à Jikan.
+    """
+    tokens = [token.strip() for token in ids.split(",")]
+    if not tokens or len(tokens) > 50 or any(
+        not token.isdecimal() or int(token) <= 0 for token in tokens
+    ):
+        raise HTTPException(status_code=400, detail="Fournir entre 1 et 50 identifiants positifs.")
+
+    manga_ids = list(dict.fromkeys(int(token) for token in tokens))
+    sql = """
+        SELECT
+            m.id AS manga_id,
+            COALESCE(
+                j.raw_json #>> '{images,jpg,large_image_url}',
+                j.raw_json #>> '{images,jpg,image_url}',
+                j.raw_json #>> '{images,webp,large_image_url}',
+                j.raw_json #>> '{images,webp,image_url}'
+            ) AS image_url
+        FROM manga m
+        LEFT JOIN jikan_manga_source j ON j.mal_id = m.source_mal_id
+        WHERE m.id = ANY(%(manga_ids)s);
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"manga_ids": manga_ids})
+            rows = cur.fetchall()
+
+    from urllib.parse import urlparse
+
+    covers = []
+    for row in rows:
+        url = row.get("image_url")
+        if url:
+            parsed = urlparse(url)
+            if parsed.scheme != "https" or parsed.hostname != "cdn.myanimelist.net":
+                url = None
+        covers.append({"manga_id": row["manga_id"], "image_url": url})
+
+    return {"count": len(covers), "covers": covers}
