@@ -53,6 +53,20 @@ def extract_valid_isbns(fields: list[str]) -> list[str]:
     return result
 
 
+def bibliographic_language(values: list[str]) -> str:
+    """Dublin Core language when supplied, otherwise explicitly unknown."""
+    if not values:
+        return "unknown"
+    tokens = set(re.findall(r"[\\wÀ-ÿ]+", " ".join(values).casefold()))
+    french = bool(tokens & {"fr", "fra", "fre", "français", "french"})
+    other = tokens - {"fr", "fra", "fre", "français", "french"}
+    if french and not other:
+        return "french"
+    if french:
+        return "mixed"
+    return "other"
+
+
 def parse_title_results(xml_bytes: bytes, checked_at: str,
                         limit: int = SEARCH_LIMIT) -> list[dict[str, Any]]:
     if len(xml_bytes) > MAX_RESPONSE_BYTES or re.search(
@@ -88,6 +102,7 @@ def parse_title_results(xml_bytes: bytes, checked_at: str,
                 "author_fr": "; ".join(creators[:4])[:350] or None,
                 "publisher_fr": "; ".join(publishers[:2])[:200] or None,
                 "release_date_text": dates[0][:80] if dates else None,
+                "language_status": bibliographic_language(fields.get("language", [])),
                 "edition_kind_suggested": edition_kind_from_title(title),
                 "source_name": BNF_SOURCE,
                 "source_url": "https://catalogue.bnf.fr/" + ark,
@@ -132,7 +147,8 @@ def lookup_title_records(title: str) -> dict[str, Any]:
         "is_exhaustive": False,
         "scope": "bnf_title_search_isbn_records_only",
         "note": (
-            "Sélection limitée de notices BnF contenant un ISBN-13 valide. "
+            "Sélection limitée de notices BnF contenant un ISBN-13 valide, "
+            "sans garantie de langue française lorsque celle-ci n'est pas renseignée. "
             "Ni inventaire complet des tomes publiés, ni preuve de vente actuelle, "
             "ni rattachement automatique à ce manga."
         ),
