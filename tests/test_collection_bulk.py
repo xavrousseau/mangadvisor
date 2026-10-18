@@ -62,9 +62,9 @@ class SafeBulkTests(unittest.TestCase):
             normalize_csv("serie;tome\nNaruto;1\n")
         with self.assertRaises(HTTPException):
             normalize_csv("isbn;possede\n"+"9782871294146;oui\n"* (MAX_ROWS+1))
-        with self.assertRaises(HTTPException):
-            normalize_csv("isbn;possede\n9782871294146;oui;extra\n")
-        # Last case is a row-level validation issue, not an abort.
+        malformed=normalize_csv("isbn;possede\n9782871294146;oui;extra\n")
+        self.assertEqual(len(malformed["errors"]),1)
+        self.assertEqual(len(malformed["items"]),0)
     
     def test_false_never_triggers_a_destructive_import(self):
         parsed=normalize_csv("isbn;possede;lu\n9782871294146;non;non\n")
