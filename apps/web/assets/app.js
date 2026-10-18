@@ -8,7 +8,7 @@ const state = {
   lang: ["fr","en"].includes(localStorage.getItem("ma-language")) ? localStorage.getItem("ma-language") : "fr",
   catalogPage:1, catalogQuery:"",catalogGenre:"",catalogFinished:false,
   libraryPage:1,libraryQuery:"",libraryStatus:"",
-  recMode:"library",recGoal:"SIMILAR_SAFE",recMinScore:6.8,recFinished:false,recExclude:false,
+  recMode:"library",recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
 };
@@ -214,7 +214,8 @@ async function renderHome(token){
    const result=await request("/recommendations/library",{
      method:"POST",data:{
        limit:6,min_score:6.8,only_finished:false,
-       exclude_sensitive_mismatches:false,recommendation_goal:"SIMILAR_SAFE"
+       exclude_sensitive_mismatches:false,recommendation_goal:"SIMILAR_SAFE",
+       recommendation_balance:"BALANCED"
      }
    });
    const picks=personalPicks(result.recommendations||[],[],4);
@@ -474,7 +475,12 @@ async function renderRecommendations(token){
    '<div class="field" style="margin-top:15px"><label>'+L("selectedMangas")+'</label><div class="selected-chips">'+
    (state.selected.length?state.selected.map((x,i)=>'<span class="chip">'+e(x)+'<button type="button" data-action="remove-selected" data-index="'+i+'" aria-label="'+L("cancel")+' '+e(x)+'">×</button></span>').join(""):'<span class="tiny muted">'+L("emptySelected")+'</span>')+
    '</div></div>')+
- '<div class="filters" style="margin:20px 0 12px"><div class="field medium"><label for="rec-min-score">'+L("minRating")+'</label>'+
+ '<div class="filters" style="margin:20px 0 12px"><div class="field medium"><label for="rec-balance">'+L("recBalance")+'</label>'+
+ '<select id="rec-balance" class="select">'+
+ [["CLOSE","recBalanceClose"],["BALANCED","recBalanceBalanced"],["EXPLORE","recBalanceExplore"]].map(([mode,key])=>
+   '<option value="'+mode+'"'+(state.recBalance===mode?' selected':'')+'>'+L(key)+'</option>').join("")+'</select></div>'+
+ '<p class="rec-balance-help">'+L("recBalanceHelp")+'</p>'+
+ '<div class="field medium"><label for="rec-min-score">'+L("minRating")+'</label>'+
  '<input type="number" min="0" max="10" step="0.1" class="input" id="rec-min-score" value="'+e(state.recMinScore)+'"></div>'+
  '<label class="check"><input type="checkbox" id="rec-finished"'+(state.recFinished?' checked':'')+'>'+L("finishedOnly")+'</label>'+
  '<label class="check"><input type="checkbox" id="rec-exclude"'+(state.recExclude?' checked':'')+'>'+L("excludeThemes")+'</label></div>'+
@@ -498,6 +504,15 @@ async function showRecResults(token){
   (sources.length?'<div class="list-head">'+L("sources")+': '+sources.slice(0,5).map(e).join(" · ")+'</div>':'')+
   recommendationProfileContext(result)+
   '<div id="rec-cards">'+loadingCards(3)+'</div>';
+ const diagnosis=result.quality_diagnostic;
+ if(diagnosis&&state.recBalance!=="CLOSE"){
+   const count=diagnosis.after||{};
+   const stats='<div class="rec-quality"><strong>'+L("recQualityStats")+'</strong>'+
+     '<span>'+L("recQualityNote")+'</span>'+
+     '<span>'+e(count.limited_evidence_count??0)+' '+L("recQualityLimited")+'</span>'+
+     '<span>'+e(count.repeated_overlap_pairs??0)+' '+L("recQualityRepeat")+'</span></div>';
+   target.insertAdjacentHTML("beforeend",stats);
+ }
  const text=await recommendationMarkup(result.recommendations||[],token);
  if(token===renderToken&&document.querySelector("#rec-cards"))document.querySelector("#rec-cards").innerHTML=text;
 }
@@ -505,7 +520,7 @@ async function generateRecommendations(){
  const btn=document.querySelector("#rec-submit");
  if(btn){btn.disabled=true;btn.textContent=t(state.lang,"loading");}
  try{
-  const opts={limit:8,min_score:Number(state.recMinScore)||0,only_finished:state.recFinished,exclude_sensitive_mismatches:state.recExclude};
+  const opts={limit:8,min_score:Number(state.recMinScore)||0,only_finished:state.recFinished,exclude_sensitive_mismatches:state.recExclude,recommendation_balance:state.recBalance};
   if(state.recMode==="manual"&&!state.selected.length){toast(t(state.lang,"emptySelected"));return;}
   const result=state.recMode==="library"
     ?await request("/recommendations/library",{method:"POST",data:{...opts,recommendation_goal:state.recGoal}})
@@ -653,6 +668,7 @@ root.addEventListener("change",async event=>{
  if(input.id==="catalog-finished"){state.catalogFinished=input.checked;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="lib-status"){state.libraryStatus=input.value;state.libraryPage=1;await updateLibrary(renderToken);}
  if(input.id==="rec-goal"){state.recGoal=input.value;state.recResult=null;}
+ if(input.id==="rec-balance"){state.recBalance=input.value;state.recResult=null;}
  if(input.id==="rec-min-score"){state.recMinScore=input.value;state.recResult=null;}
  if(input.id==="rec-finished"){state.recFinished=input.checked;state.recResult=null;}
  if(input.id==="rec-exclude"){state.recExclude=input.checked;state.recResult=null;}
