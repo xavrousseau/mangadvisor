@@ -81,7 +81,7 @@ jobs:
           cover=fetch('/covers/mangas?ids=1,2')
           assert cover['count']==2,cover
           library=fetch('/library?limit=20')
-          assert len(library['items'])==2,library
+          assert len(library['items'])==3,library
           detail=fetch('/mangas/1')
           assert detail['title']=='Naruto' and detail['genres'],detail
           similar=fetch('/recommendations/similar?title=Naruto&limit=3')
