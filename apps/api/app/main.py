@@ -10,6 +10,7 @@ from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
 from apps.api.app.collection import create_collection_router, ensure_collection_schema
 from apps.api.app.collection_bulk import collection_import_router
+from apps.api.app.collection_scan import scan_router
 from apps.api.app.edition_discovery import edition_discovery_router
 
 
@@ -3665,4 +3666,5 @@ def prepare_fr_collection() -> None:
 
 app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
 app.include_router(collection_import_router(get_connection, DEFAULT_USER_ID))
+app.include_router(scan_router(get_connection, DEFAULT_USER_ID))
 app.include_router(edition_discovery_router(get_connection))
