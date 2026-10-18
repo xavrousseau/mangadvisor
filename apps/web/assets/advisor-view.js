@@ -1,7 +1,7 @@
 /** Conversational advisor UI: safe, bounded and catalogue-grounded. */
 export const ADVISOR_PROMPTS={
  fr:[
-  "Je veux un manga sombre avec une intrigue prenante, pas trop long, terminé, idéalement en français.",
+  "Je veux une enquête psychologique sans horreur ni gore, pas trop longue, idéalement en français.",
   "J'ai envie d'une série douce et réconfortante.",
   "Une aventure fantastique assez longue.",
   "Je cherche un manga de mystère terminé avec une édition française obligatoire."
