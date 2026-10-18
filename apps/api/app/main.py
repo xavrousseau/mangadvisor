@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
+from apps.api.app.recommendation_explanations import add_explanations
 
 
 app = FastAPI(
@@ -2084,6 +2085,13 @@ def recommend_from_library(
 
     recommendations = recommendations[: payload.limit]
 
+    # Sources vraiment utilisées par le moteur, et intersections par manga.
+    # La requête de preuve est en lecture seule et ne modifie pas le classement.
+    add_explanations(
+        recommendations, positive_sources_used,
+        origin="library", connection_factory=get_connection,
+    )
+
     status_counts = {
         row["library_status"]: row["count"]
         for row in status_rows
@@ -2514,6 +2522,11 @@ def recommend_similar(
 
         row["reason"] = reason
         recommendations.append(row)
+
+    add_explanations(
+        recommendations, [source],
+        origin="similar", connection_factory=get_connection,
+    )
 
     return {
         "source": source,
@@ -3559,6 +3572,11 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
 
         row["reason"] = reason
         recommendations.append(row)
+
+    add_explanations(
+        recommendations, sources,
+        origin="manual", connection_factory=get_connection,
+    )
 
     return {
         "sources": sources,
