@@ -30,6 +30,8 @@ echo   --------
 echo   12 - Run Jikan Pipeline
 echo   13 - Activer le scanner mobile HTTPS
 echo   14 - Arreter le scanner mobile HTTPS
+echo   15 - Installer et activer le conseiller IA local
+echo   16 - Arreter le conseiller IA local
 echo.
 echo   Q  - Quitter
 echo.
@@ -60,6 +62,8 @@ if /I "%CHOICE%"=="11" start "Mangadvisor - Nuke"         cmd /k call "%ROOT_DIR
 
 if /I "%CHOICE%"=="13" start "Mangadvisor - Mobile HTTPS" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" & goto menu
 if /I "%CHOICE%"=="14" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto menu
+if /I "%CHOICE%"=="15" start "Mangadvisor - IA locale" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" & goto menu
+if /I "%CHOICE%"=="16" start "Mangadvisor - Arreter IA" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" -Stop & goto menu
 
 if /I "%CHOICE%"=="12" goto jikan_menu
 
@@ -158,6 +162,8 @@ if /I "%~1"=="clean"   start "Mangadvisor - Clean"        cmd /k call "%ROOT_DIR
 if /I "%~1"=="nuke"    start "Mangadvisor - Nuke"         cmd /k call "%ROOT_DIR%cmd\nuke.cmd" & goto :eof
 
 if /I "%~1"=="mobile" start "Mangadvisor - Mobile HTTPS" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" & goto :eof
+if /I "%~1"=="ai" start "Mangadvisor - IA locale" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" & goto :eof
+if /I "%~1"=="ai-stop" start "Mangadvisor - Arreter IA" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" -Stop & goto :eof
 if /I "%~1"=="mobile-stop" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto :eof
 
 if /I "%~1"=="jikan"       start "Mangadvisor - Jikan Pipeline" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" & goto :eof
