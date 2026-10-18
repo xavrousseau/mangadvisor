@@ -2,6 +2,7 @@ import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
 import { createIsbnScanner } from "./isbn-scanner.js";
 import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js";
+import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS} from "./advisor-view.js";
 import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
@@ -21,6 +22,7 @@ const state = {
   libraryPage:1,libraryQuery:"",libraryStatus:"",
   recMode:"mood",mood:"MYSTERY",moodLength:"ANY",moodFinished:false,moodUseLibrary:true,moodMinScore:6.5,recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
+  advisorHistory:[],advisorContext:{},advisorSeen:[],advisorResponse:null,advisorBusy:false,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,biblioCandidates:null,biblioSearchNonce:0,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
@@ -533,11 +535,72 @@ async function recommendationMarkup(items,token){
   '<details class="reco-explanation" style="grid-column:1/-1"><summary>✦ '+L("why")+'</summary>'+
    recommendationExplanation(m)+'</details></article>').join("")+'</div>';
 }
+async function renderAdvisorRecommendations(token){
+ const html='<div class="headline-row"><div><div class="eyebrow">✧ MANGADVISOR · YOUR MANGA ADVISOR</div>'+
+  '<h1 class="page-title">'+L("advisorTitle")+'</h1><p class="page-desc">'+L("advisorPageIntro")+'</p></div></div>'+
+  '<div class="toggle-tabs rec-mode-tabs" role="group" aria-label="'+L("forYou")+'">'+
+  '<button class="selected" data-action="rec-mode" data-value="advisor">'+L("advisorMode")+'</button>'+
+  '<button data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button>'+
+  '<button data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
+  '<button data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
+  '<div id="advisor-main">'+advisorChatMarkup({
+   history:state.advisorHistory,busy:state.advisorBusy,lang:state.lang},L,e)+'</div>'+
+  '<div id="advisor-results"></div>';
+ if(!mount(html,token))return;
+ await paintAdvisorResults(token);
+}
+async function paintAdvisorResults(token){
+ const target=document.querySelector("#advisor-results"),response=state.advisorResponse;
+ if(!target||!response?.recommendations?.length)return;
+ const urls=await covers(response.recommendations);
+ if(token!==renderToken||state.recMode!=="advisor")return;
+ target.innerHTML=advisorResultsMarkup(response,{L,e,tr,
+  poster:m=>poster(m,urls),rating:m=>stars(m),
+  published:status=>e(publication(state.lang,status))});
+}
+async function sendAdvisorMessage(raw){
+ const value=String(raw||"").trim();
+ if(state.advisorBusy||value.length<2||value.length>500)return;
+ state.advisorBusy=true;state.advisorHistory.push({role:"user",text:value});
+ state.advisorHistory=state.advisorHistory.slice(-18);
+ const currentToken=renderToken;
+ if(state.recMode==="advisor"){
+  const main=document.querySelector("#advisor-main");
+  if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:true,lang:state.lang},L,e);
+ }
+ try{
+  const response=await request("/advisor/message",{method:"POST",data:{
+   message:value,context:state.advisorContext,seen_ids:state.advisorSeen,lang:state.lang,limit:6
+  }});
+  state.advisorContext=response.context||{};
+  state.advisorResponse=response;
+  if(response.recommendations?.length)
+   state.advisorSeen=[...new Set([...state.advisorSeen,...response.recommendations.map(x=>x.id)])].slice(-100);
+  state.advisorHistory.push({role:"assistant",text:response.reply||""});
+  if(response.limitations?.includes("maturity_not_verified"))
+   state.advisorHistory.push({role:"assistant",text:t(state.lang,"advisorMaturityCaution")});
+ }catch(err){
+  state.advisorHistory.push({role:"assistant",text:err?.message||t(state.lang,"requestError")});
+ }finally{
+  state.advisorHistory=state.advisorHistory.slice(-18);
+  state.advisorBusy=false;
+  if(state.recMode==="advisor"&&currentToken===renderToken){
+   const main=document.querySelector("#advisor-main");
+   if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:false,lang:state.lang},L,e);
+   const target=document.querySelector("#advisor-results");
+   if(target)target.innerHTML="";
+   await paintAdvisorResults(currentToken);
+   document.querySelector("#advisor-message")?.focus();
+   document.querySelector("#advisor-main")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
+ }
+}
 async function renderMoodRecommendations(token){
  const html='<div class="headline-row"><div><div class="eyebrow">✧ MANGADVISOR · GUIDED DISCOVERY</div>'+
   '<h1 class="page-title">'+L("moodPageTitle")+'</h1><p class="page-desc">'+L("moodPageIntro")+'</p></div></div>'+
   '<div class="toggle-tabs rec-mode-tabs" role="group" aria-label="'+L("forYou")+'">'+
   '<button class="selected" data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button>'+
+  '<button data-action="rec-mode" data-value="advisor">'+L("advisorMode")+'</button>'+
   '<button data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
   '<button data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
   moodFormMarkup({mood:state.mood,length:state.moodLength,onlyFinished:state.moodFinished,
@@ -587,6 +650,7 @@ async function generateMoodDiscoveries(){
  }
 }
 async function renderRecommendations(token){
+ if(state.recMode==="advisor")return renderAdvisorRecommendations(token);
  if(state.recMode==="mood")return renderMoodRecommendations(token);
  const libraryMode=state.recMode==="library";
  const goalLabels={"SIMILAR_SAFE":"goalSimilar","READ_NEXT":"goalNext","SHORT_FINISHED":"goalShort"};
@@ -598,7 +662,8 @@ async function renderRecommendations(token){
  '<div class="toggle-tabs" role="group" aria-label="'+L("forYou")+'">'+
  '<button class="'+(libraryMode?'selected':'')+'" data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
  '<button class="'+(!libraryMode?'selected':'')+'" data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button>'+
- '<button data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button></div>'+
+ '<button data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button>'+
+ '<button data-action="rec-mode" data-value="advisor">'+L("advisorMode")+'</button></div>'+
  '<div class="option-panel"><h2>'+L(libraryMode?"libraryMode":"manualMode")+'</h2>'+
  '<p>'+L(libraryMode?"libraryModeText":"manualModeText")+'</p>'+
  (libraryMode?'<div class="field medium"><label for="rec-goal">'+L("goal")+'</label>'+
@@ -684,6 +749,8 @@ async function sendRecommendationFeedback(button){
   };
   toast(t(state.lang,names[action]));
   // Le calcul reste côté API : la sélection courante perd le manga déjà évalué.
+  if(state.advisorResponse?.recommendations)
+   state.advisorResponse.recommendations=state.advisorResponse.recommendations.filter(item=>Number(item.id)!==mangaId);
   if(state.recResult?.recommendations)
    state.recResult.recommendations=state.recResult.recommendations.filter(
      item=>Number(item.id)!==mangaId
@@ -1064,6 +1131,16 @@ root.addEventListener("click",async event=>{
   if(!state.selected.includes(button.dataset.title))state.selected.push(button.dataset.title);
   state.recResult=null;await render();return;
  }
+ if(action==="advisor-reset"){
+  if(state.advisorBusy)return;
+  state.advisorHistory=[];state.advisorContext={};state.advisorSeen=[];state.advisorResponse=null;
+  await render();return;
+ }
+ if(action==="advisor-prompt"){
+  const prompt=ADVISOR_PROMPTS[state.lang]?.[Number(button.dataset.index)];
+  if(prompt)await sendAdvisorMessage(prompt);
+  return;
+ }
  if(action==="mood-select"){
   if(MOOD_OPTIONS.some(([name])=>name===button.dataset.mood)){
    state.mood=button.dataset.mood;state.recResult=null;await render();
@@ -1084,6 +1161,9 @@ async function manualSearch(){
  }catch(err){if(target)target.innerHTML='<p class="message">'+e(err.message)+'</p>';}
 }
 root.addEventListener("submit",event=>{
+ if(event.target.id==="advisor-form"){
+  event.preventDefault();sendAdvisorMessage(new FormData(event.target).get("message"));return;
+ }
  if(event.target.id==="scan-isbn-form"||event.target.id==="scan-series-form"){
   event.preventDefault();isbnScanner.submit(event.target);return;
  }
