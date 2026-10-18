@@ -59,7 +59,7 @@ export function unknownIsbnWizardMarkup(data, tr, escape) {
     '</label><select class="select" id="resolve-edition-kind">' + editionOpts + '</select></div>' +
     '<div class="field"><label for="resolve-volume-number">' + L("collectionTome") +
     '</label><input class="input" id="resolve-volume-number" type="number" min="1" max="9999" value="' +
-    e(data.volumeNumber || 1) + '"></div></div>' +
+    e(data.volumeNumber ?? "") + '" placeholder="1" required></div></div>' +
     '<p class="resolve-warning">' + L("resolveConfirmWarning") + '</p>' +
     '<button type="button" class="btn btn-primary" data-action="resolve-confirm-edition">' +
     L("resolveConfirm") + '</button></div>' : '';
