@@ -25,7 +25,13 @@ def run(page,device):
     chat(page,"Français obligatoire")
     expect(page.locator(".advisor-card")).to_have_count(1,timeout=25000)
     expect(page.locator(".advisor-card h3").first).to_have_text("Demo CI 08")
-    assert page.locator(".advisor-message.is-user").count()>=2
+    chat(page,"Une enquête psychologique, sans horreur et sans gore")
+    expect(page.locator(".advisor-card").first).to_be_visible(timeout=25000)
+    expect(page.locator(".advisor-story-chip")).to_have_count(2,timeout=25000)
+    expect(page.locator(".advisor-card").first).to_contain_text("Mot du synopsis")
+    expect(page.locator(".advisor-card").first).to_contain_text("Tag du catalogue")
+    expect(page.locator(".advisor-message.is-assistant").last).to_contain_text("sans horreur documentée")
+    assert page.locator(".advisor-message.is-user").count()>=3
     page.screenshot(path=str(DIR/f"{device}-advisor-conversation.png"),full_page=True)
     page.locator('[data-action="advisor-reset"]').click()
     expect(page.locator(".advisor-suggestion")).to_have_count(4)
