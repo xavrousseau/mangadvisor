@@ -68,6 +68,41 @@ class FrenchEditionTests(unittest.TestCase):
             EditionCreate(isbn13="9782871294146",edition_kind="PERFECT",volume_number=0)
         self.assertTrue(VolumeState(is_owned=False,is_read=True).is_read)
 
+    def test_isbn_must_be_a_complete_number_not_a_substring(self):
+        combined=XML.replace(b"978-2-87129-414-6",b"97828712941460")
+        self.assertIsNone(parse_bnf_sru(combined,"9782871294146"))
+
+    def test_malicious_record_identifier_cannot_be_an_official_bnf_link(self):
+        hacked=XML.replace(b"ark:/12148/cb12345678x",
+                           b"ark:/12148/cb12345678x?redirect=evil.test")
+        self.assertIsNone(parse_bnf_sru(hacked,"9782871294146"))
+        hacked=XML.replace(b"ark:/12148/cb12345678x",
+                           b"https://evil.test/ark:/12148/cb12345678x")
+        self.assertIsNone(parse_bnf_sru(hacked,"9782871294146"))
+
+    def test_bnf_xml_entity_declarations_are_rejected(self):
+        payload=b'<!DOCTYPE foo [<!ENTITY x "evil">]>'+XML
+        with self.assertRaises(ValueError):
+            parse_bnf_sru(payload,"9782871294146")
+
+    def test_verified_book_overview_does_not_invent_series_title(self):
+        from apps.api.app.collection import verified_fr_overview
+        records=[
+            {"title_fr":"Monster. Tome 1","publisher_fr":"Kana",
+             "author_fr":"Naoki Urasawa","edition_kind":"CLASSIC"},
+            {"title_fr":"Monster. Tome 2","publisher_fr":"Kana",
+             "author_fr":"Naoki Urasawa","edition_kind":"CLASSIC"},
+            {"title_fr":"Monster. Edition Perfect. Tome 1","publisher_fr":"Kana",
+             "author_fr":"Naoki Urasawa","edition_kind":"PERFECT"},
+        ]
+        meta=verified_fr_overview(records)
+        self.assertEqual(meta["publishers_fr"],["Kana"])
+        self.assertEqual(meta["edition_types"],["CLASSIC","PERFECT"])
+        self.assertEqual(meta["reference_count"],3)
+        self.assertEqual(len(meta["titles_fr"]),3)
+        self.assertNotIn("official_series_title_fr",meta)
+        self.assertEqual(verified_fr_overview([])["titles_fr"],[])
+
     def test_remote_service_failure_is_explicit(self):
         with patch("apps.api.app.collection.urllib.request.urlopen",side_effect=OSError("offline")):
             with self.assertRaises(HTTPException) as failure:

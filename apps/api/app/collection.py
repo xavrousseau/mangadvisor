@@ -86,10 +86,68 @@ def edition_kind_from_title(title: str) -> str:
     return "UNKNOWN"
 
 
+def isbn_in_identifiers(identifiers: list[str], isbn13: str) -> bool:
+    """Match a complete ISBN-13 token, never digits concatenated across labels."""
+    for label in identifiers:
+        # A BnF identifier may contain other identifiers and punctuation.
+        # Do not construct a thirteen-digit candidate across their boundary.
+        candidates = re.findall(
+            r"(?<![0-9])97[89](?:[\s\-\u2010-\u2015]?[0-9]){10}(?![0-9])",
+            label,
+        )
+        for candidate in candidates:
+            try:
+                if isbn13_normalize(candidate) == isbn13:
+                    return True
+            except ValueError:
+                continue
+    return False
+
+
+def safe_bnf_ark(value: str) -> str | None:
+    """Allow only actual BnF record ARKs; never create links to arbitrary URLs."""
+    raw = (value or "").strip()
+    match = re.fullmatch(
+        r"(?:https?://catalogue\.bnf\.fr/)?(ark:/12148/cb[0-9A-Za-z]+)",
+        raw,
+    )
+    return match.group(1) if match else None
+
+
+def verified_fr_overview(editions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Sourced book-level facts only; no assumed official title for the work."""
+    def unique_values(key: str, limit: int = 8) -> list[str]:
+        seen: set[str] = set()
+        values: list[str] = []
+        for entry in editions:
+            raw = entry.get(key)
+            if not isinstance(raw, str) or not raw.strip():
+                continue
+            label = raw.strip()
+            if label.casefold() not in seen:
+                seen.add(label.casefold())
+                values.append(label)
+            if len(values) >= limit:
+                break
+        return values
+
+    return {
+        "source_scope": "verified_registered_books_only",
+        "titles_fr": unique_values("title_fr", 8),
+        "publishers_fr": unique_values("publisher_fr", 8),
+        "authors_fr": unique_values("author_fr", 8),
+        "edition_types": sorted({str(e["edition_kind"]) for e in editions}),
+        "reference_count": len(editions),
+    }
+
+
 def parse_bnf_sru(xml_bytes: bytes, isbn: str) -> dict[str, Any] | None:
     """Parse only trustworthy Dublin Core data; reject ISBN-mismatched records."""
     if len(xml_bytes) > 1_500_000:
         raise ValueError("Notice BnF trop volumineuse.")
+    # Reject entity declarations from untrusted remote XML before parsing.
+    if re.search(rb"<!\s*(?:DOCTYPE|ENTITY)\b", xml_bytes, re.I):
+        raise ValueError("La réponse XML BnF contient une déclaration interdite.")
     root = ET.fromstring(xml_bytes)
     ns = {"srw": "http://www.loc.gov/zing/srw/",
           "dc": "http://purl.org/dc/elements/1.1/"}
@@ -101,7 +159,7 @@ def parse_bnf_sru(xml_bytes: bytes, isbn: str) -> dict[str, Any] | None:
                 fields.setdefault(key, []).append(node.text.strip())
         # Never attach a record just because its title happens to match.
         identifiers = fields.get("identifier", [])
-        if not any(isbn in re.sub(r"\D", "", value) for value in identifiers):
+        if not isbn_in_identifiers(identifiers, isbn):
             continue
         title = next(iter(fields.get("title", [])), "").strip()
         if not title:
@@ -110,8 +168,13 @@ def parse_bnf_sru(xml_bytes: bytes, isbn: str) -> dict[str, Any] | None:
         publishers = fields.get("publisher") or []
         dates = fields.get("date") or []
         # SRU's recordIdentifier is a BnF identifier, never free-form user HTML.
-        ark = record.findtext("srw:recordIdentifier", default="", namespaces=ns)
-        catalogue_link = "https://catalogue.bnf.fr/" + urllib.parse.quote(ark, safe="/:")
+        ark = safe_bnf_ark(
+            record.findtext("srw:recordIdentifier", default="", namespaces=ns)
+        )
+        if not ark:
+            # A traceable record is required before claiming an official notice.
+            continue
+        catalogue_link = "https://catalogue.bnf.fr/" + ark
         return {
             "isbn13": isbn,
             "title_fr": title[:350],
@@ -207,6 +270,7 @@ def create_collection_router(
                 entries = cur.fetchall()
         return {
             "manga_id": manga_id, "editions": entries,
+            "french_overview": verified_fr_overview(entries),
             "count": len(entries),
             "owned_books": sum(bool(e["is_owned"]) for e in entries),
             "read_books": sum(bool(e["is_read"]) for e in entries),

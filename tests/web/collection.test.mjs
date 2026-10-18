@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 const src=readFileSync("apps/web/assets/collection-view.js","utf8");
-const { collectionPanel, editionPreview, EDITION_KINDS }=
+const { collectionPanel, editionPreview, EDITION_KINDS, groupedEditions }=
   await import("data:text/javascript;charset=utf-8,"+encodeURIComponent(src));
 const escape = value => String(value??"").replace(/[&<>"']/g, ch=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -54,4 +54,34 @@ test("confirmed ISBN preview does not auto-add a volume",()=>{
  assert.match(preview,/collectionConfirmTitle/);
  assert.match(preview,/data-action="edition-confirm"/);
  assert.doesNotMatch(preview,/data-action="volume-owned"/);
+});
+
+
+test("classic, perfect and deluxe are distinct visual groups",()=>{
+ const data=structuredClone(example);
+ data.french_overview={
+   source_scope:"verified_registered_books_only",
+   reference_count:2, publishers_fr:["Kana"],authors_fr:["Masashi Kishimoto"],
+ };
+ const html=collectionPanel(data,null,"fr",t,escape);
+ assert.match(html,/class="fr-notices"/);
+ assert.match(html,/Kana/);
+ assert.match(html,/data-edition-kind="CLASSIC"/);
+ assert.match(html,/data-edition-kind="DELUXE"/);
+ assert.match(html,/2026-10-18/);
+ const grouped=groupedEditions(data.editions);
+ assert.deepEqual(grouped.map(x=>x.kind),["CLASSIC","DELUXE"]);
+ assert.equal(grouped[0].books.length,1);
+});
+test("manual ISBN preview requires an explicit volume number",()=>{
+ const preview=editionPreview({
+   title_fr:"Monster, tome 3",isbn13:"9782871294146",edition_kind_suggested:"UNKNOWN",
+ }, "fr",t,escape);
+ assert.match(preview,/id="edition-number"[^>]*value=""[^>]*required/);
+ assert.doesNotMatch(preview,/id="edition-number"[^>]*value="1"/);
+});
+test("no French records means no invented publishers or official series title",()=>{
+ const html=collectionPanel({editions:[],french_overview:{publishers_fr:["Fake"]}},null,"fr",t,escape);
+ assert.doesNotMatch(html,/Fake/);
+ assert.doesNotMatch(html,/class="fr-notices"/);
 });
