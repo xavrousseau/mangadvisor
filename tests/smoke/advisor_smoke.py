@@ -23,7 +23,7 @@ def main():
     assert status["mode"]=="guided" and not status["available"],status
     ai_req=urllib.request.Request(
         BASE+"/advisor/ai-message",
-        data=json.dumps({"message":"Une aventure fantastique","lang":"fr","limit":3}).encode(),
+        data=json.dumps({"message":"Je cherche un manga d’action","lang":"fr","limit":3}).encode(),
         headers={"Content-Type":"application/json"},method="POST")
     with urllib.request.urlopen(ai_req,timeout=40) as result:
         ai_result=json.load(result)
