@@ -378,7 +378,12 @@ async function recommendationMarkup(items,token){
   (m.recommendation_score!=null?score(m.recommendation_score)+' '+L("scoreUnit"):'—')+'</strong>'+
   '<span class="muted">'+stars(m)+'</span></div>'+
   '<p>'+recEvidence(m)+'</p>'+
-  '<div class="actions"><button class="btn btn-small btn-soft" data-go="/manga/'+e(m.id)+'">'+L("details")+' →</button></div></div>'+
+  '<div class="actions"><button class="btn btn-small btn-soft" data-go="/manga/'+e(m.id)+'">'+L("details")+' →</button></div>'+
+  '<div class="feedback-actions" role="group" aria-label="'+L("feedbackInfo")+'">'+
+  '<button type="button" class="feedback-btn" data-action="feedback" data-feedback="INTERESTED" data-manga-id="'+e(m.id)+'">♡ '+L("feedbackInterested")+'</button>'+
+  '<button type="button" class="feedback-btn" data-action="feedback" data-feedback="ALREADY_READ" data-manga-id="'+e(m.id)+'">✓ '+L("feedbackRead")+'</button>'+
+  '<button type="button" class="feedback-btn dislike" data-action="feedback" data-feedback="NOT_FOR_ME" data-manga-id="'+e(m.id)+'">× '+L("feedbackDislike")+'</button>'+
+  '</div></div>'+
   '<details class="reco-explanation" style="grid-column:1/-1"><summary>'+L("why")+'</summary><p>'+
    e(m.reason||t(state.lang,"whyNone"))+'</p>'+
    (m.sensitive_mismatches?.length?'<p>⚠ '+L("differences")+': '+m.sensitive_mismatches.map(tr).join(", ")+'</p>':'')+
@@ -444,6 +449,51 @@ async function generateRecommendations(){
  }catch(err){const box=document.querySelector("#rec-results");if(box)box.innerHTML=errorBox(err);}
  finally{if(btn){btn.disabled=false;btn.innerHTML='✧ '+t(state.lang,"recommend")+' →';}}
 }
+async function sendRecommendationFeedback(button){
+ const mangaId=idNumber(button.dataset.mangaId);
+ const action=button.dataset.feedback;
+ if(!mangaId||!["INTERESTED","ALREADY_READ","NOT_FOR_ME"].includes(action))return;
+ const card=button.closest(".rec-card");
+ const buttons=card?[...card.querySelectorAll('[data-action="feedback"]')]:[button];
+ buttons.forEach(x=>x.disabled=true);
+ try{
+  await request("/recommendations/feedback",{
+    method:"POST",data:{manga_id:mangaId,action}
+  });
+  const names={
+    INTERESTED:"feedbackInterestedSaved",
+    ALREADY_READ:"feedbackReadSaved",
+    NOT_FOR_ME:"feedbackDislikeSaved"
+  };
+  toast(t(state.lang,names[action]));
+  // Le calcul reste côté API : la sélection courante perd le manga déjà évalué.
+  if(state.recResult?.recommendations)
+   state.recResult.recommendations=state.recResult.recommendations.filter(
+     item=>Number(item.id)!==mangaId
+   );
+  for(const result of Object.values(state.similar))
+   if(Array.isArray(result?.recommendations))
+     result.recommendations=result.recommendations.filter(item=>Number(item.id)!==mangaId);
+  if(routeInfo().view==="home"){
+    // Recalcul de l'accueil sur données réelles après un nouvel avis.
+    await render();
+  }else{
+    card?.remove();
+    if(routeInfo().view==="recommendations"){
+      const results=document.querySelector("#rec-results");
+      if(results&&!results.querySelector(".rec-card")){
+        const group=results.querySelector("#rec-cards");
+        if(group)group.innerHTML='<div class="info">'+L("feedbackRefresh")+'</div>';
+      }
+    }
+  }
+ }catch(error){
+  buttons.forEach(x=>x.disabled=false);
+  toast(error?.message||t(state.lang,"error"));
+ }
+}
+
+
 async function saveLibrary(form){
  const manga=state.currentDetail;if(!manga)return;
  const fd=new FormData(form);
@@ -489,6 +539,7 @@ root.addEventListener("click",async event=>{
  }
  const action=button.dataset.action;
  if(action==="refresh")return render();
+ if(action==="feedback")return sendRecommendationFeedback(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
  if(action==="catalog-prev"||action==="catalog-next"){
   state.catalogPage=Math.max(1,state.catalogPage+(action.endsWith("next")?1:-1));
