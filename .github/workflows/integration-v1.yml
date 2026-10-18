@@ -126,6 +126,9 @@ jobs:
       - name: Vérifier les liens vérifiés entre sources et mangas proposés
         run: python tests/smoke/explanations_smoke.py
 
+      - name: Tester la qualité des recommandations
+        run: python tests/smoke/quality_smoke.py
+
       - name: Vérifier la persistance des réactions et les exclusions
         run: python tests/smoke/feedback_smoke.py
 
