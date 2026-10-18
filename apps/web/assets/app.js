@@ -1,5 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
+import { createIsbnScanner } from "./isbn-scanner.js";
 import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
@@ -52,6 +53,9 @@ async function request(path,{method="GET",data,signal}={}){
   }
   return response.json();
 }
+const isbnScanner=createIsbnScanner({root,request,lang:()=>state.lang,escape:escapeHtml,
+ onSaved:async ()=>{if(routeInfo().view==="detail")await refreshFrenchCollection();}
+});
 async function covers(items){
   const ids=[...new Set(items.map(m=>Number(m.manga_id||m.id)).filter(Number.isInteger))];
   if(!ids.length)return {};
@@ -137,6 +141,7 @@ async function go(path,replace=false){
  await render();
 }
 async function render(){
+ isbnScanner.close();
  const token=++renderToken;
  root.innerHTML=shell();
  await view(token);
@@ -329,7 +334,8 @@ async function renderLibrary(token){
  const statusOpts=[["","allStatuses"],...STATUS.map(v=>[v,v])];
  const html='<div class="headline-row"><div><div class="eyebrow">YOUR COLLECTION</div><h1 class="page-title">'+L("library")+'</h1>'+
  '<p class="page-desc">'+L("libraryHelp")+'</p></div>'+
- '<button class="btn btn-soft" data-go="/discover">＋ '+L("startExplore")+'</button></div>'+
+ '<div class="actions"><button class="btn btn-primary" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner mes tomes":"Scan my volumes")+'</button>'+
+ '<button class="btn btn-soft" data-go="/discover">＋ '+L("startExplore")+'</button></div></div>'+
  '<div class="filters"><div class="field grow"><label for="lib-query">'+L("librarySearch")+'</label>'+
  '<input id="lib-query" class="input" type="search" autocomplete="off" value="'+e(state.libraryQuery)+'" placeholder="'+L("searchPlaceholder")+'"></div>'+
  '<div class="field medium"><label for="lib-status">'+L("status")+'</label><select id="lib-status" class="select">'+
@@ -407,7 +413,8 @@ async function renderDetail(token,id){
    '<p class="muted tiny">'+L("status")+' : '+e(publication(state.lang,manga.status))+' · '+
    (manga.manga_type?tr(manga.manga_type):'Manga')+'</p>'+
    '<div class="actions"><button class="btn btn-primary" data-action="scroll-save">＋ '+L(libraryItem?"inLibrary":"addLibrary")+'</button>'+
-    '<button class="btn btn-soft" data-action="similar">✧ '+L("similar")+'</button></div></div></section>'+
+    '<button class="btn btn-soft" data-action="similar">✧ '+L("similar")+'</button>'+
+ '<button class="btn btn-soft" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner un tome":"Scan a volume")+'</button></div></div></section>'+
    '<div class="detail-stats">'+[
     ["communityRating",stars(manga)],["volumes",manga.volumes??"—"],["chapters",manga.chapters??"—"],["popularity",manga.popularity??"—"]
    ].map(([label,value])=>'<div class="stat"><small>'+L(label)+'</small><strong>'+e(value)+'</strong></div>').join("")+'</div>'+
@@ -956,6 +963,8 @@ root.addEventListener("click",async event=>{
  }
  const action=button.dataset.action;
  if(action==="refresh")return render();
+ if(action==="open-scanner")return isbnScanner.open(routeInfo().view==="detail"?state.currentDetail:null);
+ if(action.startsWith("scan-"))return isbnScanner.click(action,button);
  if(["appearance-preset","appearance-accent","appearance-density","appearance-reset"].includes(action)){
   const part={"appearance-preset":"preset","appearance-accent":"accent","appearance-density":"density"}[action];
   const wanted=action==="appearance-reset" ? DEFAULT_APPEARANCE : {...state.appearance,[part]:button.dataset.value};
@@ -1012,6 +1021,9 @@ async function manualSearch(){
  }catch(err){if(target)target.innerHTML='<p class="message">'+e(err.message)+'</p>';}
 }
 root.addEventListener("submit",event=>{
+ if(event.target.id==="scan-isbn-form"||event.target.id==="scan-series-form"){
+  event.preventDefault();isbnScanner.submit(event.target);return;
+ }
  if(event.target.id==="library-editor"){event.preventDefault();saveLibrary(event.target);}
  if(event.target.id==="edition-isbn-form"){event.preventDefault();searchFrenchIsbn(event.target);}
  if(event.target.id==="fr-bibliography-form"){event.preventDefault();searchFrenchBibliography(event.target);}
@@ -1019,6 +1031,7 @@ root.addEventListener("submit",event=>{
 });
 root.addEventListener("change",async event=>{
  const input=event.target;
+ if(input.id.startsWith("scan-")){isbnScanner.capture();return;}
  if(input.id==="app-language"){
   state.lang=input.value==="en"?"en":"fr";localStorage.setItem("ma-language",state.lang);await render();return;
  }
@@ -1042,6 +1055,7 @@ root.addEventListener("change",async event=>{
 });
 root.addEventListener("input",event=>{
  const id=event.target.id;
+ if(id.startsWith("scan-")){isbnScanner.capture();return;}
  if(id==="bulk-resolve-volume")syncBulkConfirmation();
  if(id==="bulk-csv-text" && state.bulkPreview && event.target.value.trim()!==state.bulkCsv){
   state.bulkPreview=null;state.bulkResolver=null;
@@ -1058,6 +1072,7 @@ root.addEventListener("input",event=>{
  }
 });
 root.addEventListener("keydown",event=>{
+ if(event.key==="Escape"&&isbnScanner.isOpen()){event.preventDefault();isbnScanner.close();return;}
  if(event.key==="Enter"&&event.target.id==="manual-search"){event.preventDefault();manualSearch();}
 });
 window.addEventListener("popstate",()=>render());
