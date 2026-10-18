@@ -191,6 +191,10 @@ def run():
             expect(page.locator('[data-action="resolve-confirm-edition"]')).to_be_visible()
             expect(page.locator("#resolve-volume-number")).to_have_value("")
             page.locator("#resolve-volume-number").fill("2")
+            field_height = page.locator("#resolve-volume-number").evaluate(
+                "(element) => element.getBoundingClientRect().height"
+            )
+            assert 39 <= field_height <= 52, f"Champ numéro de tome déformé sur {device}: {field_height}px"
             page.screenshot(path=str(OUTPUT / f"{device}-isbn-inconnu-assiste.png"), full_page=True)
             page.locator('[data-action="resolve-cancel"]').click()
             expect(page.locator("#bulk-resolver-panel")).to_have_count(0)
