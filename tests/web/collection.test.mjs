@@ -98,8 +98,8 @@ test("progress is explicitly scoped to recorded ISBNs and updates for each editi
  const markup=collectionPanel(data,null,"fr",t,escape);
  assert.match(markup,/class="edition-progress"/);
  assert.match(markup,/progressNoPublishedTotal/);
- assert.match(markup,/aria-label="collectionOwned" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"/);
- assert.match(markup,/aria-label="collectionOwned" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"/);
+ assert.match(markup,/aria-label="Possédé" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"/);
+ assert.match(markup,/aria-label="Possédé" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"/);
  assert.match(markup,/style="width:100%"/);
  assert.match(markup,/style="width:0%"/);
 });
