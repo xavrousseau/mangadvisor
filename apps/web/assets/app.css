@@ -516,7 +516,12 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 .resolve-check{color:var(--accent);margin-left:auto}
 .resolve-confirm h4{margin:0 0 11px;font-size:16px}
 .resolve-confirm strong{color:var(--text)}
-.resolve-confirm .form-grid{margin:16px 0}
+.resolve-confirm .form-grid{margin:16px 0;align-items:start}
+.resolve-confirm .form-grid .field{align-self:start;justify-content:flex-start;min-height:0}
+.resolve-confirm #resolve-volume-number{
+  display:block;width:100%;height:44px;min-height:44px;max-height:44px;
+  flex:none;box-sizing:border-box;align-self:start;
+}
 .resolve-confirm .btn{margin-top:9px}
 @media(max-width:740px){
  .resolve-wizard{padding:13px}
