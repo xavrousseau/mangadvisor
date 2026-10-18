@@ -339,3 +339,32 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .profile-context{padding:13px 14px}
 }
 @media(max-width:385px){.profile-source-grid{grid-template-columns:1fr}}
+
+
+/* Mangadvisor 1.1 — correspondances réellement vérifiées. */
+.verified-source{
+ padding:10px 13px;background:rgba(255,174,103,.045);
+ border:1px solid #665240;border-radius:10px;margin:9px 0;
+}
+.verified-source strong{display:block;color:var(--accent);font-size:12px;margin-bottom:8px}
+.verified-equation{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
+.verified-equation>div{
+ padding:9px 12px;background:#252e3b;border:1px solid var(--border);
+ border-radius:8px;display:flex;flex-direction:column;gap:3px;min-width:87px;
+}
+.verified-equation>span{color:var(--muted);font-weight:900}
+.verified-equation small{color:var(--muted);font-size:10px}
+.verified-equation strong{font-size:17px;color:#f6f1e8}
+.verified-equation .verified-total{border-color:#a6784f}
+.verified-equation .verified-total strong{color:var(--accent)}
+.improve-panel{
+ margin:17px 0;padding:13px 17px;border-radius:13px;
+ background:var(--accent-tint);border:1px solid #71523d;
+}
+.improve-panel summary{font-size:13px;color:var(--accent);font-weight:800;cursor:pointer}
+.improve-panel p{color:#d5d0ca;font-size:12px;line-height:1.7;margin:13px 0}
+@media(max-width:740px){
+ .verified-equation{gap:6px}
+ .verified-equation>div{min-width:65px;padding:7px}
+ .verified-equation strong{font-size:15px}
+}
