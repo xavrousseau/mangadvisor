@@ -719,7 +719,7 @@ async function startBulkResolution(button){
  if(!/^[0-9]{13}$/.test(isbn)||
     !state.bulkPreview?.items?.some(row=>row.isbn13===isbn&&row.match==="UNKNOWN"))return;
  state.bulkResolver={isbn,record:null,query:"",matches:[],searched:false,selected:null,
-   kind:"UNKNOWN",volume:1};
+   kind:"UNKNOWN",volume:null};
  drawBulkResolver();
  document.querySelector("#bulk-resolver-slot")?.scrollIntoView({behavior:"smooth",block:"nearest"});
  try{
@@ -770,6 +770,14 @@ function selectBulkManga(button){
  drawBulkResolver();
  document.querySelector(".bulk-resolver-confirm")?.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
+function syncBulkConfirmation(){
+ const btn=document.querySelector('[data-action="bulk-resolve-confirm"]');
+ if(!btn)return;
+ const raw=String(document.querySelector("#bulk-resolve-volume")?.value??"").trim();
+ const number=Number(raw);
+ btn.disabled=!(document.querySelector("#bulk-resolve-ack")?.checked && raw &&
+   Number.isInteger(number) && number>=1 && number<=9999);
+}
 async function confirmBulkAssociation(button){
  const draft=state.bulkResolver;if(!draft||!currentBulkResolver(draft.isbn)||
     !isVerifiedIsbnRecord(draft.record,draft.isbn)||!draft.selected)return;
@@ -777,7 +785,8 @@ async function confirmBulkAssociation(button){
  const edition_kind=document.querySelector("#bulk-resolve-kind")?.value;
  const volume_number=Number(document.querySelector("#bulk-resolve-volume")?.value);
  const mangaId=idNumber(draft.selected.id);
- if(!checkbox?.checked || !EDITION_OPTIONS.includes(edition_kind)||
+ if(!checkbox?.checked || !String(document.querySelector("#bulk-resolve-volume")?.value??"").trim() ||
+    !EDITION_OPTIONS.includes(edition_kind)||
     !mangaId||!Number.isInteger(volume_number)||volume_number<1||volume_number>9999){
   toast(t(state.lang,"resolveInputNeeded"));return;
  }
@@ -962,10 +971,7 @@ root.addEventListener("change",async event=>{
  if(input.id==="catalog-genre"){state.catalogGenre=input.value;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="catalog-finished"){state.catalogFinished=input.checked;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="lib-status"){state.libraryStatus=input.value;state.libraryPage=1;await updateLibrary(renderToken);}
- if(input.id==="bulk-resolve-ack"){
-  const action=document.querySelector('[data-action="bulk-resolve-confirm"]');
-  if(action)action.disabled=!input.checked;
- }
+ if(input.id==="bulk-resolve-ack")syncBulkConfirmation();
  if(input.id==="bulk-csv-file"&&input.files?.[0]){
   const file=input.files[0];
   if(file.size>80000){toast(t(state.lang,"bulkFormat"));input.value="";return;}
@@ -982,6 +988,7 @@ root.addEventListener("change",async event=>{
 });
 root.addEventListener("input",event=>{
  const id=event.target.id;
+ if(id==="bulk-resolve-volume")syncBulkConfirmation();
  if(id==="bulk-csv-text" && state.bulkPreview && event.target.value.trim()!==state.bulkCsv){
   state.bulkPreview=null;state.bulkResolver=null;
   const output=document.querySelector("#bulk-import-result");
