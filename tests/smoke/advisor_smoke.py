@@ -27,7 +27,7 @@ def main():
         headers={"Content-Type":"application/json"},method="POST")
     with urllib.request.urlopen(ai_req,timeout=40) as result:
         ai_result=json.load(result)
-    assert ai_result["ai_mode"]=="guided_fallback",ai_result
+    assert ai_result["ai_mode"]=="guided",ai_result
     assert ai_result["count"]>0,ai_result
     assert all("mood_matches" in row for row in ai_result["recommendations"]),ai_result
 
