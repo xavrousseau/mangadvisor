@@ -135,6 +135,14 @@ jobs:
           python -m pip install playwright requests pillow
           python -m playwright install --with-deps chromium
 
+      # The advisor's synthetic French edition is tested before browser feedback
+      # mutates the shared disposable library (including candidate exclusions).
+      - name: Vérifier les contraintes du conseiller sur PostgreSQL jetable
+        run: python tests/smoke/advisor_smoke.py
+
+      - name: Valider le conseiller conversationnel sur ordinateur et mobile
+        run: python tests/smoke/advisor_browser.py
+
       - name: Contrôler Streamlit ordinateur et mobile
         run: python tests/smoke/browser_smoke.py
 
@@ -152,12 +160,6 @@ jobs:
 
       - name: Valider la découverte selon l’envie sur ordinateur et mobile
         run: python tests/smoke/mood_discovery_browser.py
-
-      - name: Vérifier les contraintes du conseiller sur PostgreSQL jetable
-        run: python tests/smoke/advisor_smoke.py
-
-      - name: Valider le conseiller conversationnel sur ordinateur et mobile
-        run: python tests/smoke/advisor_browser.py
 
       - name: Vérifier la persistance des réactions et les exclusions
         run: python tests/smoke/feedback_smoke.py
