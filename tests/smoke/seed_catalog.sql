@@ -23,6 +23,12 @@ INSERT INTO manga_genre(manga_id,genre_id)
 SELECT m.id,g.id FROM manga m
 JOIN genre g ON g.name = CASE WHEN m.id % 2 = 0 THEN 'Action' ELSE 'Adventure' END
 ON CONFLICT DO NOTHING;
+-- Ajouter deux genres communs à Naruto et à plusieurs titres fictifs.
+-- Cela garantit des candidats réels pour les tests du moteur "similaire".
+INSERT INTO manga_genre(manga_id,genre_id)
+SELECT m.id,g.id FROM manga m JOIN genre g ON g.name = 'Action'
+WHERE m.title IN ('Naruto','Demo CI 05','Demo CI 07','Demo CI 09','Demo CI 11')
+ON CONFLICT DO NOTHING;
 INSERT INTO manga_theme(manga_id,theme_id)
 SELECT m.id,t.id FROM manga m CROSS JOIN theme t
 WHERE t.name = 'Mystery' AND m.id % 2 = 0

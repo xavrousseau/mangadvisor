@@ -66,6 +66,20 @@ def run():
                 expect(page.locator(".detail-hero h1")).to_be_visible(timeout=30000)
                 page.go_back()
                 expect(page.locator("#rec-results .rec-card").first).to_be_visible(timeout=30000)
+                disliked = page.locator("#rec-results .rec-card").first.locator(
+                    '[data-action="feedback"][data-feedback="NOT_FOR_ME"]'
+                )
+                disliked_id = disliked.get_attribute("data-manga-id")
+                disliked.click()
+                expect(page.locator(
+                    '#rec-results [data-action="feedback"][data-manga-id="' + disliked_id + '"]'
+                )).to_have_count(0, timeout=30000)
+                # Le prochain appel au moteur doit réellement exclure ce manga.
+                page.locator("#rec-submit").click()
+                expect(page.locator("#rec-results .rec-card").first).to_be_visible(timeout=60000)
+                expect(page.locator(
+                    '#rec-results [data-action="feedback"][data-manga-id="' + disliked_id + '"]'
+                )).to_have_count(0, timeout=30000)
             page.screenshot(path=str(OUTPUT / f"{device}-pour-moi.png"), full_page=True)
 
             page.locator('[data-go="/library"]').first.click()
