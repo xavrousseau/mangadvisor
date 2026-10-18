@@ -141,6 +141,9 @@ jobs:
       - name: Vérifier la persistance des réactions et les exclusions
         run: python tests/smoke/feedback_smoke.py
 
+      - name: Tester l'import CSV sans destruction des anciens compteurs
+        run: python tests/smoke/collection_bulk_smoke.py
+
       - name: Captures d'écran et diagnostic
         if: always()
         uses: actions/upload-artifact@v4
