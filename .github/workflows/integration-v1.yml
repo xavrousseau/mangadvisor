@@ -123,6 +123,9 @@ jobs:
       - name: Contrôler Streamlit ordinateur et mobile
         run: python tests/smoke/browser_smoke.py
 
+      - name: Vérifier les preuves de recommandations sur PostgreSQL
+        run: python tests/smoke/explanations_smoke.py
+
       - name: Vérifier la persistance des réactions et les exclusions
         run: python tests/smoke/feedback_smoke.py
 
