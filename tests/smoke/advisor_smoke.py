@@ -36,6 +36,27 @@ def main():
     assert second["recommendations"][0]["title"]=="Demo CI 08",second
     assert second["recommendations"][0]["french_recorded"] is True,second
 
+    narrative=request("Une enquête psychologique, sans horreur et sans gore",second["context"])
+    assert narrative["context"]["mood"]=="MYSTERY",narrative
+    assert narrative["context"]["avoid_horror"] is True,narrative
+    assert narrative["context"]["avoid_gore"] is True,narrative
+    assert set(narrative["context"]["narrative_preferences"])=={
+        "INVESTIGATION","PSYCHOLOGICAL"},narrative
+    assert "sans horreur documentée" in narrative["interpreted_criteria"],narrative
+    assert narrative["count"]>0,narrative
+    assert all("Horror" not in m["genres"] and "Gore" not in m["themes"]
+               for m in narrative["recommendations"]),narrative
+    assert all(m["title"]!="Demo CI 28" for m in narrative["recommendations"]),narrative
+    assert narrative["recommendations"][0]["title"]=="Demo CI 08",narrative
+    matched=narrative["recommendations"][0]["narrative_matches"]
+    assert {x["concept"] for x in matched}=={"PSYCHOLOGICAL","INVESTIGATION"},matched
+    assert {x["source"] for x in matched}=={"catalog_tag","synopsis_word"},matched
+    assert "synopsis" not in narrative["recommendations"][0]
+
+    refined=request("Finalement l'horreur me va",narrative["context"])
+    assert refined["context"]["avoid_horror"] is False,refined
+    assert refined["context"]["avoid_gore"] is True,refined
+
     strict=request("Français obligatoire",second["context"])
     assert strict["context"]["french"]=="REQUIRE",strict
     assert strict["count"]==1,strict
