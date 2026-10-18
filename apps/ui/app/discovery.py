@@ -35,6 +35,41 @@ def paginated_catalog(items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]]
     return items[:PAGE_SIZE], len(items) > PAGE_SIZE
 
 
+
+@st.dialog("Fiche manga", width="large")
+def show_manga_dialog(
+    manga_id: int,
+    *,
+    get_manga_detail: Callable[[int], dict[str, Any]],
+    display_manga_detail: Callable[[dict[str, Any]], None],
+    get_similar_recommendations: Callable[..., dict[str, Any]],
+    display_manga_recommendations: Callable[[list[dict[str, Any]]], None],
+    recommendation_limit: int,
+) -> None:
+    """Ouvre immédiatement la fiche au premier plan, sans dépendre du défilement.
+
+    La modale ne relance que son contenu lors des interactions (Streamlit st.dialog).
+    """
+    manga = get_manga_detail(manga_id)
+    display_manga_detail(manga)
+    st.divider()
+    st.markdown("### Et si tu aimais aussi…")
+    if st.button(
+        "✨ Trouver des mangas similaires",
+        key=f"ma_discover_similar_button_{manga_id}",
+        type="primary",
+    ):
+        st.session_state["ma_discover_similar"] = get_similar_recommendations(
+            title=manga["title"], limit=recommendation_limit
+        )
+    similar = st.session_state.get("ma_discover_similar")
+    if similar is not None:
+        recommendations = similar.get("recommendations") or []
+        if recommendations:
+            display_manga_recommendations(recommendations)
+        else:
+            st.info("Aucune recommandation trouvée pour ce titre.")
+
 def render_discovery(
     *,
     get_mangas: Callable[..., list[dict[str, Any]]],
@@ -75,7 +110,6 @@ def render_discovery(
     if st.session_state.get("ma_discover_signature") != search_signature:
         st.session_state["ma_discover_signature"] = search_signature
         st.session_state["ma_discover_page"] = 1
-        st.session_state.pop("ma_discover_selected_id", None)
         st.session_state.pop("ma_discover_similar", None)
 
     page = int(st.session_state.get("ma_discover_page", 1))
@@ -112,8 +146,15 @@ def render_discovery(
                             key=f"ma_discover_open_{manga_id}",
                             use_container_width=True,
                         ):
-                            st.session_state["ma_discover_selected_id"] = int(manga_id)
                             st.session_state.pop("ma_discover_similar", None)
+                            show_manga_dialog(
+                                int(manga_id),
+                                get_manga_detail=get_manga_detail,
+                                display_manga_detail=display_manga_detail,
+                                get_similar_recommendations=get_similar_recommendations,
+                                display_manga_recommendations=display_manga_recommendations,
+                                recommendation_limit=recommendation_limit,
+                            )
 
     previous_col, next_col = st.columns(2)
     with previous_col:
@@ -124,35 +165,3 @@ def render_discovery(
         if st.button("Suivant →", disabled=not has_next, key="ma_discover_next"):
             st.session_state["ma_discover_page"] = page + 1
             st.rerun()
-
-    chosen_id = st.session_state.get("ma_discover_selected_id")
-    if chosen_id:
-        st.divider()
-        close_col, heading_col = st.columns([1, 4], gap="medium")
-        with close_col:
-            if st.button("✕ Fermer", key="ma_discover_close"):
-                st.session_state.pop("ma_discover_selected_id", None)
-                st.session_state.pop("ma_discover_similar", None)
-                st.rerun()
-        with heading_col:
-            st.caption("FICHE SÉLECTIONNÉE · DONNÉES DU CATALOGUE")
-
-        manga = get_manga_detail(int(chosen_id))
-        display_manga_detail(manga)
-        st.divider()
-        st.markdown("### Et si tu aimais aussi…")
-        if st.button(
-            "✨ Trouver des mangas similaires",
-            key="ma_discover_similar_button",
-            type="primary",
-        ):
-            st.session_state["ma_discover_similar"] = get_similar_recommendations(
-                title=manga["title"], limit=recommendation_limit
-            )
-        similar = st.session_state.get("ma_discover_similar")
-        if similar is not None:
-            recommendations = similar.get("recommendations") or []
-            if recommendations:
-                display_manga_recommendations(recommendations)
-            else:
-                st.info("Aucune recommandation trouvée pour ce titre.")
