@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
 const src=readFileSync("apps/web/assets/enrichment-view.js","utf8");
-const {enrichmentPanel,enrichmentResults,reconcileEnrichment}=
+const {enrichmentPanel,enrichmentResults,reconcileEnrichment,mergeEnrichmentPages}=
  await import("data:text/javascript;charset=utf-8,"+encodeURIComponent(src));
 const e=v=>String(v??"").replace(/[&<>"']/g,x=>({
  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -80,4 +80,63 @@ test("failed or absent search returns bounded empty message",()=>{
  assert.match(html,/enrichEmpty/);
  assert.match(html,/enrichPartial/);
  assert.doesNotMatch(html,/enrich-verify-isbn/);
+});
+
+
+test("French title query is editable without creating a stored official alias",()=>{
+ const html=enrichmentPanel(e,t,"fr");
+ assert.match(html,/id="enrich-alt-title"/);
+ assert.match(html,/maxlength="90"/);
+ assert.match(html,/enrichAliasHelp/);
+ assert.doesNotMatch(html,/data-action="edition-confirm"/);
+});
+
+test("formats are visually grouped but still unconfirmed and safe",()=>{
+ const grouped={...report,items:[
+  {...report.items[0],edition_kind_suggested:"DELUXE"},
+  {...report.items[1],edition_kind_suggested:"CLASSIC"},
+  {...report.items[2],edition_kind_suggested:"PERFECT"}],
+  searched_titles:["Naruto","Naruto FR"],page:1,max_pages:3,has_more_pages:true};
+ const html=enrichmentResults(grouped,e,t,"fr");
+ assert.equal((html.match(/class="enrich-format-group"/g)||[]).length,3);
+ assert.match(html,/editionDELUXE/);
+ assert.match(html,/editionCLASSIC/);
+ assert.match(html,/editionPERFECT/);
+ assert.match(html,/Naruto FR/);
+ assert.match(html,/data-action="enrich-more"/);
+ assert.match(html,/enrichPagesLoaded/);
+});
+
+test("incremental pages dedupe ISBNs and preserve verified candidates",()=>{
+ const p1={...report,page:1,max_pages:3,has_more_pages:true,
+  items:[isbn("9782344074282","TO_VERIFY"),isbn("9782871294146","REGISTERED_HERE")]};
+ const confirmed=reconcileEnrichment(p1,[{isbn13:"9782344074282"}]);
+ const p2={...report,page:2,has_more_pages:false,
+  items:[isbn("9782344074282","TO_VERIFY"),isbn("9781234567804","TO_VERIFY")],
+  to_verify_count:2,registered_here_count:0,registered_other_count:0};
+ const merged=mergeEnrichmentPages(confirmed,p2);
+ assert.equal(merged.items.length,3);
+ assert.equal(merged.registered_here_count,2);
+ assert.equal(merged.to_verify_count,1);
+ assert.equal(merged.pages_loaded,2);
+ assert.equal(merged.has_more_pages,false);
+ assert.equal((enrichmentResults(merged,e,t,"fr").match(/data-action="enrich-verify-isbn"/g)||[]).length,1);
+ assert.doesNotMatch(enrichmentResults(merged,e,t,"fr"),/data-action="enrich-more"/);
+ assert.equal(confirmed.items.length,2);
+});
+
+test("new query or different manga never merges old BnF results",()=>{
+ const next={...report,manga_id:2,searched_titles:["Naruto FR"],page:1,items:[]};
+ const result=mergeEnrichmentPages(report,next);
+ assert.equal(result,next);
+ const changed={...report,searched_titles:["Alternative title"],page:1,items:[]};
+ assert.equal(mergeEnrichmentPages(report,changed),changed);
+});
+
+test("all aliases and BnF titles remain escaped in page summaries",()=>{
+ const suspicious={...report,searched_titles:["Naruto",'<img src=x onerror=alert(1)>'],
+  page:1,has_more_pages:true};
+ const html=enrichmentResults(suspicious,e,t,"fr");
+ assert.doesNotMatch(html,/<img src/);
+ assert.match(html,/&lt;img/);
 });

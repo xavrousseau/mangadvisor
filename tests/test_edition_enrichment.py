@@ -117,5 +117,68 @@ class EnrichmentTests(unittest.TestCase):
                          ["9782344074282","9782871294146"])
 
 
+    def test_optional_french_title_is_deduped_sanitized_and_not_persisted(self):
+        book={"title":"Shingeki no Kyojin","title_english":"Attack on Titan"}
+        self.assertEqual(select_search_titles(book, "L’Attaque des Titans"),
+                         ["Shingeki no Kyojin","Attack on Titan","L’Attaque des Titans"])
+        self.assertEqual(select_search_titles(book,"Attack on Titan"),
+                         ["Shingeki no Kyojin","Attack on Titan"])
+        with self.assertRaises(ValueError):
+            select_search_titles(book,'Monster" OR bib.isbn')
+
+    def test_bnf_page_limits_and_more_are_documentary_not_exhaustive(self):
+        records=[candidate("9782871294146","Monster. Tome 1")]
+        first=build_workshop(12,["Monster"],
+            [{"items":records,"bnf_reported_records":55}],{},[],page=1)
+        second=build_workshop(12,["Monster"],
+            [{"items":records,"bnf_reported_records":55}],{},[],page=2)
+        last=build_workshop(12,["Monster"],
+            [{"items":records,"bnf_reported_records":55}],{},[],page=3)
+        self.assertTrue(first["has_more_pages"])
+        self.assertTrue(second["has_more_pages"])
+        self.assertFalse(last["has_more_pages"])
+        self.assertTrue(first["first_page_per_title_only"])
+        self.assertFalse(second["first_page_per_title_only"])
+        self.assertFalse(last["exhaustive"])
+        self.assertFalse(last["writes_performed"])
+        empty=build_workshop(12,["Monster"],
+            [{"items":[],"bnf_reported_records":19}],{},[],page=1)
+        self.assertFalse(empty["has_more_pages"])
+
+    def test_second_page_and_alias_hit_sru_at_record_21_without_writes(self):
+        class Cursor:
+            def __enter__(self):return self
+            def __exit__(self,*args):return False
+            def execute(self,sql,params):
+                assert sql.strip().upper().startswith("SELECT"),sql
+                self.params=params
+            def fetchone(self):return {
+                "id":12,"title":"Shingeki no Kyojin","title_english":"Attack on Titan"}
+            def fetchall(self):return []
+        class Conn:
+            def __enter__(self):return self
+            def __exit__(self,*args):return False
+            def cursor(self):return Cursor()
+        router=create_enrichment_router(lambda: Conn())
+        endpoint=next(r.endpoint for r in router.routes if r.path.endswith("/enrichment"))
+        mock={"items":[candidate("9782871294146","L'Attaque des Titans. Tome 1")],
+              "bnf_reported_records":70}
+        with patch("apps.api.app.edition_enrichment.search_bnf_by_title",
+                   return_value=mock) as search:
+            page=endpoint(12,page=2,alternate_title="L’Attaque des Titans")
+        self.assertEqual(search.call_count,3)
+        for call in search.call_args_list:
+            self.assertEqual(call.kwargs,{"start_record":21})
+        self.assertEqual(page["searched_titles"][-1],"L’Attaque des Titans")
+        self.assertTrue(page["has_more_pages"])
+        self.assertEqual(page["count"],1)
+        self.assertFalse(page["match_verified"])
+        for invalid in (0,4,999):
+            with self.assertRaises(HTTPException) as exc:
+                endpoint(12,page=invalid)
+            self.assertEqual(exc.exception.status_code,422)
+
+
+
 if __name__=="__main__":
     unittest.main()

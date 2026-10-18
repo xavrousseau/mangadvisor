@@ -1,6 +1,7 @@
 /** Bounded BnF title-based workshop; candidate ≠ verified series association. */
 const VALID_STATUS=new Set(["TO_VERIFY","REGISTERED_HERE","REGISTERED_OTHER"]);
 const VALID_CLUE=new Set(["TITLE_WORDS_PRESENT","SOME_TITLE_WORDS","NO_TITLE_WORDS"]);
+const FORMAT_ORDER=["CLASSIC","DELUXE","PERFECT","COLLECTOR","INTEGRAL","OTHER","UNKNOWN"];
 const bnfLink=url=>{
  try{
   const parsed=new URL(String(url||""));
@@ -14,8 +15,12 @@ export function enrichmentPanel(escape,t,lang){
  return '<section class="enrichment-panel" id="fr-enrichment">'+
   '<div class="enrichment-head"><div><div class="eyebrow">✧ MANGADVISOR · BnF</div>'+
   '<h3>'+L("enrichHeading")+'</h3><p>'+L("enrichIntro")+'</p></div>'+
-  '<button type="button" class="btn btn-primary" data-action="enrich-discover">✦ '+
-    L("enrichRun")+'</button></div>'+
+  '</div><div class="enrich-query"><label for="enrich-alt-title">'+L("enrichAliasLabel")+'</label>'+
+   '<div class="actions"><input type="search" id="enrich-alt-title" class="input" maxlength="90" '+
+     'placeholder="'+L("enrichAliasPlaceholder")+'" autocomplete="off">'+
+   '<button type="button" class="btn btn-primary" data-action="enrich-discover">✦ '+
+     L("enrichRun")+'</button></div>'+
+   '<p class="tiny muted">'+L("enrichAliasHelp")+'</p></div>'+
   '<div id="fr-enrichment-results" aria-live="polite"></div></section>';
 }
 
@@ -28,6 +33,30 @@ export function reconcileEnrichment(data,editions){
     ?{...item,registration_status:"REGISTERED_HERE",
       registered_manga_id:data.manga_id}:item);
  return {...data,items,
+  to_verify_count:items.filter(x=>x.registration_status==="TO_VERIFY").length,
+  registered_here_count:items.filter(x=>x.registration_status==="REGISTERED_HERE").length,
+  registered_other_count:items.filter(x=>x.registration_status==="REGISTERED_OTHER").length,
+ };
+}
+
+/** Append another BnF page without losing candidate confirmations or duplicate ISBNs. */
+export function mergeEnrichmentPages(previous, incoming){
+ if(!previous || !Array.isArray(previous.items) || !incoming ||
+    previous.manga_id!==incoming.manga_id ||
+    JSON.stringify(previous.searched_titles)!==JSON.stringify(incoming.searched_titles))return incoming;
+ const byIsbn=new Map(previous.items.map(item=>[item.isbn13,item]));
+ for(const next of (Array.isArray(incoming.items)?incoming.items:[])){
+  const old=byIsbn.get(next.isbn13);
+  if(!old || (old.registration_status==="TO_VERIFY" &&
+     ["REGISTERED_HERE","REGISTERED_OTHER"].includes(next.registration_status))){
+   byIsbn.set(next.isbn13,next);
+  }
+ }
+ const items=Array.from(byIsbn.values());
+ return {...incoming,items,count:items.length,
+  pages_loaded:Math.max(previous.pages_loaded||previous.page||1,incoming.page||1),
+  search_errors:[...new Set([...(previous.search_errors||[]),...(incoming.search_errors||[])])],
+  truncated:Boolean(previous.truncated||incoming.truncated),
   to_verify_count:items.filter(x=>x.registration_status==="TO_VERIFY").length,
   registered_here_count:items.filter(x=>x.registration_status==="REGISTERED_HERE").length,
   registered_other_count:items.filter(x=>x.registration_status==="REGISTERED_OTHER").length,
@@ -49,7 +78,7 @@ export function enrichmentResults(data,escape,t,lang){
   ((data?.search_errors?.length)?'<p class="enrich-warning">'+L("enrichPartial")+': '+
     data.search_errors.map(e).join(", ")+'</p>':"")+
   (data?.truncated?'<p class="enrich-warning">'+L("enrichTruncated")+'</p>':"");
- const entries=candidates.map(x=>{
+ const entry=x=>{
   const link=bnfLink(x.source_url);
   const status=x.registration_status;
   const clue=VALID_CLUE.has(x.title_clue)?x.title_clue:"NO_TITLE_WORDS";
@@ -77,7 +106,27 @@ export function enrichmentResults(data,escape,t,lang){
      e(x.isbn13)+'">'+L("enrichVerify")+' →</button>':
     '<span class="enrich-done" aria-label="'+L("enrichNoAction")+'">✓</span>')+
    '</article>';
- }).join("");
- return stats+hints+(entries?'<div class="enrich-candidates">'+entries+'</div>':
- '<div class="home-empty">'+L("enrichEmpty")+'</div>');
+ };
+ const sections=FORMAT_ORDER.map(kind=>{
+  const group=candidates.filter(x=>x.edition_kind_suggested===kind ||
+    (kind==="UNKNOWN"&&!FORMAT_ORDER.includes(x.edition_kind_suggested)));
+  if(!group.length)return null;
+  const newCount=group.filter(x=>x.registration_status==="TO_VERIFY").length;
+  return {kind,group,newCount};
+ }).filter(Boolean).sort((a,b)=>b.newCount-a.newCount);
+ const groups=sections.map(({kind,group})=>
+  '<section class="enrich-format-group"><div class="enrich-format-header"><h4>'+
+   L("edition"+kind)+'</h4><span>'+e(group.length)+' '+L("enrichReferences")+'</span></div>'+
+   '<div class="enrich-candidates">'+group.map(entry).join("")+'</div></section>'
+ ).join("");
+ const titles=(Array.isArray(data?.searched_titles)?data.searched_titles:[]).map(e).join(" · ");
+ const page=Math.max(1,Math.min(3,Number(data?.pages_loaded||data?.page||1)));
+ const navigation='<div class="enrich-pagination"><p>'+
+  L("enrichQueries")+': '+titles+' · '+
+  L("enrichPagesLoaded")+': '+e(page)+' / '+e(data?.max_pages||3)+'</p>'+
+  (data?.has_more_pages?
+   '<button type="button" class="btn btn-small btn-soft" data-action="enrich-more">'+
+   L("enrichLoadMore")+' →</button>':'')+'</div>';
+ return stats+hints+(candidates.length?'<div class="enrich-formats">'+groups+'</div>':
+ '<div class="home-empty">'+L("enrichEmpty")+'</div>')+navigation;
 }

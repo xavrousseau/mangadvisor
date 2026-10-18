@@ -115,13 +115,16 @@ def parse_title_search_response(raw: bytes, *, limit: int = MAX_BIBLIOGRAPHY_RES
             "message":"Notices candidates par titre uniquement. Les ISBN doivent être vérifiés et associés manuellement à la série."}
 
 
-def search_bnf_by_title(query: str) -> dict[str,Any]:
+def search_bnf_by_title(query: str, *, start_record: int = 1) -> dict[str,Any]:
     cleaned=sanitize_title_query(query)
+    # Fixed 20-record BnF pages, at most three. Existing manual discovery stays at page 1.
+    if start_record not in (1, 21, 41):
+        raise ValueError("Page BnF non autorisée.")
     args=urllib.parse.urlencode({
         "version":"1.2","operation":"searchRetrieve",
         "query":f'bib.title all "{cleaned}"',
         "recordSchema":"dublincore",
-        "startRecord":1,
+        "startRecord":start_record,
         "maximumRecords":MAX_BIBLIOGRAPHY_RESULTS,
     })
     request=urllib.request.Request(BNF_SRU+"?"+args,headers={
@@ -131,7 +134,12 @@ def search_bnf_by_title(query: str) -> dict[str,Any]:
     try:
         with urllib.request.urlopen(request,timeout=9) as response:
             raw=response.read(MAX_RESPONSE_BYTES+1)
-        return parse_title_search_response(raw)
+        parsed=parse_title_search_response(raw)
+        if start_record != 1:
+            parsed["search_scope"]="requested_title_search_page"
+        parsed["bnf_start_record"]=start_record
+        parsed["bnf_page_size"]=MAX_BIBLIOGRAPHY_RESULTS
+        return parsed
     except (urllib.error.URLError, TimeoutError, OSError, ValueError, ET.ParseError) as exc:
         raise HTTPException(status_code=503,detail=
             "La recherche dans le catalogue BnF est momentanément indisponible ; aucune édition n'a été ajoutée.") from exc

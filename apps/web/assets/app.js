@@ -4,7 +4,7 @@ import { createIsbnScanner } from "./isbn-scanner.js";
 import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js";
 import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS} from "./advisor-view.js";
 import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
-import { enrichmentPanel, enrichmentResults, reconcileEnrichment } from "./enrichment-view.js";
+import { enrichmentPanel, enrichmentResults, reconcileEnrichment, mergeEnrichmentPages } from "./enrichment-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
@@ -26,7 +26,7 @@ const state = {
   advisorHistory:[],advisorContext:{},advisorSeen:[],advisorResponse:null,advisorBusy:false,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,biblioCandidates:null,biblioSearchNonce:0,
-  enrichmentReport:null,enrichmentNonce:0,
+  enrichmentReport:null,enrichmentNonce:0,enrichmentAlias:"",enrichmentBusy:false,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
 };
 let renderToken = 0, searchTimer = null;
@@ -407,7 +407,7 @@ async function renderDetail(token,id){
   if(token!==renderToken)return;
   state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.editionPreview=null;
   state.biblioCandidates=null;state.biblioSearchNonce++;
-  state.enrichmentReport=null;state.enrichmentNonce++;
+  state.enrichmentReport=null;state.enrichmentAlias="";state.enrichmentNonce++;
   const synopsis=translation?.text||manga.synopsis||"";
   const reallyTranslated=state.lang==="fr"&&Boolean(translation?.translated);
   const elements='<section class="detail-hero">'+
@@ -796,6 +796,8 @@ async function refreshFrenchCollection(){
    bibliographyPanel(escapeHtml,t,state.lang,manga.title)+
    enrichmentPanel(escapeHtml,t,state.lang);
   if(state.biblioCandidates)showBibliographyResults();
+  const aliasInput=document.querySelector("#enrich-alt-title");
+  if(aliasInput)aliasInput.value=state.enrichmentAlias;
   if(state.enrichmentReport)showEnrichmentResults();
  }catch(error){toast(error?.message||t(state.lang,"error"));}
 }
@@ -805,26 +807,50 @@ function showEnrichmentResults(){
   target.innerHTML=enrichmentResults(state.enrichmentReport,escapeHtml,t,state.lang);
  }
 }
-async function discoverFrenchEnrichment(button){
+async function discoverFrenchEnrichment(button,loadMore=false){
  const manga=state.currentDetail;
- if(!manga||routeInfo().view!=="detail")return;
+ if(!manga||routeInfo().view!=="detail"||state.enrichmentBusy)return;
+ const previous=state.enrichmentReport;
+ const page=loadMore?Number(previous?.pages_loaded||previous?.page||1)+1:1;
+ if(page>3||(loadMore&&!previous?.has_more_pages))return;
  const nonce=++state.enrichmentNonce;
  const target=document.querySelector("#fr-enrichment-results");
  if(!target)return;
- state.enrichmentReport=null;
+ if(!loadMore){
+  state.enrichmentAlias=String(document.querySelector("#enrich-alt-title")?.value||"").trim();
+  state.enrichmentReport=null;
+  target.innerHTML='<div class="info">'+L("enrichLoading")+'</div>';
+ }else{
+  target.insertAdjacentHTML("beforeend",'<p class="info" id="enrich-more-loading">'+L("enrichLoading")+'</p>');
+ }
+ state.enrichmentBusy=true;
  button.disabled=true;
- target.innerHTML='<div class="info">'+L("enrichLoading")+'</div>';
  try{
-  const data=await request("/collection/mangas/"+manga.id+"/enrichment");
+  const query=new URLSearchParams();
+  if(page>1)query.set("page",String(page));
+  if(state.enrichmentAlias)query.set("alternate_title",state.enrichmentAlias);
+  const suffix=query.toString()?"?"+query.toString():"";
+  const data=await request("/collection/mangas/"+manga.id+"/enrichment"+suffix);
   if(nonce!==state.enrichmentNonce||routeInfo().view!=="detail"||
     Number(routeInfo().id)!==Number(manga.id))return;
-  state.enrichmentReport=reconcileEnrichment(data,state.frenchCollection?.editions);
+  const combined=loadMore?mergeEnrichmentPages(previous,data):data;
+  state.enrichmentReport=reconcileEnrichment(combined,state.frenchCollection?.editions);
   showEnrichmentResults();
  }catch(error){
   if(nonce===state.enrichmentNonce){
-   target.innerHTML='<div class="message">'+e(error.message||t(state.lang,"enrichError"))+'</div>';
+   if(loadMore){
+    target.insertAdjacentHTML("beforeend",'<div class="message">'+
+      e(error.message||t(state.lang,"enrichError"))+'</div>');
+   }else{
+    target.innerHTML='<div class="message">'+
+      e(error.message||t(state.lang,"enrichError"))+'</div>';
+   }
   }
- }finally{if(button.isConnected)button.disabled=false;}
+ }finally{
+  state.enrichmentBusy=false;
+  document.querySelector("#enrich-more-loading")?.remove();
+  if(button.isConnected)button.disabled=false;
+ }
 }
 function showBibliographyResults(){
  const target=document.querySelector("#fr-bibliography-results");
@@ -1146,6 +1172,7 @@ root.addEventListener("click",async event=>{
  if(action==="biblio-verify-isbn"||action==="enrich-verify-isbn")
   return verifyBibliographyCandidate(button);
  if(action==="enrich-discover")return discoverFrenchEnrichment(button);
+ if(action==="enrich-more")return discoverFrenchEnrichment(button,true);
  if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
  if(action==="catalog-prev"||action==="catalog-next"){

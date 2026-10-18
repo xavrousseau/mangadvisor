@@ -296,35 +296,62 @@ def run():
                 **candidate_record,"isbn13":"9782871294146",
                 "title_fr":"Naruto. Tome 1","registration_status":"REGISTERED_HERE",
                 "registered_manga_id":1,"registered_edition_kind":"CLASSIC",
-                "registered_volume_number":1,"title_clue":"TITLE_WORDS_PRESENT"
+                "registered_volume_number":1,"title_clue":"TITLE_WORDS_PRESENT",
+                "edition_kind_suggested":"CLASSIC"
             },{
                 **candidate_record,"isbn13":"9781234567897",
                 "title_fr":"Naruto inconnu","registration_status":"REGISTERED_OTHER",
-                "registered_manga_id":2,"title_clue":"SOME_TITLE_WORDS"
+                "registered_manga_id":2,"title_clue":"SOME_TITLE_WORDS",
+                "edition_kind_suggested":"UNKNOWN"
             }]
             def enrichment_mock(route):
+                url=route.request.url
+                assert "alternate_title=Naruto+FR" in url,url
+                second="page=2" in url
+                if second:
+                    sample=[
+                        {**enriched[0],"edition_kind_suggested":"PERFECT"},
+                        {**candidate_record,"isbn13":"9781234567804",
+                         "title_fr":"Naruto Deluxe. Tome 2",
+                         "registration_status":"TO_VERIFY",
+                         "edition_kind_suggested":"DELUXE",
+                         "title_clue":"TITLE_WORDS_PRESENT"}
+                    ]
+                else:
+                    sample=enriched
                 route.fulfill(status=200,content_type="application/json",
                     body=json.dumps({
-                       "manga_id":1,"searched_titles":["Naruto"],
-                       "items":enriched,"count":3,
-                       "to_verify_count":1,"registered_here_count":1,
-                       "registered_other_count":1,
+                       "manga_id":1,"searched_titles":["Naruto","Naruto FR"],
+                       "items":sample,"count":len(sample),
+                       "page":2 if second else 1,"max_pages":3,
+                       "has_more_pages":not second,
+                       "to_verify_count":2 if second else 1,
+                       "registered_here_count":0 if second else 1,
+                       "registered_other_count":0 if second else 1,
                        "candidate_only":True,"exhaustive":False,
-                       "first_page_per_title_only":True,"writes_performed":False,
+                       "first_page_per_title_only":not second,"writes_performed":False,
                        "search_errors":[],
                     }))
-            page.route("**/api/collection/mangas/1/enrichment",enrichment_mock)
+            page.route("**/api/collection/mangas/1/enrichment*",enrichment_mock)
             expect(page.locator("#fr-enrichment")).to_be_visible()
+            page.locator("#enrich-alt-title").fill("Naruto FR")
             page.locator('[data-action="enrich-discover"]').click()
             expect(page.locator(".enrich-candidate")).to_have_count(3,timeout=30000)
             expect(page.locator('[data-action="enrich-verify-isbn"]')).to_have_count(1)
             expect(page.locator(".enrich-stats")).to_contain_text("Déjà lié ailleurs")
-            page.locator('[data-action="enrich-verify-isbn"]').click()
+            expect(page.locator('[data-action="enrich-more"]')).to_be_visible()
+            page.locator('[data-action="enrich-more"]').click()
+            expect(page.locator(".enrich-candidate")).to_have_count(4,timeout=30000)
+            expect(page.locator(".enrich-format-group")).to_have_count(4)
+            expect(page.locator(".enrich-pagination")).to_contain_text("2 / 3")
+            expect(page.locator('[data-action="enrich-more"]')).to_have_count(0)
+            expect(page.locator('[data-action="enrich-verify-isbn"]')).to_have_count(2)
+            page.locator('[data-action="enrich-verify-isbn"][data-isbn="9782344074282"]').click()
             expect(page.locator("#edition-preview .edition-preview")).to_be_visible(timeout=30000)
             expect(page.locator("#edition-number")).to_have_value("")
             expect(page.locator(".edition-item")).to_have_count(1)
             page.screenshot(path=str(OUTPUT / f"{device}-atelier-enrichissement-fr.png"),full_page=True)
-            page.unroute("**/api/collection/mangas/1/enrichment")
+            page.unroute("**/api/collection/mangas/1/enrichment*")
             page.unroute("**/api/collection/mangas/1/discover?*")
             page.unroute("**/api/collection/isbn/9782344074282")
             page.screenshot(path=str(OUTPUT / f"{device}-collection-fr.png"),full_page=True)

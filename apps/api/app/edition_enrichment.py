@@ -13,11 +13,12 @@ from typing import Any, Callable
 from fastapi import APIRouter, HTTPException
 
 from apps.api.app.edition_discovery import (
-    search_bnf_by_title, sanitize_title_query,
+    MAX_BIBLIOGRAPHY_RESULTS, search_bnf_by_title, sanitize_title_query,
 )
 
-MAX_SEARCH_TITLES = 2
+MAX_SEARCH_TITLES = 3  # Primary + English + one user-supplied French title.
 MAX_WORKSHOP_RESULTS = 30
+MAX_WORKSHOP_PAGES = 3
 STOPWORDS = {
     "le", "la", "les", "de", "des", "du", "un", "une", "et", "the",
     "a", "an", "of", "and", "edition", "editions", "version", "tome",
@@ -50,8 +51,13 @@ def title_clue(candidate: str, known_titles: list[str]) -> tuple[int, str]:
     return (0, "NO_TITLE_WORDS")
 
 
-def select_search_titles(manga: dict[str, Any]) -> list[str]:
-    """At most two distinct catalog titles; invalid unsafe CQL excluded."""
+def select_search_titles(
+    manga: dict[str, Any], alternate_title: str = ""
+) -> list[str]:
+    """Primary/English catalog titles plus one explicitly entered French alias.
+
+    Do not persist the user-supplied alias or assume it is a verified title.
+    """
     options: list[str] = []
     for key in ("title", "title_english"):
         value = manga.get(key)
@@ -63,8 +69,12 @@ def select_search_titles(manga: dict[str, Any]) -> list[str]:
             continue
         if valid.casefold() not in {x.casefold() for x in options}:
             options.append(valid)
-        if len(options) == MAX_SEARCH_TITLES:
+        if len(options) == MAX_SEARCH_TITLES - 1:
             break
+    if alternate_title:
+        alias = sanitize_title_query(alternate_title)
+        if alias.casefold() not in {value.casefold() for value in options}:
+            options.append(alias)
     return options
 
 
@@ -74,6 +84,7 @@ def build_workshop(
     results: list[dict[str, Any]],
     registrations: dict[str, dict[str, Any]],
     errors: list[str],
+    *, page: int = 1,
 ) -> dict[str, Any]:
     """Dedupe ISBNs, attach true registration state, no fictional volumes."""
     titles = list(searched_titles)
@@ -111,6 +122,13 @@ def build_workshop(
         ),
     )
     selected = ordered[:MAX_WORKSHOP_RESULTS]
+    page_end = page * MAX_BIBLIOGRAPHY_RESULTS
+    has_more = page < MAX_WORKSHOP_PAGES and any(
+        (r.get("bnf_reported_records") is not None
+         and r["bnf_reported_records"] > page_end)
+        or (r.get("bnf_reported_records") is None and bool(r.get("items")))
+        for r in results
+    )
     return {
         "manga_id": manga_id,
         "searched_titles": titles,
@@ -121,7 +139,11 @@ def build_workshop(
         "registered_other_count": sum(i["registration_status"] == "REGISTERED_OTHER" for i in selected),
         "truncated": len(ordered) > MAX_WORKSHOP_RESULTS,
         "search_errors": errors,
-        "first_page_per_title_only": True,
+        "page": page,
+        "page_size_bnf_records": MAX_BIBLIOGRAPHY_RESULTS,
+        "max_pages": MAX_WORKSHOP_PAGES,
+        "has_more_pages": has_more,
+        "first_page_per_title_only": page == 1,
         "exhaustive": False,
         "candidate_only": True,
         "match_verified": False,
@@ -134,7 +156,18 @@ def create_enrichment_router(connection_factory: Callable[..., Any]) -> APIRoute
     router = APIRouter(prefix="/collection", tags=["Atelier d'enrichissement français"])
 
     @router.get("/mangas/{manga_id}/enrichment")
-    def enrich_manga(manga_id: int) -> dict[str, Any]:
+    def enrich_manga(
+        manga_id: int, page: int = 1, alternate_title: str = ""
+    ) -> dict[str, Any]:
+        if page not in (1, 2, 3):
+            raise HTTPException(status_code=422, detail="Pages autorisées : 1 à 3.")
+        if len(alternate_title) > 90:
+            raise HTTPException(status_code=422, detail="Titre français trop long.")
+        if alternate_title:
+            try:
+                alternate_title = sanitize_title_query(alternate_title)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
         with connection_factory() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -145,7 +178,7 @@ def create_enrichment_router(connection_factory: Callable[..., Any]) -> APIRoute
         if not manga:
             raise HTTPException(status_code=404, detail="Série introuvable.")
 
-        titles = select_search_titles(manga)
+        titles = select_search_titles(manga, alternate_title)
         if not titles:
             raise HTTPException(
                 status_code=422,
@@ -156,7 +189,12 @@ def create_enrichment_router(connection_factory: Callable[..., Any]) -> APIRoute
         errors = []
         for title in titles:
             try:
-                results.append(search_bnf_by_title(title))
+                if page == 1:
+                    results.append(search_bnf_by_title(title))
+                else:
+                    results.append(search_bnf_by_title(
+                        title, start_record=(page - 1) * MAX_BIBLIOGRAPHY_RESULTS + 1
+                    ))
             except HTTPException as exc:
                 if exc.status_code == 503:
                     errors.append(title)
@@ -183,6 +221,8 @@ def create_enrichment_router(connection_factory: Callable[..., Any]) -> APIRoute
                         {"isbns": sorted(candidates)},
                     )
                     registrations = {r["isbn13"]: r for r in cur.fetchall()}
-        return build_workshop(manga_id, titles, results, registrations, errors)
+        return build_workshop(
+            manga_id, titles, results, registrations, errors, page=page
+        )
 
     return router
