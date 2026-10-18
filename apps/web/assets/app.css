@@ -549,3 +549,26 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .fr-notice-line{grid-template-columns:1fr;gap:3px}
  .edition-group-head h3{font-size:17px}
 }
+
+
+/* Mangadvisor 1.2 — progression fiable des livres connus par édition. */
+.edition-progress{
+ background:var(--surface2);border:1px solid var(--border);
+ border-radius:11px;padding:13px 15px;margin:12px 0 17px
+}
+.edition-progress-line+.edition-progress-line{margin-top:13px}
+.edition-progress-label{display:flex;align-items:baseline;justify-content:space-between;
+ gap:8px;font-size:12px;margin-bottom:8px}
+.edition-progress-label span{color:var(--muted)}
+.edition-progress-label strong{color:var(--text);font-size:12px}
+.edition-progress-track{height:8px;background:var(--border);
+ overflow:hidden;border-radius:8px}
+.edition-progress-fill{height:100%;display:block;border-radius:8px;transition:width .22s ease}
+.edition-progress-fill.owned{background:var(--accent)}
+.edition-progress-fill.read{background:var(--text);opacity:.65}
+.edition-progress-disclaimer{color:var(--muted);font-size:11px;
+ line-height:1.55;margin:12px 0 0}
+@media(max-width:740px){
+ .edition-progress{padding:11px}
+ .edition-progress-label{flex-wrap:wrap}
+}
