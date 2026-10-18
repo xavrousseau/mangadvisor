@@ -10,9 +10,13 @@ export function csvPreviewMarkup(data, text, escape) {
     ? e(row.title_fr)+" · "+e(row.edition_kind)+" · "+L("collectionTome")+" "+e(row.volume_number)
     : L("bulkUnknown");
   const labels=[row.is_owned?L("collectionOwned"):"",row.is_read?L("collectionRead"):""].filter(Boolean).join(" · ")||L("bulkNoChange");
+  const resolveButton = !matched && /^\d{13}$/.test(String(row.isbn13)) ?
+    '<button type="button" class="btn btn-small btn-soft resolve-start" data-action="resolve-unknown" ' +
+    'data-isbn="' + e(row.isbn13) + '">' + L("resolveAction") + ' →</button>' : '';
   return '<tr><td><span class="bulk-status '+(matched?'matched':'pending')+'">'+
    (matched?'✓ '+L("bulkKnown"):'! '+L("bulkUnknown"))+'</span></td>'+
-   '<td class="bulk-isbn">'+e(row.isbn13)+'</td><td>'+description+'</td><td>'+labels+'</td></tr>';
+   '<td class="bulk-isbn">'+e(row.isbn13)+'</td><td>'+description+'</td><td>'+labels+
+   (resolveButton ? '<div class="resolve-row-action">'+resolveButton+'</div>' : '')+'</td></tr>';
  }).join("");
  const warnings=errors.length
    ?'<details class="bulk-errors"><summary>'+L("bulkInvalid")+' ('+e(errors.length)+')</summary><ul>'+
