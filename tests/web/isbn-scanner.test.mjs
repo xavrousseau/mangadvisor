@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
 const src=readFileSync("apps/web/assets/isbn-scanner.js","utf8");
-const {normalizeScannerIsbn,scanCanSave,scannerMarkup,SCAN_KINDS}=
+const {normalizeScannerIsbn,scanCanSave,scannerMarkup,SCAN_KINDS,scanSessionTotals,scanSessionEntry,scanOutcome}=
  await import("data:text/javascript;charset=utf-8,"+encodeURIComponent(src));
 const escape=value=>String(value??"").replace(/[&<>"']/g,c=>({
  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -72,4 +72,50 @@ test("successful scan offers next book and remembers session count",()=>{
  assert.match(html,/data-action="scan-close"/);
  assert.match(html,/3 volume\(s\) processed/);
  assert.doesNotMatch(html,/data-action="scan-confirm"/);
+});
+
+
+test("session totals distinguish new, updated, duplicate and unresolved ISBNs",()=>{
+ let entries=[];
+ entries=scanSessionEntry(entries,{isbn:"9782871294146",title:"Naruto 1",status:"unresolved"});
+ entries=scanSessionEntry(entries,{isbn:"9782871294146",title:"Naruto 1",status:"created"});
+ entries=scanSessionEntry(entries,{isbn:"9782344074282",title:"Monster",status:"duplicate"});
+ entries=scanSessionEntry(entries,{isbn:"9782368526156",title:"New book",status:"updated"});
+ assert.equal(entries.length,3);
+ assert.deepEqual(scanSessionTotals(entries),{created:1,updated:1,duplicate:1,unresolved:0});
+ const different=scanSessionEntry(entries,{isbn:"9791000000000",status:"unresolved"});
+ assert.equal(scanSessionTotals(different).unresolved,1);
+});
+
+test("a known scan is only an update if a positive status changes",()=>{
+ assert.equal(scanOutcome({status:"created"},null),"created");
+ assert.equal(scanOutcome({status:"updated",edition:{is_owned:true,is_read:false}},
+  {is_owned:false,is_read:false}),"updated");
+ assert.equal(scanOutcome({status:"updated",edition:{is_owned:true,is_read:true}},
+  {is_owned:true,is_read:true}),"duplicate");
+ assert.equal(scanOutcome({status:"updated",edition:{is_owned:true,is_read:true}},
+  {is_owned:true,is_read:false}),"updated");
+});
+
+test("session report is escaped, lists unresolved ISBNs and offers retry",()=>{
+ const badTitle='<svg onload=evil()>';
+ const rows=[
+  {isbn:"9782871294146",status:"created",title:"Naruto 1"},
+  {isbn:"9782344074282",status:"unresolved",title:badTitle}
+ ];
+ const html=scannerMarkup("fr",escape,{phase:"summary",isbn:"",camera:false,message:""},1,rows);
+ assert.match(html,/Bilan de session/);
+ assert.match(html,/Tomes ajoutés/);
+ assert.match(html,/À vérifier/);
+ assert.match(html,/data-action="scan-retry"/);
+ assert.match(html,/data-action="scan-resume"/);
+ assert.doesNotMatch(html,/<svg onload/);
+ assert.match(html,/&lt;svg onload/);
+});
+
+test("previously selected series is shown as a suggestion, not an automatic confirmation",()=>{
+ const html=scannerMarkup("fr",escape,{...draft,previousSeries:true,ack:false},2);
+ assert.match(html,/Série conservée du tome précédent/);
+ assert.match(html,/data-action="scan-confirm" disabled/);
+ assert.match(html,/id="scan-ack"/);
 });

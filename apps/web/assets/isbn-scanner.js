@@ -30,6 +30,11 @@ const I18N = {
   kindUNKNOWN:"À préciser",kindCLASSIC:"Classique",kindDELUXE:"Deluxe",
   kindPERFECT:"Perfect",kindCOLLECTOR:"Collector",kindINTEGRAL:"Intégrale",kindOTHER:"Autre",
   empty:"Choisis Possédé, Lu ou les deux.", cameraReady:"Caméra active — lecture EAN-13",
+  report:"Bilan de session", created:"Tomes ajoutés",updated:"Statuts complétés",duplicate:"Déjà enregistrés",
+  unresolved:"À vérifier",resume:"Reprendre",noScan:"Aucun ISBN traité pour le moment.",
+  retry:"Réessayer",skip:"Passer au suivant",suggested:"Série conservée du tome précédent : contrôle-la avant confirmation.",
+  sessionHelp:"Bilan de cette session seulement. Les ISBN non résolus n'ont pas été ajoutés.",
+  reportView:"Voir le bilan",
  },
  en: {
   title:"Scan my volumes",intro:"One barcode, a verified record, your confirmation. Nothing is added automatically.",
@@ -56,6 +61,11 @@ const I18N = {
   kindUNKNOWN:"Unspecified",kindCLASSIC:"Standard",kindDELUXE:"Deluxe",
   kindPERFECT:"Perfect",kindCOLLECTOR:"Collector",kindINTEGRAL:"Omnibus",kindOTHER:"Other",
   empty:"Choose Owned, Read or both.",cameraReady:"Camera active — reading EAN-13",
+  report:"Session summary",created:"Books added",updated:"Statuses completed",duplicate:"Already registered",
+  unresolved:"Needs review",resume:"Resume",noScan:"No ISBN scanned yet.",
+  retry:"Retry",skip:"Skip to next",suggested:"Series carried over from previous volume: check before confirming.",
+  sessionHelp:"Only this session. Unresolved ISBNs have not been saved.",
+  reportView:"View summary",
  }
 };
 const msg=(lang,key)=>I18N[lang==="en"?"en":"fr"][key]||key;
@@ -77,8 +87,23 @@ export function scanCanSave(draft){
   String(draft.volume).trim()!=="" && draft.ack);
 }
 
-export function scannerMarkup(lang,escape,draft,count=0){
+export function scanSessionTotals(events=[]){
+ return events.reduce((total,event)=>{
+  if(["created","updated","duplicate","unresolved"].includes(event.status))total[event.status]++;
+  return total;
+ },{created:0,updated:0,duplicate:0,unresolved:0});
+}
+export function scanSessionEntry(events,entry){
+ return [...events.filter(event=>event.isbn!==entry.isbn),entry];
+}
+export function scanOutcome(result,previous){
+ if(result?.status==="created")return "created";
+ const edition=result?.edition||{};
+ return (edition.is_owned&&!previous?.is_owned)||(edition.is_read&&!previous?.is_read)?"updated":"duplicate";
+}
+export function scannerMarkup(lang,escape,draft,count=0,session=[]){
  const e=value=>escape(String(value??"")),L=key=>e(msg(lang,key));
+ const totals=scanSessionTotals(session);
  const hasBook=draft.phase==="known"||draft.phase==="unknown";
  const book=draft.phase==="known"?draft.registered?.edition:draft.record;
  const known=draft.phase==="known",unknown=draft.phase==="unknown";
@@ -104,6 +129,7 @@ export function scannerMarkup(lang,escape,draft,count=0){
     (book.is_owned?'<p class="scan-duplicate">✓ '+L("already")+'</p>':"")+'</div>';
   }else{
    detail+='<div class="scan-associate"><p class="scan-hint">'+L("choose")+'</p>'+
+    (draft.previousSeries?'<p class="scan-hint">ⓘ '+L("suggested")+'</p>':"")+
     (draft.selected?'<p class="scan-selected"><strong>'+L("series")+' :</strong> '+e(draft.selected.title)+
       ' <button type="button" class="btn-link" data-action="scan-unselect">'+L("search")+'</button></p>':
       '<form id="scan-series-form" class="scan-inline-form">'+
@@ -134,12 +160,25 @@ export function scannerMarkup(lang,escape,draft,count=0){
    '<h3>'+L("success")+'</h3><p>'+e(draft.savedTitle||draft.isbn)+'</p>'+
    '<p class="scan-hint">'+L("preserved")+'</p><div class="actions">'+
    '<button class="btn btn-primary" data-action="scan-next">'+L("next")+'</button>'+
+   '<button class="btn btn-soft" data-action="scan-summary">'+L("reportView")+'</button>'+
+   '<button class="btn btn-soft" data-action="scan-close">'+L("done")+'</button></div></div>';
+ }
+ if(draft.phase==="summary"){
+  detail='<div class="scan-report"><h3>'+L("report")+'</h3><p class="scan-hint">'+L("sessionHelp")+'</p>'+
+   '<div class="scan-report-grid">'+["created","updated","duplicate","unresolved"].map(key=>
+    '<div class="scan-report-stat"><strong>'+e(totals[key])+'</strong><span>'+L(key)+'</span></div>').join("")+'</div>'+
+   (session.length?'<div class="scan-report-list">'+session.slice(-80).map(row=>
+    '<div class="scan-report-row"><span class="scan-report-badge">'+L(row.status)+'</span>'+
+    '<strong>'+e(row.title||row.isbn)+'</strong><small>'+e(row.isbn)+'</small>'+
+    (row.status==="unresolved"?'<button class="btn-link" data-action="scan-retry" data-isbn="'+e(row.isbn)+'">'+L("retry")+'</button>':"")+
+    '</div>').join("")+'</div>':'<p class="scan-hint">'+L("noScan")+'</p>')+
+   '<div class="actions"><button class="btn btn-primary" data-action="scan-resume">'+L("resume")+'</button>'+
    '<button class="btn btn-soft" data-action="scan-close">'+L("done")+'</button></div></div>';
  }
  return '<div class="scan-overlay" id="scan-overlay"><section id="scan-dialog" class="scan-dialog" role="dialog" aria-modal="true" aria-labelledby="scan-title">'+
   '<header class="scan-heading"><div><div class="eyebrow">MANGADVISOR · ISBN</div><h2 id="scan-title">'+L("title")+'</h2>'+
   '<p>'+L("intro")+'</p></div><button type="button" class="scan-x" data-action="scan-close" aria-label="'+L("close")+'">×</button></header>'+
-  (draft.phase==="saved"?detail:
+  (draft.phase==="saved"||draft.phase==="summary"?detail:
    '<div class="scan-body"><form class="scan-inline-form" id="scan-isbn-form">'+
    '<label for="scan-isbn-input">'+L("manual")+'</label><div class="actions">'+
    '<input class="input" id="scan-isbn-input" name="isbn" maxlength="18" autocomplete="off" inputmode="numeric" placeholder="978..." value="'+e(draft.isbn||"")+'">'+
@@ -147,12 +186,16 @@ export function scannerMarkup(lang,escape,draft,count=0){
    cameraButtons+camera+
    (draft.phase==="loading"?'<div class="info">'+L("checking")+'</div>':"")+
    (draft.message?'<p class="scan-error" role="alert">'+e(draft.message)+'</p>':"")+
-   detail+'</div>')+
-  '<footer class="scan-footer">'+e(count)+' '+L("more")+'</footer></section></div>';
+   detail+'<div class="scan-footer-tools"><button type="button" class="btn-link" data-action="scan-summary">'+L("reportView")+'</button>'+
+   (draft.phase==="idle"&&draft.message&&draft.isbn?'<button class="btn btn-small" data-action="scan-skip">'+L("skip")+'</button>':"")+
+   '</div></div>')+
+  '<footer class="scan-footer">'+e(count)+' '+L("more")+' · '+
+   e(totals.created)+' '+L("created")+' · '+e(totals.unresolved)+' '+L("unresolved")+'</footer></section></div>';
 }
 
 export function createIsbnScanner({root,request,lang,escape,onSaved}){
  let draft=null,stream=null,frame=0,epoch=0,detector=null,lastDetect=0,busy=false,handled=0,returnFocus=null;
+ let session=[],lastSeries=null,preferCamera=false;
  const isOpen=()=>Boolean(draft&&root.querySelector("#scan-overlay"));
  const t=key=>msg(lang(),key);
  function stopCamera(){
@@ -166,15 +209,15 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
  function paint(){
   if(!draft)return;
   const existing=root.querySelector("#scan-overlay");
-  if(existing)existing.outerHTML=scannerMarkup(lang(),escape,draft,handled);
-  else root.insertAdjacentHTML("beforeend",scannerMarkup(lang(),escape,draft,handled));
+  if(existing)existing.outerHTML=scannerMarkup(lang(),escape,draft,handled,session);
+  else root.insertAdjacentHTML("beforeend",scannerMarkup(lang(),escape,draft,handled,session));
  }
  function close(){
   epoch++;stopCamera();draft=null;root.querySelector("#scan-overlay")?.remove();
   if(returnFocus?.isConnected)returnFocus.focus();returnFocus=null;
  }
  function open(selectedManga=null){
-  close();returnFocus=document.activeElement;handled=0;
+  close();returnFocus=document.activeElement;handled=0;session=[];lastSeries=null;preferCamera=false;
   draft={phase:"idle",isbn:"",record:null,registered:null,matches:[],selected:selectedManga?.id?
    {id:selectedManga.id,title:selectedManga.title}:null,query:"",searched:false,
    kind:"UNKNOWN",volume:"",owned:true,read:false,ack:false,camera:false,message:""};
@@ -186,11 +229,11 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
  }
  function reset(next=false){
   if(!draft)return;
-  const selected=next?null:draft.selected;
+  const selected=next?lastSeries:draft.selected;
   stopCamera();epoch++;
   draft={phase:"idle",isbn:"",record:null,registered:null,matches:[],selected,
    query:"",searched:false,kind:"UNKNOWN",volume:"",owned:true,read:false,ack:false,
-   camera:false,message:""};
+   camera:false,message:"",previousSeries:next&&Boolean(selected)};
   paint();root.querySelector("#scan-isbn-input")?.focus();
  }
  async function lookup(raw){
@@ -217,6 +260,7 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
    paint();
   }catch(err){
    if(current!==epoch||!isOpen())return;
+   session=scanSessionEntry(session,{isbn,title:isbn,status:"unresolved",error:err.message||t("noBnf")});
    draft={...draft,phase:"idle",message:err.message||t("noBnf")};
    paint();
   }
@@ -236,7 +280,7 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
     audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}
    });
    if(current!==epoch||!isOpen()){cameraStream.getTracks().forEach(track=>track.stop());return;}
-   stream=cameraStream;draft.camera=true;draft.message="";paint();
+   stream=cameraStream;draft.camera=true;preferCamera=true;draft.message="";paint();
    const video=root.querySelector("#scan-video");
    video.srcObject=stream;
    await video.play();
@@ -300,7 +344,11 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
    const result=await request("/collection/scan/confirm",{method:"POST",data:payload});
    if(current!==epoch||!isOpen())return;
    const title=result.edition?.title_fr||draft.isbn;
-   handled++;
+   const status=scanOutcome(result,draft.registered?.edition);
+   session=scanSessionEntry(session,{isbn:draft.isbn,title,status});
+   if(draft.phase==="unknown")lastSeries=draft.selected?{...draft.selected}:null;
+   else if(result.edition?.manga_id)lastSeries={id:result.edition.manga_id,title:result.edition.manga_title};
+   handled=session.filter(row=>row.status!=="unresolved").length;
    stopCamera();draft={...draft,phase:"saved",savedTitle:title,message:""};paint();
    await onSaved(result);
   }catch(err){if(current===epoch&&isOpen()){button.disabled=false;message(err.message||t("noBnf"));}}
@@ -310,7 +358,16 @@ export function createIsbnScanner({root,request,lang,escape,onSaved}){
   if(!draft)return;
   if(action==="scan-start"){await startCamera();return;}
   if(action==="scan-stop"){stopCamera();paint();return;}
-  if(action==="scan-next"){reset(true);return;}
+  if(action==="scan-summary"){stopCamera();draft={...draft,phase:"summary"};paint();return;}
+  if(action==="scan-resume"){reset(false);return;}
+  if(action==="scan-next"||action==="scan-skip"){
+   reset(true);if(preferCamera)await startCamera();return;
+  }
+  if(action==="scan-retry"){
+   const isbn=normalizeScannerIsbn(button.dataset.isbn);
+   if(isbn){reset(false);await lookup(isbn);}
+   return;
+  }
   if(action==="scan-unselect"){capture();draft.selected=null;draft.matches=[];draft.searched=false;paint();return;}
   if(action==="scan-select"&&draft.phase==="unknown"){
    capture();const manga=draft.matches.find(m=>Number(m.id)===Number(button.dataset.id));

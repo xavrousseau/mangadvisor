@@ -28,6 +28,8 @@ echo.
 echo   Pipeline
 echo   --------
 echo   12 - Run Jikan Pipeline
+echo   13 - Activer le scanner mobile HTTPS
+echo   14 - Arreter le scanner mobile HTTPS
 echo.
 echo   Q  - Quitter
 echo.
@@ -55,6 +57,9 @@ if /I "%CHOICE%"=="8"  start "Mangadvisor - Down"         cmd /k call "%ROOT_DIR
 if /I "%CHOICE%"=="9"  start "Mangadvisor - Restart"      cmd /k call "%ROOT_DIR%cmd\restart.cmd" & goto menu
 if /I "%CHOICE%"=="10" start "Mangadvisor - Clean"        cmd /k call "%ROOT_DIR%cmd\clean.cmd" & goto menu
 if /I "%CHOICE%"=="11" start "Mangadvisor - Nuke"         cmd /k call "%ROOT_DIR%cmd\nuke.cmd" & goto menu
+
+if /I "%CHOICE%"=="13" start "Mangadvisor - Mobile HTTPS" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" & goto menu
+if /I "%CHOICE%"=="14" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto menu
 
 if /I "%CHOICE%"=="12" goto jikan_menu
 
@@ -152,6 +157,9 @@ if /I "%~1"=="restart" start "Mangadvisor - Restart"      cmd /k call "%ROOT_DIR
 if /I "%~1"=="clean"   start "Mangadvisor - Clean"        cmd /k call "%ROOT_DIR%cmd\clean.cmd" & goto :eof
 if /I "%~1"=="nuke"    start "Mangadvisor - Nuke"         cmd /k call "%ROOT_DIR%cmd\nuke.cmd" & goto :eof
 
+if /I "%~1"=="mobile" start "Mangadvisor - Mobile HTTPS" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" & goto :eof
+if /I "%~1"=="mobile-stop" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto :eof
+
 if /I "%~1"=="jikan"       start "Mangadvisor - Jikan Pipeline" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" & goto :eof
 if /I "%~1"=="jikan-reset" start "Mangadvisor - Jikan Reset"    cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" --reset-db --start-page 1 --end-page 3 --limit 10 & goto :eof
 
@@ -177,6 +185,7 @@ echo.
 echo Commandes disponibles :
 echo   check ^| build ^| up ^| start ^| status ^| logs ^| stop ^| down ^| restart ^| clean ^| nuke
 echo   jikan ^| jikan-reset ^| jikan-pages START END LIMIT
+echo   mobile ^| mobile-stop
 exit /b 1
 
 endlocal

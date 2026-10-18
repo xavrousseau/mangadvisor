@@ -684,3 +684,29 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .scan-footer{padding:13px 18px}
  .headline-row{align-items:flex-start}
 }
+
+
+/* Mobile scanning session: discreet counters and a readable review list. */
+.scan-footer-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:15px;flex-wrap:wrap}
+.scan-report{padding:25px 27px 30px}
+.scan-report h3{font-size:25px;margin:0 0 6px}
+.scan-report-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:20px 0}
+.scan-report-stat{background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+ padding:16px 9px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.scan-report-stat strong{font:900 29px/1.15 'Outfit',sans-serif;color:var(--accent)}
+.scan-report-stat span{font-size:10px;color:var(--muted);line-height:1.35}
+.scan-report-list{display:grid;gap:8px;max-height:330px;overflow-y:auto;margin:20px 0}
+.scan-report-row{display:grid;grid-template-columns:minmax(108px,auto) minmax(0,1fr) auto;gap:8px 12px;align-items:center;
+ padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)}
+.scan-report-badge{font-size:10px;font-weight:800;color:var(--accent)}
+.scan-report-row strong{font-size:12px;overflow-wrap:anywhere}
+.scan-report-row small{font-size:10px;color:var(--muted);font-family:monospace}
+.scan-report-row .btn-link{grid-column:2/-1;justify-self:start}
+.scan-report>.actions{margin-top:16px}
+@media(max-width:740px){
+ .scan-report{padding:20px 18px 28px}
+ .scan-report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .scan-report-row{grid-template-columns:1fr auto}
+ .scan-report-row .scan-report-badge{grid-column:1/-1}
+ .scan-report-row strong{grid-column:1/-1}
+}
