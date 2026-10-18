@@ -604,3 +604,83 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .biblio-candidate .btn{align-self:flex-start}
  .bibliography-panel input{min-width:0;width:100%}
 }
+
+
+/* ISBN quick-add — responsive and theme-aware, with a dedicated scan target. */
+.scan-overlay{position:fixed;inset:0;z-index:1000;background:rgba(3,7,13,.84);
+ backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:20px}
+.scan-dialog{width:min(100%,670px);max-height:min(94vh,900px);overflow:auto;overscroll-behavior:contain;
+ background:var(--surface);color:var(--text);border:1px solid var(--border);
+ border-radius:22px;box-shadow:0 24px 100px rgba(0,0,0,.6)}
+.scan-heading{display:flex;justify-content:space-between;gap:24px;padding:23px 27px 18px;
+ border-bottom:1px solid var(--border)}
+.scan-heading h2{font-size:27px;margin:3px 0 8px}
+.scan-heading p{font-size:12px;color:var(--muted);line-height:1.6;margin:0}
+.scan-x{flex:none;width:38px;height:38px;border-radius:11px;background:var(--surface2);
+ color:var(--text);border:1px solid var(--border);font-size:24px;line-height:1}
+.scan-x:hover{border-color:var(--accent)}
+.scan-body{padding:23px 27px 28px}
+.scan-inline-form{display:grid;gap:8px;margin-bottom:12px}
+.scan-inline-form>label{font-size:12px;font-weight:800;color:var(--muted)}
+.scan-inline-form .actions{display:flex;align-items:stretch}
+.scan-inline-form .input{flex:1;min-width:0}
+.scan-inline-form .btn{flex:none}
+.scan-tools{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.scan-camera{display:none;position:relative;background:#090e16;border:1px solid var(--border);
+ border-radius:15px;min-height:230px;overflow:hidden;margin-bottom:17px}
+.scan-camera.is-active{display:flex;align-items:center;justify-content:center}
+.scan-camera video{height:270px;width:100%;object-fit:cover;display:block}
+.scan-camera p{position:absolute;bottom:12px;left:12px;right:12px;z-index:2;color:white;
+ text-align:center;font-size:12px;margin:0;text-shadow:0 2px 7px #000}
+.scan-target{position:absolute;pointer-events:none;z-index:1;top:24%;left:12%;
+ width:76%;height:42%;border:3px solid var(--accent);border-radius:14px;box-shadow:0 0 0 900px rgba(0,0,0,.12)}
+.scan-target::after{content:'';position:absolute;top:50%;height:2px;width:84%;left:8%;
+ background:var(--accent);box-shadow:0 0 15px var(--accent)}
+.scan-error{background:rgba(255,102,102,.08);border:1px solid var(--error);
+ color:var(--text);border-radius:10px;padding:11px 13px;font-size:12px;line-height:1.6}
+.scan-status{color:var(--accent);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}
+.scan-status.is-known{color:var(--muted)}
+.scan-book{padding:17px 19px;border:1px solid var(--border);background:var(--surface2);border-radius:15px;margin:14px 0}
+.scan-book-isbn{font-family:monospace;font-size:12px;letter-spacing:.03em;color:var(--muted);margin:9px 0}
+.scan-book h3{font-size:22px;margin:0 0 6px;overflow-wrap:anywhere}
+.scan-book p{font-size:12px;color:var(--muted);line-height:1.6}
+.scan-book a{color:var(--accent);font-size:12px;font-weight:800}
+.scan-known,.scan-associate{border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:15px 0}
+.scan-known p{line-height:1.6;margin-bottom:0;font-size:13px}
+.scan-duplicate{color:var(--accent)}
+.scan-hint{color:var(--muted);font-size:11px;line-height:1.7;margin:10px 0}
+.scan-selected{padding:12px;border-radius:10px;background:var(--accent-tint);font-size:13px;line-height:1.5}
+.scan-match{display:flex;align-items:center;justify-content:space-between;gap:15px;text-align:left;
+ padding:11px 13px;background:var(--surface2);border:1px solid var(--border);
+ border-radius:9px;color:var(--text);width:100%;font-size:12px}
+.scan-match span{color:var(--accent);white-space:nowrap}
+.scan-matches{display:grid;gap:7px;margin:14px 0}
+.scan-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:17px 0}
+.scan-fields .field{min-width:0}
+.scan-ack{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);
+ border-radius:10px;font-size:12px;line-height:1.5}
+.scan-confirm{display:grid;gap:12px;padding-top:8px}
+.scan-confirm strong{font-size:13px}
+.scan-toggles{display:flex;gap:20px;flex-wrap:wrap}
+.scan-confirm>.btn{justify-self:start}
+.scan-success{padding:48px 28px;text-align:center}
+.scan-success-icon{width:64px;height:64px;margin:0 auto 20px;border-radius:50%;
+ background:var(--accent-tint);display:grid;place-items:center;color:var(--accent);font-size:37px}
+.scan-success h3{font-size:27px;margin-bottom:8px}
+.scan-success>p{color:var(--muted);overflow-wrap:anywhere}
+.scan-success .actions{justify-content:center;margin-top:21px}
+.scan-footer{padding:14px 27px;border-top:1px solid var(--border);color:var(--soft);
+ font-size:11px;text-align:right}
+@media(max-width:740px){
+ .scan-overlay{align-items:stretch;padding:0}
+ .scan-dialog{border-radius:0;max-height:100dvh;width:100%;height:100dvh}
+ .scan-heading{padding:17px 18px}
+ .scan-heading h2{font-size:23px}
+ .scan-body{padding:19px 18px 32px}
+ .scan-fields{grid-template-columns:1fr}
+ .scan-inline-form .actions{flex-direction:column}
+ .scan-inline-form .btn{width:100%}
+ .scan-camera video{height:240px}
+ .scan-footer{padding:13px 18px}
+ .headline-row{align-items:flex-start}
+}
