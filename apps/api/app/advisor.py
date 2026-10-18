@@ -165,6 +165,35 @@ def score_candidates(
     selected.sort(key=lambda row:row[:4],reverse=True)
     return [row[4] for row in selected[:limit]]
 
+def describe_context(context:AdvisorContext,lang:str)->str:
+    """Reveal interpreted constraints, not invisible assumptions."""
+    fr=lang=="fr"
+    labels={
+        "DARK":("sombre","dark"),"COMFORT":("douceur","cozy"),
+        "ACTION":("action","action"),"MYSTERY":("mystère","mystery"),
+        "ROMANCE":("romance","romance"),"FANTASY":("fantastique","fantasy"),
+    }
+    parts=[labels[mood][0 if fr else 1]
+           for mood in (context.mood,context.secondary_mood) if mood]
+    if context.length=="SHORT":
+        parts.append("12 tomes maximum" if fr else "up to 12 volumes")
+    elif context.length=="LONG":
+        parts.append("13 tomes et plus" if fr else "13+ volumes")
+    if context.only_finished is True:
+        parts.append("série terminée" if fr else "finished series")
+    elif context.only_finished is False:
+        parts.append("série en cours de publication" if fr else "currently publishing")
+    if context.french=="REQUIRE":
+        parts.append("ISBN français enregistré obligatoire" if fr else "recorded French ISBN required")
+    elif context.french=="PREFER":
+        parts.append("ISBN français enregistré souhaité" if fr else "recorded French ISBN preferred")
+    if context.avoid_romance:
+        parts.append("sans romance documentée" if fr else "without tagged romance")
+    parts.append(("tes goûts" if fr else "your tastes") if context.use_library
+                 else ("sans personnalisation" if fr else "no personalization"))
+    return " · ".join(parts)
+
+
 def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->APIRouter:
     @router.post("/message")
     def ask_advisor(payload:AdvisorRequest)->dict[str,Any]:
@@ -267,20 +296,22 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                         preferences[row["kind"]].add(row["tag"])
         chosen=score_candidates(candidates,context,preferences,payload.limit)
         personalized=context.use_library and any(preferences.values())
+        interpretation=describe_context(context,payload.lang)
+        data["interpreted_criteria"]=interpretation
         data.update(
             status="results" if chosen else "empty",
             recommendations=chosen,count=len(chosen),
             personalized=personalized,
             reply=(
-                ("Voici des pistes appuyées sur les genres et thèmes du catalogue. "
+                ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres et thèmes du catalogue. "
                  "Les ISBN français ne prouvent pas la disponibilité en magasin."
                  if is_fr else
-                 "These picks are grounded in cataloged genres and themes. "
+                 "I understood: "+interpretation+". These picks are grounded in cataloged genres and themes. "
                  "Recorded French ISBNs do not confirm store availability.")
                 if chosen else
-                ("Aucun titre vérifiable ne réunit ces critères. Essaie d'assouplir la longueur, la langue ou l'ambiance."
+                ("J'ai compris : "+interpretation+". Aucun titre documenté ne réunit ces critères. Essaie d'assouplir la longueur, la langue ou l'ambiance."
                  if is_fr else
-                 "No supported catalog titles meet all conditions. Try relaxing length, French records or mood.")
+                 "I understood: "+interpretation+". No supported catalog titles meet all conditions. Try relaxing length, French records or mood.")
             ),
         )
         return data
