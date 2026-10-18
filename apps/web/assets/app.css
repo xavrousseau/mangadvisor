@@ -269,3 +269,30 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
   .home-reading-body h3{font-size:17px}
   .home-empty{padding:15px;gap:10px}
 }
+
+/* Mangadvisor 1.1 : réactions accessibles sous chaque conseil. */
+.feedback-actions{
+  display:flex;flex-wrap:wrap;gap:7px;
+  margin:12px 0 1px;
+}
+.feedback-btn{
+  background:#202c34;color:#d7e6df;
+  border:1px solid #3a514d;border-radius:8px;
+  padding:9px 11px;font-size:11px;font-weight:750;
+  transition:background .16s,border-color .16s,color .16s;
+}
+.feedback-btn:hover:not(:disabled){
+  color:#fff1df;background:#364038;border-color:var(--accent);
+}
+.feedback-btn.dislike{
+  background:#2d242b;color:#ecc6c6;border-color:#63444b;
+}
+.feedback-btn.dislike:hover:not(:disabled){
+  background:#54313b;color:#fff0ee;border-color:#dc838b;
+}
+.feedback-btn:disabled{opacity:.36;cursor:wait}
+.rec-card .feedback-actions{margin-top:11px}
+@media(max-width:740px){
+  .feedback-actions{gap:6px}
+  .feedback-btn{padding:9px 8px;font-size:10px}
+}
