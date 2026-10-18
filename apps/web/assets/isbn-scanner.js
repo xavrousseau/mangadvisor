@@ -30,6 +30,11 @@ const I18N = {
   kindUNKNOWN:"À préciser",kindCLASSIC:"Classique",kindDELUXE:"Deluxe",
   kindPERFECT:"Perfect",kindCOLLECTOR:"Collector",kindINTEGRAL:"Intégrale",kindOTHER:"Autre",
   empty:"Choisis Possédé, Lu ou les deux.", cameraReady:"Caméra active — lecture EAN-13",
+  report:"Bilan de session", created:"Tomes ajoutés",updated:"Statuts complétés",duplicate:"Déjà enregistrés",
+  unresolved:"À vérifier",resume:"Reprendre",noScan:"Aucun ISBN traité pour le moment.",
+  retry:"Réessayer",skip:"Passer au suivant",suggested:"Série conservée du tome précédent : contrôle-la avant confirmation.",
+  sessionHelp:"Bilan de cette session seulement. Les ISBN non résolus n'ont pas été ajoutés.",
+  reportView:"Voir le bilan",
  },
  en: {
   title:"Scan my volumes",intro:"One barcode, a verified record, your confirmation. Nothing is added automatically.",
@@ -56,6 +61,11 @@ const I18N = {
   kindUNKNOWN:"Unspecified",kindCLASSIC:"Standard",kindDELUXE:"Deluxe",
   kindPERFECT:"Perfect",kindCOLLECTOR:"Collector",kindINTEGRAL:"Omnibus",kindOTHER:"Other",
   empty:"Choose Owned, Read or both.",cameraReady:"Camera active — reading EAN-13",
+  report:"Session summary",created:"Books added",updated:"Statuses completed",duplicate:"Already registered",
+  unresolved:"Needs review",resume:"Resume",noScan:"No ISBN scanned yet.",
+  retry:"Retry",skip:"Skip to next",suggested:"Series carried over from previous volume: check before confirming.",
+  sessionHelp:"Only this session. Unresolved ISBNs have not been saved.",
+  reportView:"View summary",
  }
 };
 const msg=(lang,key)=>I18N[lang==="en"?"en":"fr"][key]||key;
@@ -77,8 +87,23 @@ export function scanCanSave(draft){
   String(draft.volume).trim()!=="" && draft.ack);
 }
 
-export function scannerMarkup(lang,escape,draft,count=0){
+export function scanSessionTotals(events=[]){
+ return events.reduce((total,event)=>{
+  if(["created","updated","duplicate","unresolved"].includes(event.status))total[event.status]++;
+  return total;
+ },{created:0,updated:0,duplicate:0,unresolved:0});
+}
+export function scanSessionEntry(events,entry){
+ return [...events.filter(event=>event.isbn!==entry.isbn),entry];
+}
+export function scanOutcome(result,previous){
+ if(result?.status==="created")return "created";
+ const edition=result?.edition||{};
+ return (edition.is_owned&&!previous?.is_owned)||(edition.is_read&&!previous?.is_read)?"updated":"duplicate";
+}
+export function scannerMarkup(lang,escape,draft,count=0,session=[]){
  const e=value=>escape(String(value??"")),L=key=>e(msg(lang,key));
+ const totals=scanSessionTotals(session);
  const hasBook=draft.phase==="known"||draft.phase==="unknown";
  const book=draft.phase==="known"?draft.registered?.edition:draft.record;
  const known=draft.phase==="known",unknown=draft.phase==="unknown";
@@ -104,6 +129,7 @@ export function scannerMarkup(lang,escape,draft,count=0){
     (book.is_owned?'<p class="scan-duplicate">✓ '+L("already")+'</p>':"")+'</div>';
   }else{
    detail+='<div class="scan-associate"><p class="scan-hint">'+L("choose")+'</p>'+
+    (draft.previousSeries?'<p class="scan-hint">ⓘ '+L("suggested")+'</p>':"")+
     (draft.selected?'<p class="scan-selected"><strong>'+L("series")+' :</strong> '+e(draft.selected.title)+
       ' <button type="button" class="btn-link" data-action="scan-unselect">'+L("search")+'</button></p>':
       '<form id="scan-series-form" class="scan-inline-form">'+
