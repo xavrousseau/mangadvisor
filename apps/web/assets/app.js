@@ -1,5 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
+import { explainRecommendation, explainProfile } from "./explain.js";
 
 const STATUS = ["READ","READING","OWNED","WANT_TO_READ","DROPPED","NOT_INTERESTED"];
 const SCREENS = ["home","discover","recommendations","library"];
@@ -226,8 +227,9 @@ async function renderHome(token){
    const sources=recommendationSources(result);
    const intro=sources.length?
      '<p class="home-source">'+L("homePersonalBecause")+' <strong>'+sources.map(e).join(" · ")+'</strong></p>':'';
+   const context=recommendationProfileContext(result);
    const cards=await recommendationMarkup(picks,token);
-   if(stillHere()&&target)target.innerHTML=intro+cards;
+   if(stillHere()&&target)target.innerHTML=intro+context+cards;
   }catch(error){
    if(stillHere()&&target)target.innerHTML=
      '<div class="home-empty"><p>'+L("homePersonalMissing")+'</p>'+
@@ -361,11 +363,53 @@ async function renderDetail(token,id){
  }catch(err){if(token===renderToken)document.querySelector("#detail-content").innerHTML=errorBox(err);}
 }
 function recEvidence(m){
- const sources=[
-  ["themeMatch",m.common_themes],["genreMatch",m.common_genres],
-  ["audienceMatch",m.common_demographics],["communitySignal",m.community_recommended_from]
- ].filter(([,x])=>Array.isArray(x)&&x.length);
- return sources.slice(0,2).map(([key,vals])=>L(key)+": "+vals.slice(0,2).map(x=>tr(x)).join(", ")).join(" · ") || L("whyNone");
+ const data=explainRecommendation(m);
+ if(!data.factors.length)return L("whyNone");
+ return data.factors.slice(0,2).map(x=>
+  L(x.label)+": "+x.values.slice(0,2).map(tr).join(", ")
+ ).join(" · ");
+}
+function recommendationExplanation(m){
+ const info=explainRecommendation(m);
+ const factors=info.factors.length?info.factors.map(x=>
+  '<div class="why-factor"><span class="why-factor-label">'+L(x.label)+'</span>'+
+  '<span class="why-factor-tags">'+x.values.map(v=>'<span class="pill">'+tr(v)+'</span>').join("")+'</span></div>'
+ ).join(""):'<p class="muted tiny">'+L("explainNothing")+'</p>';
+ const components=info.components.length?
+  '<div class="why-section"><h4>'+L("explainComponents")+'</h4>'+
+  '<div class="why-scores">'+info.components.map(x=>
+   '<div class="why-score"><span>'+L(x.label)+'</span><strong>'+e(
+     (x.value>0?"+":"")+x.value.toFixed(1)
+    )+' '+L("scoreUnit")+'</strong></div>').join("")+'</div>'+
+  '<p class="why-note">'+L("explainComponentsNote")+'</p></div>':'';
+ const warnings=info.mismatches.length?
+  '<div class="why-caution"><strong>⚠ '+L("explainWarnings")+'</strong>'+
+  '<div class="why-factor-tags">'+info.mismatches.map(v=>'<span class="pill">'+tr(v)+'</span>').join("")+'</div></div>':'';
+ const original=info.originalReason?
+   '<details class="why-original"><summary>'+L("explainOriginal")+'</summary>'+
+   (state.lang==="en"?'<p class="why-note">'+L("explainOriginalFrench")+'</p>':'')+
+   '<p>'+e(info.originalReason)+'</p></details>':'';
+ return '<div class="why-explainer"><div class="why-section"><h4>'+L("explainEvidence")+'</h4>'+
+   factors+'</div>'+components+warnings+original+'</div>';
+}
+function recommendationProfileContext(response){
+ const profile=explainProfile(response);
+ if(!profile.sources.length&&!profile.genres.length&&!profile.themes.length)return "";
+ const sources=profile.sources.length?
+  '<div class="profile-source-grid">'+profile.sources.map(item=>
+   '<div class="profile-source"><strong>'+e(item.title)+'</strong><div class="profile-source-meta">'+
+   (item.favorite?'<span class="pill accent">♥ '+L("explainProfileFavorite")+'</span>':'')+
+   (item.status?'<span class="pill">'+e(libraryStatus(state.lang,item.status))+'</span>':'')+
+   (item.score!==null?'<span class="pill">★ '+e(item.score.toFixed(1))+'/10</span>':'')+
+   '</div></div>').join("")+'</div>':'<p class="muted tiny">'+L("explainNoSource")+'</p>';
+ const group=(key,items)=>items.length?
+  '<div class="profile-group"><strong>'+L(key)+'</strong>'+
+  '<div class="why-factor-tags">'+items.map(x=>'<span class="pill">'+tr(x)+'</span>').join("")+'</div></div>':'';
+ return '<details class="profile-context"><summary>✦ '+L("explainProfileTitle")+'</summary>'+
+  '<div class="profile-content"><h4>'+L("explainProfileSources")+'</h4>'+sources+
+  '<p class="why-note">'+L("explainProfileCaution")+'</p>'+
+  group("explainProfileGenres",profile.genres)+group("explainProfileThemes",profile.themes)+
+  '</div></details>';
 }
 async function recommendationMarkup(items,token){
  if(!items.length)return emptyBox("✧",L("noRecommendations"),L("noResultsHelp"),L("startExplore"),"/discover");
@@ -384,10 +428,8 @@ async function recommendationMarkup(items,token){
   '<button type="button" class="feedback-btn" data-action="feedback" data-feedback="ALREADY_READ" data-manga-id="'+e(m.id)+'">✓ '+L("feedbackRead")+'</button>'+
   '<button type="button" class="feedback-btn dislike" data-action="feedback" data-feedback="NOT_FOR_ME" data-manga-id="'+e(m.id)+'">× '+L("feedbackDislike")+'</button>'+
   '</div></div>'+
-  '<details class="reco-explanation" style="grid-column:1/-1"><summary>'+L("why")+'</summary><p>'+
-   e(m.reason||t(state.lang,"whyNone"))+'</p>'+
-   (m.sensitive_mismatches?.length?'<p>⚠ '+L("differences")+': '+m.sensitive_mismatches.map(tr).join(", ")+'</p>':'')+
-  '</details></article>').join("")+'</div>';
+  '<details class="reco-explanation" style="grid-column:1/-1"><summary>✦ '+L("why")+'</summary>'+
+   recommendationExplanation(m)+'</details></article>').join("")+'</div>';
 }
 async function renderRecommendations(token){
  const libraryMode=state.recMode==="library";
@@ -431,6 +473,7 @@ async function showRecResults(token){
  const sources=(result.positive_sources||result.sources||[]).map(s=>s.title).filter(Boolean);
  target.innerHTML='<div class="section-header"><h2 class="section-title">'+L("results")+'</h2></div>'+
   (sources.length?'<div class="list-head">'+L("sources")+': '+sources.slice(0,5).map(e).join(" · ")+'</div>':'')+
+  recommendationProfileContext(result)+
   '<div id="rec-cards">'+loadingCards(3)+'</div>';
  const text=await recommendationMarkup(result.recommendations||[],token);
  if(token===renderToken&&document.querySelector("#rec-cards"))document.querySelector("#rec-cards").innerHTML=text;
