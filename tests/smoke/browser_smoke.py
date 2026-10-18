@@ -249,6 +249,53 @@ def run():
             # La page conserve l'ancienne fiche et ses données.
             expect(page.locator("#library-editor")).to_be_visible()
             page.screenshot(path=str(OUTPUT / f"{device}-collection-fr.png"),full_page=True)
+            # French title discovery (BnF response simulated for reproducibility).
+            # Neither title search nor ISBN preview may silently add a book.
+            bnf_search={
+                "query":"Naruto",
+                "is_exhaustive":False,
+                "items":[
+                    {"isbn13":"9782871294146","title_fr":"Naruto — Tome 1",
+                     "publisher_fr":"Kana","verified_isbn":True,
+                     "source_url":"https://catalogue.bnf.fr/ark:/12148/cb12345678x",
+                     "source_checked_at":"2026-10-18T10:00:00+00:00"},
+                    {"isbn13":"9782344074282","title_fr":"Naruto — Tome 2",
+                     "publisher_fr":"Kana","verified_isbn":True,
+                     "source_url":"https://catalogue.bnf.fr/ark:/12148/cb99999999x",
+                     "source_checked_at":"2026-10-18T10:00:00+00:00"},
+                ],
+            }
+            exact_book={
+                "isbn13":"9782344074282","title_fr":"Naruto — Tome 2",
+                "publisher_fr":"Kana","verified_isbn":True,
+                "edition_kind_suggested":"UNKNOWN",
+                "source_url":"https://catalogue.bnf.fr/ark:/12148/cb99999999x",
+            }
+            def search_bnf_fixture(route):
+                assert "query=Naruto" in route.request.url
+                route.fulfill(status=200,content_type="application/json",
+                              body=json.dumps(bnf_search))
+            def isbn_bnf_fixture(route):
+                route.fulfill(status=200,content_type="application/json",
+                              body=json.dumps(exact_book))
+            page.route("**/api/collection/discover-books?*",search_bnf_fixture)
+            page.route("**/api/collection/isbn/9782344074282",isbn_bnf_fixture)
+            expect(page.locator("#fr-discovery-form")).to_be_visible()
+            page.locator("#fr-discovery-query").fill("Naruto")
+            page.locator("#fr-discovery-form button[type=submit]").click()
+            expect(page.locator(".fr-discovery-card")).to_have_count(2,timeout=30000)
+            expect(page.locator(".fr-discovery-present")).to_contain_text(
+                "Déjà associé")
+            expect(page.locator('[data-action="fr-discovery-select"]')).to_have_count(1)
+            expect(page.locator(".fr-discovery-found")).to_contain_text(
+                "Résultats",timeout=30000)
+            page.locator('[data-action="fr-discovery-select"][data-isbn="9782344074282"]').click()
+            expect(page.locator("#edition-preview .edition-preview")).to_be_visible(timeout=30000)
+            expect(page.locator("#edition-preview")).to_contain_text("Naruto — Tome 2")
+            expect(page.locator("#edition-number")).to_have_value("")
+            page.screenshot(path=str(OUTPUT / f"{device}-exploration-livres-fr.png"),full_page=True)
+            page.unroute("**/api/collection/discover-books?*")
+            page.unroute("**/api/collection/isbn/9782344074282")
             if device=="desktop":
                 edition_item=page.locator(".edition-item").first
                 edition_item.locator('[data-action="volume-owned"]').click()
