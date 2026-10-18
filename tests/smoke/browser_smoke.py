@@ -296,11 +296,13 @@ def run():
                 **candidate_record,"isbn13":"9782871294146",
                 "title_fr":"Naruto. Tome 1","registration_status":"REGISTERED_HERE",
                 "registered_manga_id":1,"registered_edition_kind":"CLASSIC",
-                "registered_volume_number":1,"title_clue":"TITLE_WORDS_PRESENT"
+                "registered_volume_number":1,"title_clue":"TITLE_WORDS_PRESENT",
+                "edition_kind_suggested":"CLASSIC"
             },{
                 **candidate_record,"isbn13":"9781234567897",
                 "title_fr":"Naruto inconnu","registration_status":"REGISTERED_OTHER",
-                "registered_manga_id":2,"title_clue":"SOME_TITLE_WORDS"
+                "registered_manga_id":2,"title_clue":"SOME_TITLE_WORDS",
+                "edition_kind_suggested":"UNKNOWN"
             }]
             def enrichment_mock(route):
                 url=route.request.url
