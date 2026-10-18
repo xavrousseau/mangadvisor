@@ -166,3 +166,68 @@ div[data-testid="stMetric"] {
     scroll-behavior: auto !important; transition-duration: .01ms !important;
   }
 }
+
+/* Galerie et recommandations illustrées — Mangadvisor 1.0 */
+[data-testid="stImage"] img {
+  display: block;
+  width: 100%;
+  max-height: 270px;
+  object-fit: contain;
+  background: #141a26;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+}
+.ma-cover-placeholder {
+  height: 250px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  border: 1px solid rgba(255,189,128,.25);
+  border-radius: 10px;
+  padding: 15px;
+  background: radial-gradient(circle at 85% 18%, rgba(240,158,95,.3), transparent 42%),
+              linear-gradient(153deg,#5d3849,#282b3b 60%,#151a25);
+}
+.ma-cover-placeholder::before {
+  content: "";
+  position: absolute;
+  border: 12px solid rgba(255,191,131,.25);
+  border-radius: 50%;
+  width: 140px;
+  height: 140px;
+  top: -50px;
+  right: -55px;
+}
+.ma-cover-lines {
+  position: absolute;
+  width: 72%;
+  height: 160%;
+  top: -16%;
+  left: 34%;
+  transform: rotate(27deg);
+  background: linear-gradient(90deg,transparent 25%,rgba(13,14,27,.26) 26%,rgba(13,14,27,.04) 65%,transparent 66%);
+}
+.ma-cover-name {
+  color: #fff6ed;
+  position: relative;
+  z-index: 1;
+  font-weight: 900;
+  font-size: clamp(1.05rem,2.6vw,1.65rem);
+  letter-spacing: -.06em;
+  line-height: 1.02;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 12px rgba(0,0,0,.55);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] {
+  background: var(--ma-card);
+}
+@media (max-width: 768px) {
+  .ma-cover-placeholder { height: 240px; }
+  [data-testid="stImage"] img { max-height: 270px; }
+}
