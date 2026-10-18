@@ -203,6 +203,15 @@ def list_mangas(
     ),
     limit: int = Query(default=20, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    genre: str | None = Query(
+        default=None,
+        max_length=60,
+        description="Filtre par genre exact (ex. Adventure).",
+    ),
+    only_finished: bool = Query(
+        default=False,
+        description="Affiche uniquement les séries terminées.",
+    ),
 ) -> dict[str, Any]:
     """
     Liste les mangas du catalogue canonique.
@@ -217,16 +226,29 @@ def list_mangas(
         "offset": offset,
     }
 
-    where_clause = ""
-
+    conditions: list[str] = []
     if q:
-        where_clause = """
-        WHERE
-            m.title ILIKE %(q)s
-            OR m.title_english ILIKE %(q)s
-            OR m.title_japanese ILIKE %(q)s
-        """
+        conditions.append(
+            "(m.title ILIKE %(q)s OR m.title_english ILIKE %(q)s "
+            "OR m.title_japanese ILIKE %(q)s)"
+        )
         params["q"] = f"%{q}%"
+
+    if genre:
+        conditions.append(
+            """EXISTS (
+                SELECT 1 FROM manga_genre mg_filter
+                JOIN genre g_filter ON g_filter.id = mg_filter.genre_id
+                WHERE mg_filter.manga_id = m.id
+                  AND LOWER(g_filter.name) = LOWER(%(genre)s)
+            )"""
+        )
+        params["genre"] = genre
+
+    if only_finished:
+        conditions.append("LOWER(COALESCE(m.status, '')) = 'finished'")
+
+    where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     sql = f"""
         SELECT

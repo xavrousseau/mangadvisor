@@ -231,3 +231,38 @@ div[data-testid="stMetric"] {
   .ma-cover-placeholder { height: 240px; }
   [data-testid="stImage"] img { max-height: 270px; }
 }
+
+
+/* Mangadvisor 1.0 — catalogue Découvrir / fiches manga */
+.ma-detail-kicker {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 790;
+  letter-spacing: .15em;
+  color: var(--ma-accent);
+  margin: 12px 0 6px;
+}
+.stApp [data-testid="stColumn"] > div > [data-testid="stVerticalBlock"] {
+  min-width: 0;
+}
+.stApp [data-testid="stMarkdownContainer"] h2 {
+  scroll-margin-top: 65px;
+}
+/* Les couvertures restent lisibles dans les galeries et sur les fiches. */
+.stApp [data-testid="stImage"] img {
+  width: 100%;
+  border-radius: 12px;
+  object-fit: contain;
+}
+.stApp div[data-testid="stButton"] button {
+  transition: border-color .16s ease, background-color .16s ease;
+}
+.stApp div[data-testid="stButton"] button:hover {
+  border-color: var(--ma-accent) !important;
+}
+@media (max-width: 768px) {
+  .ma-detail-kicker { margin-top: 7px; }
+  .stApp [data-testid="stColumn"] .ma-cover-placeholder {
+    min-height: 190px;
+  }
+}
