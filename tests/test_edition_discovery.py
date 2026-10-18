@@ -17,6 +17,7 @@ xmlns:dc="http://purl.org/dc/elements/1.1/">
 <srw:recordData><dc:dc>
 <dc:title>Naruto. Tome 1</dc:title><dc:creator>Masashi Kishimoto</dc:creator>
 <dc:publisher>Kana</dc:publisher><dc:date>2002</dc:date>
+<dc:language>fre</dc:language>
 <dc:identifier>ISBN 978-2-87129-414-6</dc:identifier>
 </dc:dc></srw:recordData></srw:record>
 <srw:record><srw:recordIdentifier>ark:/12148/cb22222222x</srw:recordIdentifier>
@@ -59,6 +60,8 @@ class TitleSearchTests(unittest.TestCase):
                          "https://catalogue.bnf.fr/ark:/12148/cb11111111x")
         self.assertTrue(items[0]["verified_isbn"])
         self.assertEqual(items[0]["publisher_fr"],"Kana")
+        self.assertEqual(items[0]["language_status"],"french")
+        self.assertEqual(items[1]["language_status"],"unknown")
         self.assertNotIn("manga_id",items[0])
         self.assertNotIn("volume_number",items[0])
         self.assertNotIn("is_published_full_collection",items[0])
@@ -75,6 +78,13 @@ class TitleSearchTests(unittest.TestCase):
             parse_title_results(b'<!DOCTYPE foo><data/>',"date")
         with self.assertRaises(ValueError):
             parse_title_results(b"x"*2_000_001,"date")
+
+    def test_language_status_does_not_invent_french_when_missing(self):
+        from apps.api.app.edition_discovery import bibliographic_language
+        self.assertEqual(bibliographic_language([]),"unknown")
+        self.assertEqual(bibliographic_language(["French"]),"french")
+        self.assertEqual(bibliographic_language(["eng"]),"other")
+        self.assertEqual(bibliographic_language(["fra", "eng"]),"mixed")
 
     def test_remote_failure_is_explicit_and_no_write_occurs(self):
         with patch("apps.api.app.edition_discovery.urllib.request.urlopen",
