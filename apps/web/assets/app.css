@@ -519,3 +519,33 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .bulk-manga-option{padding:11px}
  .bulk-resolver-head button{flex:0 0 auto}
 }
+
+
+/* V1.2 — livre français vérifié vs œuvre originale ; regroupements par type. */
+.fr-notices{background:var(--surface2);border:1px solid var(--border);
+ border-left:3px solid var(--accent);border-radius:12px;
+ padding:17px 19px;margin:17px 0}
+.fr-notices-heading{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+ color:var(--accent);font-size:13px}
+.fr-notices-heading>span{margin-left:auto;font-size:11px;color:var(--muted)}
+.fr-notices-caveat{color:var(--muted);font-size:12px;line-height:1.65;margin:11px 0}
+.fr-notice-line{display:grid;grid-template-columns:minmax(155px,230px) 1fr;
+ gap:12px;padding-top:10px;border-top:1px solid var(--border);
+ font-size:12px;line-height:1.6}
+.fr-notice-line+.fr-notice-line{margin-top:9px}
+.fr-notice-line>strong{color:var(--text);font-weight:750}
+.fr-notice-line>span{color:var(--muted);overflow-wrap:anywhere}
+.edition-group{margin:25px 0 0}
+.edition-group-head{display:flex;align-items:center;justify-content:space-between;
+ gap:10px;flex-wrap:wrap;padding:0 0 11px;border-bottom:1px solid var(--border);margin-bottom:13px}
+.edition-group-head h3{font-size:19px;color:var(--text);margin:0}
+.edition-group-head>span{font-size:12px;color:var(--muted)}
+.edition-group .edition-list{gap:10px}
+.edition-source{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.edition-source a{font-weight:750}
+@media(max-width:740px){
+ .fr-notices{padding:13px}
+ .fr-notices-heading>span{margin-left:0}
+ .fr-notice-line{grid-template-columns:1fr;gap:3px}
+ .edition-group-head h3{font-size:17px}
+}
