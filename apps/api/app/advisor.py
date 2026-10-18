@@ -14,11 +14,13 @@ from pydantic import BaseModel, Field
 
 from apps.api.app.mood_discovery import MOODS, match_mood, preference_overlap
 from apps.api.app.narrative_evidence import narrative_matches
+from apps.api.app.advisor_editions import fetch_recommended_editions
 
 router = APIRouter(prefix="/advisor", tags=["Conversational manga advisor"])
 Mood = Literal["DARK", "COMFORT", "ACTION", "MYSTERY", "ROMANCE", "FANTASY"]
 Length = Literal["ANY", "SHORT", "LONG"]
 FrenchEvidence = Literal["ANY", "PREFER", "REQUIRE"]
+EditionKind = Literal["CLASSIC","DELUXE","PERFECT","COLLECTOR","INTEGRAL","OTHER"]
 
 class AdvisorContext(BaseModel):
     mood: Mood | None = None
@@ -26,6 +28,8 @@ class AdvisorContext(BaseModel):
     length: Length = "ANY"
     only_finished: bool | None = None
     french: FrenchEvidence = "ANY"
+    preferred_edition_kind: EditionKind | None = None
+    require_edition_kind: bool = False
     use_library: bool = True
     avoid_romance: bool = False
     avoid_horror: bool = False
@@ -74,6 +78,16 @@ HORROR_ALLOW = re.compile(r"\b(?:avec|j.accepte|autorise|allow)\s+(?:(?:l|la|the
 GORE_ALLOW = re.compile(r"\b(?:avec|autorise|allow)\s+(?:le\s+)?gore\b|\bgore\s+(?:ok|me va|is fine)\b")
 LIBRARY_OFF = re.compile(r"\b(sans (?:mes |ma )?(?:gouts|bibliotheque|preferences)|sans personnalisation|ignore my library|without my library)\b")
 LIBRARY_ON = re.compile(r"\b(selon mes gouts|mes preferences|ma bibliotheque|my library|my taste)\b")
+EDITION_KIND_WORDS = (
+    ("DELUXE", r"\bdeluxe\b"),
+    ("PERFECT", r"\b(?:perfect|kanzenban)\b"),
+    ("COLLECTOR", r"\bcollectors?\b"),
+    ("INTEGRAL", r"\b(?:integrale|integral)\b"),
+    ("CLASSIC", r"\b(?:classique|classical|standard edition)\b"),
+)
+EDITION_CLEAR = re.compile(r"\b(?:peu importe (?:l.)?(?:edition|format)|tout format|any edition|any format)\b")
+EDITION_REQUIRED = re.compile(r"\b(?:obligatoire|uniquement|seulement|absolument|only|must|required)\b")
+EDITION_PREFERRED = re.compile(r"\b(?:idealement|si possible|de preference|prefer|ideally|preferably)\b")
 RATING = re.compile(r"\b(?:note|score|rating)\s*(?:minimum|min|de|d.au moins|>=|superieure a)?\s*(\d{1,2}(?:[.,]\d)?)\s*(?:/10)?\b")
 
 def normalize(text: str) -> str:
@@ -153,6 +167,20 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
         changes.append("french")
     elif re.search(r"\b(sans contrainte de langue|peu importe la langue|any language)\b",normalized):
         current.french = "ANY";changes.append("french")
+    if EDITION_CLEAR.search(normalized):
+        current.preferred_edition_kind=None
+        current.require_edition_kind=False
+        changes.append("preferred_edition_kind")
+    else:
+        for kind, pattern in EDITION_KIND_WORDS:
+            if re.search(pattern, normalized):
+                current.preferred_edition_kind=kind
+                current.require_edition_kind=bool(
+                    EDITION_REQUIRED.search(normalized)
+                    and not EDITION_PREFERRED.search(normalized)
+                )
+                changes.append("preferred_edition_kind")
+                break
     if LIBRARY_OFF.search(normalized):
         current.use_library = False;changes.append("use_library")
     elif LIBRARY_ON.search(normalized):
@@ -195,13 +223,17 @@ def score_candidates(
         affinity = preference_overlap(item,preferences)
         verified = int(item.get("french_record_count") or 0)>0
         french_score = 24 if context.french=="PREFER" and verified else 0
+        preferred_format=bool(
+            context.preferred_edition_kind and item.get("preferred_format_record_count",0)
+        )
+        format_score = 28 if preferred_format and not context.require_edition_kind else 0
         story_evidence=narrative_matches(item,context.narrative_preferences)
         story_bonus=sum(16 if record["source"]=="catalog_tag" else 9
                         for record in story_evidence)
         rank = (
             18*len(matches["genres"]) + 21*len(matches["themes"])
             + min(20, 5*len(affinity["genres"])+7*len(affinity["themes"]))
-            + french_score + story_bonus + 2*float(item.get("score") or 0)
+            + french_score + format_score + story_bonus + 2*float(item.get("score") or 0)
         )
         selected.append((rank,float(item.get("score") or 0),
                          -int(item.get("popularity") or 99999999),-int(item["id"]),{
@@ -211,6 +243,7 @@ def score_candidates(
             "narrative_unverified":[concept for concept in context.narrative_preferences
                                     if not any(e["concept"]==concept for e in story_evidence)],
             "french_recorded":verified,
+            "preferred_format_recorded":preferred_format,
             "ranking_score":None,
         }))
     selected.sort(key=lambda row:row[:4],reverse=True)
@@ -238,6 +271,13 @@ def describe_context(context:AdvisorContext,lang:str)->str:
         parts.append("ISBN français enregistré obligatoire" if fr else "recorded French ISBN required")
     elif context.french=="PREFER":
         parts.append("ISBN français enregistré souhaité" if fr else "recorded French ISBN preferred")
+    if context.preferred_edition_kind:
+        kind=context.preferred_edition_kind
+        parts.append(
+            ("format français "+kind+(" obligatoire" if context.require_edition_kind else " souhaité"))
+            if fr else
+            ("French "+kind+" edition "+("required" if context.require_edition_kind else "preferred"))
+        )
     if context.avoid_romance:
         parts.append("sans romance documentée" if fr else "without tagged romance")
     if context.avoid_horror:
@@ -288,6 +328,7 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         params:dict[str,Any]={
             "user_id":user_id,"min_score":context.min_score,
             "genres":sorted(genre_tags),"themes":sorted(theme_tags),
+            "preferred_kind":context.preferred_edition_kind,
         }
         conditions=[
             "COALESCE(m.manga_type,'Manga') IN ('Manga','Manhwa','Manhua','One-shot')",
@@ -313,6 +354,11 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             conditions.append("m.volumes>=13")
         if context.french=="REQUIRE":
             conditions.append("EXISTS (SELECT 1 FROM manga_fr_edition fe WHERE fe.manga_id=m.id)")
+        if context.require_edition_kind and context.preferred_edition_kind:
+            conditions.append("""EXISTS (
+                SELECT 1 FROM manga_fr_edition ef
+                WHERE ef.manga_id=m.id AND ef.edition_kind=%(preferred_kind)s
+            )""")
         if context.avoid_romance or context.avoid_horror or context.avoid_gore:
             excluded=[]
             if context.avoid_romance: excluded.append("romance")
@@ -336,7 +382,10 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                 ARRAY(SELECT t.name FROM manga_theme mt JOIN theme t ON t.id=mt.theme_id
                       WHERE mt.manga_id=m.id ORDER BY t.name) AS themes,
                 (SELECT COUNT(*)::int FROM manga_fr_edition fe
-                    WHERE fe.manga_id=m.id) AS french_record_count
+                    WHERE fe.manga_id=m.id) AS french_record_count,
+                (SELECT COUNT(*)::int FROM manga_fr_edition fkind
+                    WHERE fkind.manga_id=m.id AND
+                          fkind.edition_kind=%(preferred_kind)s) AS preferred_format_record_count
             FROM manga m WHERE """+" AND ".join(conditions)+"""
             ORDER BY m.score DESC NULLS LAST,m.popularity ASC NULLS LAST,m.id ASC
             LIMIT 500
@@ -367,6 +416,11 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                     for row in cur.fetchall():
                         preferences[row["kind"]].add(row["tag"])
         chosen=score_candidates(candidates,context,preferences,payload.limit)
+        edition_summaries=fetch_recommended_editions(
+            connection_factory,[row["id"] for row in chosen]
+        ) if chosen else {}
+        for row in chosen:
+            row["french_editions"]=edition_summaries.get(row["id"])
         personalized=context.use_library and any(preferences.values())
         interpretation=describe_context(context,payload.lang)
         data["interpreted_criteria"]=interpretation
