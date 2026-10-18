@@ -26,7 +26,7 @@ MOODS: dict[str, dict[str, tuple[str, ...]]] = {
     },
     "MYSTERY": {
         "genres": ("Mystery", "Suspense"),
-        "themes": ("Detective", "Psychological", "Time Travel"),
+        "themes": ("Mystery", "Detective", "Psychological", "Time Travel"),
     },
     "ROMANCE": {
         "genres": ("Romance",),
