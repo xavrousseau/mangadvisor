@@ -15,7 +15,8 @@ const tr=k=>dictionary[k]||k;
 const data={query:"Naruto",items:[
  {isbn13:"9782871294146",title_fr:"Naruto Tome 1",
    publisher_fr:"Kana",source_url:"https://catalogue.bnf.fr/ark:/12148/cb1111x",
-   source_checked_at:"2026-10-18T10:00:00Z",verified_isbn:true},
+   source_checked_at:"2026-10-18T10:00:00Z",verified_isbn:true,
+   language_status:"french"},
  {isbn13:"9782344074282",title_fr:"Naruto Tome 2",
    publisher_fr:"Kana",source_url:"https://catalogue.bnf.fr/ark:/12148/cb2222x",
    verified_isbn:true},
@@ -32,6 +33,8 @@ test("search form starts from an editable series title",()=>{
 test("search results distinguish registered books from unlinked ISBNs",()=>{
  const html=frDiscoveryResults(data,new Set(["9782871294146"]),tr,esc);
  assert.match(html,/Déjà associé/);
+ assert.match(html,/frSearchLanguage_french/);
+ assert.match(html,/frSearchLanguage_unknown/);
  assert.match(html,/data-action="fr-discovery-select" data-isbn="9782344074282"/);
  assert.doesNotMatch(html,/data-action="fr-discovery-select" data-isbn="9782871294146"/);
  assert.match(html,/Vérifier cet ISBN/);
