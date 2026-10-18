@@ -42,9 +42,23 @@ export function collectionPanel(data, library, lang, tr, escape) {
     ?'<div class="fr-notice-line"><strong>'+L("frAuthors")+'</strong><span>'+
      overview.authors_fr.map(e).join(" · ")+'</span></div>':"")+
    '</section>':"";
+ const serverProgress=Array.isArray(data?.edition_progress)?data.edition_progress:[];
  const cards=groupedEditions(editions).map(group=>{
   const owned=group.books.filter(book=>Boolean(book.is_owned)).length;
   const read=group.books.filter(book=>Boolean(book.is_read)).length;
+  const apiProgress=serverProgress.find(row=>row.edition_kind===group.kind &&
+    Number(row.known_books)===group.books.length);
+  const total=group.books.length;
+  const limitPercent=x=>Math.min(100,Math.max(0,Number.isFinite(Number(x))?Number(x):0));
+  const ownedPct=limitPercent(apiProgress?.owned_pct_of_known??(100*owned/total));
+  const readPct=limitPercent(apiProgress?.read_pct_of_known??(100*read/total));
+  const progress='<div class="edition-progress" aria-label="'+L("progressKnownOnly")+'">'+
+    [[owned,ownedPct,"collectionOwned","owned"],[read,readPct,"collectionRead","read"]]
+      .map(([num,pct,label,type])=>'<div class="edition-progress-line"><div class="edition-progress-label"><span>'+
+        L(label)+'</span><strong>'+e(num)+' / '+e(total)+' '+L("progressReferencedBooks")+'</strong></div>'+
+        '<div class="edition-progress-track" role="progressbar" aria-label="'+L(label)+'" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+e(pct)+'">'+
+        '<span class="edition-progress-fill '+type+'" style="width:'+e(pct)+'%"></span></div></div>').join("")+
+    '<p class="edition-progress-disclaimer">'+L("progressNoPublishedTotal")+'</p></div>';
   const entries=group.books.map(item=>{
    const url=allowedLink(item.source_url);
    const sourceName=item.source_name?e(item.source_name):L("collectionBnfSource");
@@ -69,6 +83,7 @@ export function collectionPanel(data, library, lang, tr, escape) {
     '<div class="edition-group-head"><h3>'+editionLabel(group.kind)+'</h3>'+
     '<span>'+e(group.books.length)+' '+L("frBooksListed")+
     ' · '+e(owned)+' '+L("collectionOwned")+' · '+e(read)+' '+L("collectionRead")+'</span></div>'+
+    progress+
     '<div class="edition-list">'+entries+'</div></section>';
  }).join("");
  const stats=editions.length?'<div class="collection-stats">'+[
