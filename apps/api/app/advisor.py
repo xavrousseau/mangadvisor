@@ -85,7 +85,7 @@ EDITION_KIND_WORDS = (
     ("INTEGRAL", r"\b(?:integrale|integral)\b"),
     ("CLASSIC", r"\b(?:classique|classical|standard edition)\b"),
 )
-EDITION_CLEAR = re.compile(r"\b(?:peu importe (?:l.)?(?:edition|format)|tout format|any edition|any format)\b")
+EDITION_CLEAR = re.compile(r"\b(?:peu importe (?:l[' ]|le |la )?(?:edition|format)|tout format|any edition|any format)\b")
 EDITION_REQUIRED = re.compile(r"\b(?:obligatoire|uniquement|seulement|absolument|only|must|required)\b")
 EDITION_PREFERRED = re.compile(r"\b(?:idealement|si possible|de preference|prefer|ideally|preferably)\b")
 RATING = re.compile(r"\b(?:note|score|rating)\s*(?:minimum|min|de|d.au moins|>=|superieure a)?\s*(\d{1,2}(?:[.,]\d)?)\s*(?:/10)?\b")
