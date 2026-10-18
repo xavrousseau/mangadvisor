@@ -318,7 +318,8 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
     @router.post("/ai-message")
     def ask_ai_advisor(payload:AdvisorRequest)->dict[str,Any]:
         """Optional local model only parses intent; the same SQL engine retrieves results."""
-        if local_ai_enabled():
+        ai_requested=local_ai_enabled()
+        if ai_requested:
             try:
                 context,changes,more=interpret_with_ollama(
                     payload.message,payload.context,payload.lang
@@ -331,12 +332,13 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             except LocalAiUnavailable:
                 pass  # Recover reliably without changing collection or returning fake results.
         result=ask_advisor(payload)
-        result["ai_mode"]="guided_fallback"
-        result["ai_notice"]=(
-            "IA locale non active ou indisponible : conseiller guidé utilisé."
-            if payload.lang=="fr" else
-            "Local AI is not enabled or available: guided advisor used."
-        )
+        result["ai_mode"]="guided_fallback" if ai_requested else "guided"
+        if ai_requested:
+            result["ai_notice"]=(
+                "IA locale indisponible : conseiller guidé utilisé."
+                if payload.lang=="fr" else
+                "Local AI unavailable: guided advisor used."
+            )
         return result
 
     def resolve_advisor(
