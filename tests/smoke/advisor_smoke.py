@@ -16,6 +16,21 @@ def request(message, context=None, seen_ids=None, lang="fr"):
         return json.load(result)
 
 def main():
+    # The ordinary Docker setup does not download a model: AI endpoint must
+    # remain fully functional and clearly disclose guided fallback.
+    with urllib.request.urlopen(BASE+"/advisor/ai-status",timeout=20) as health:
+        status=json.load(health)
+    assert status["mode"]=="guided" and not status["available"],status
+    ai_req=urllib.request.Request(
+        BASE+"/advisor/ai-message",
+        data=json.dumps({"message":"Une aventure fantastique","lang":"fr","limit":3}).encode(),
+        headers={"Content-Type":"application/json"},method="POST")
+    with urllib.request.urlopen(ai_req,timeout=40) as result:
+        ai_result=json.load(result)
+    assert ai_result["ai_mode"]=="guided_fallback",ai_result
+    assert ai_result["count"]>0,ai_result
+    assert all("mood_matches" in row for row in ai_result["recommendations"]),ai_result
+
     first=request("Un manga d'action ou d'aventure, plutôt long et terminé")
     assert first["status"]=="results",first
     assert first["count"]>0,first
