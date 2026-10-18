@@ -86,7 +86,27 @@ jobs:
           assert detail['title']=='Naruto' and detail['genres'],detail
           similar=fetch('/recommendations/similar?title=Naruto&limit=3')
           assert 'recommendations' in similar,similar
-          print('OK : santé, catalogue, filtres, couvertures, bibliothèque, fiche, recommandations.')
+          def post(path, payload):
+              req=urllib.request.Request(
+                  'http://127.0.0.1:8000'+path,
+                  data=json.dumps(payload).encode('utf-8'),
+                  headers={'Content-Type':'application/json'},
+                  method='POST',
+              )
+              with urllib.request.urlopen(req,timeout=40) as response:
+                  return json.load(response)
+          profile=post('/recommendations/profile',{
+              'liked_titles':['Naruto','Monster'], 'limit':3,
+              'min_score':6.8,'only_finished':False,
+              'exclude_sensitive_mismatches':False,
+          })
+          assert 'recommendations' in profile,profile
+          library_reco=post('/recommendations/library',{
+              'limit':3,'min_score':6.8,'only_finished':False,
+              'exclude_sensitive_mismatches':False,'recommendation_goal':'READ_NEXT',
+          })
+          assert 'recommendations' in library_reco,library_reco
+          print('OK : catalogue, filtres, couvertures, bibliothèque, fiche et TROIS moteurs de recommandations.')
           PY
 
       - name: Installer Playwright Chromium
