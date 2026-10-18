@@ -572,3 +572,35 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  .edition-progress{padding:11px}
  .edition-progress-label{flex-wrap:wrap}
 }
+
+
+/* Bibliographic title discovery: exploratory candidates, not saved editions. */
+.bibliography-panel{margin:34px 0 12px;border:1px solid var(--border);
+ border-radius:15px;background:var(--surface);padding:22px}
+.bibliography-panel .section-header{margin:0 0 9px}
+.bibliography-panel .section-title{font-size:20px}
+.bibliography-panel>.page-desc{font-size:13px;line-height:1.6;margin:7px 0 18px}
+.bibliography-panel label{display:block;font-size:12px;font-weight:800;margin-bottom:9px}
+.bibliography-panel .actions{flex-wrap:wrap;gap:10px}
+.bibliography-panel input{min-width:200px;flex:1}
+.bibliography-panel>.collection-caveat{margin:11px 0;color:var(--muted)}
+.biblio-notice{padding:15px 17px;background:var(--surface2);border:1px solid var(--border);
+ border-left:3px solid var(--accent);border-radius:10px;margin:18px 0}
+.biblio-notice strong{font-size:13px;color:var(--accent)}
+.biblio-notice p{font-size:12px;color:var(--muted);line-height:1.6;margin:9px 0 0}
+.biblio-candidates{display:grid;gap:10px}
+.biblio-candidate{border:1px solid var(--border);background:var(--surface2);
+ border-radius:11px;padding:15px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.biblio-candidate-body{min-width:0;flex:1}
+.biblio-candidate-badge{font-size:10px;font-weight:800;color:var(--accent);display:inline-block;
+ background:var(--accent-tint);padding:6px 9px;border-radius:999px}
+.biblio-candidate h4{font-size:16px;margin:9px 0 5px;overflow-wrap:anywhere}
+.biblio-candidate p{font-size:12px;color:var(--muted);line-height:1.5;overflow-wrap:anywhere;margin:7px 0}
+.biblio-candidate .edition-source a{color:var(--accent)}
+.biblio-candidate .btn{flex:0 0 auto}
+@media(max-width:740px){
+ .bibliography-panel{padding:14px}
+ .biblio-candidate{flex-direction:column;align-items:stretch;gap:12px}
+ .biblio-candidate .btn{align-self:flex-start}
+ .bibliography-panel input{min-width:0;width:100%}
+}
