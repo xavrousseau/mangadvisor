@@ -90,6 +90,30 @@ class TestTitleDiscovery(unittest.TestCase):
                 sanitize_title_query(bad)
         self.assertEqual(sanitize_title_query("  L’Attaque    des Titans  "),"L’Attaque des Titans")
 
+    def test_remote_page_two_requests_exact_bounded_sru_slice(self):
+        from urllib.parse import urlsplit, parse_qs
+        received=[]
+        class Response:
+            def __enter__(self):return self
+            def __exit__(self,*args):return False
+            def read(self,size):return SAMPLE
+        def fake_get(request,timeout):
+            received.append(parse_qs(urlsplit(request.full_url).query))
+            self.assertEqual(timeout,9)
+            return Response()
+        with patch("apps.api.app.edition_discovery.urllib.request.urlopen",
+                   side_effect=fake_get):
+            found=search_bnf_by_title("Monster",start_record=21)
+        self.assertEqual(received[0]["startRecord"],["21"])
+        self.assertEqual(received[0]["maximumRecords"],["20"])
+        self.assertEqual(found["bnf_start_record"],21)
+        self.assertEqual(found["search_scope"],"requested_title_search_page")
+        self.assertFalse(found["exhaustive"])
+        self.assertFalse(found["items"][0]["manga_match_verified"])
+        for start in (0,2,61,999999):
+            with self.assertRaises(ValueError):
+                search_bnf_by_title("Monster",start_record=start)
+
     def test_remote_unavailability_is_explicit(self):
         with patch("apps.api.app.edition_discovery.urllib.request.urlopen",side_effect=OSError("offline")):
             with self.assertRaises(HTTPException) as e:
