@@ -1,5 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
+import { frDiscoverySearchForm, frDiscoveryResults } from "./fr-discovery-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
@@ -19,7 +20,7 @@ const state = {
   recMode:"library",recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
-  frenchCollection:null,editionPreview:null,
+  frenchCollection:null,editionPreview:null,frDiscovery:null,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
 };
 let renderToken = 0, searchTimer = null;
@@ -394,6 +395,7 @@ async function renderDetail(token,id){
   ]);
   if(token!==renderToken)return;
   state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.editionPreview=null;
+  if(state.frDiscovery?.mangaId!==Number(id))state.frDiscovery=null;
   const synopsis=translation?.text||manga.synopsis||"";
   const reallyTranslated=state.lang==="fr"&&Boolean(translation?.translated);
   const elements='<section class="detail-hero">'+
@@ -430,7 +432,10 @@ async function renderDetail(token,id){
    '<div class="section-header" id="similar-heading"><h2 class="section-title">'+L("similarTitle")+'</h2></div>'+
    '<p class="page-desc">'+L("similarHelp")+'</p><div id="similar-results">'+
     (state.similar[id]?await recommendationMarkup(state.similar[id].recommendations||[],token):'<button class="btn btn-soft" data-action="similar">✧ '+L("similar")+'</button>')+'</div>';
-  if(renderToken===token)document.querySelector("#detail-content").innerHTML=elements;
+  if(renderToken===token){
+    document.querySelector("#detail-content").innerHTML=elements;
+    mountFrenchDiscovery();
+  }
  }catch(err){if(token===renderToken)document.querySelector("#detail-content").innerHTML=errorBox(err);}
 }
 function recEvidence(m){
@@ -645,6 +650,69 @@ async function sendRecommendationFeedback(button){
 }
 
 
+function currentFrenchDiscoveryId(){
+ return routeInfo().view==="detail" ? Number(routeInfo().id) : null;
+}
+function mountFrenchDiscovery(){
+ const anchor=document.querySelector("#fr-discovery-anchor"),manga=state.currentDetail;
+ if(!anchor||!manga)return;
+ const saved=state.frDiscovery?.mangaId===Number(manga.id)?state.frDiscovery:null;
+ anchor.innerHTML=frDiscoverySearchForm(saved?.query??manga.title,key=>t(state.lang,key),escapeHtml);
+ if(saved?.result)renderFrenchSearchResults(saved.result);
+}
+function renderFrenchSearchResults(data){
+ const target=document.querySelector("#fr-discovery-results");
+ if(!target)return;
+ const known=new Set((state.frenchCollection?.editions||[]).map(x=>x.isbn13));
+ target.innerHTML=frDiscoveryResults(data,known,key=>t(state.lang,key),escapeHtml);
+}
+async function searchFrenchBooks(form){
+ const manga=state.currentDetail;
+ if(!manga||currentFrenchDiscoveryId()!==Number(manga.id))return;
+ const query=String(new FormData(form).get("title")||"").trim().slice(0,90);
+ if(!query)return;
+ state.frDiscovery={mangaId:Number(manga.id),query,result:null};
+ const target=document.querySelector("#fr-discovery-results");
+ if(target)target.innerHTML='<p class="info">'+L("loading")+'</p>';
+ try{
+  const data=await request("/collection/discover-books?"+new URLSearchParams({query}));
+  if(currentFrenchDiscoveryId()!==Number(manga.id)||
+    state.frDiscovery?.mangaId!==Number(manga.id)||
+    state.frDiscovery?.query!==query)return;
+  state.frDiscovery.result=data;
+  renderFrenchSearchResults(data);
+ }catch(error){
+  if(state.frDiscovery?.query!==query||currentFrenchDiscoveryId()!==Number(manga.id))return;
+  if(target)target.innerHTML='<div class="message">'+e(error.message||t(state.lang,"error"))+'</div>';
+ }
+}
+async function verifyFrenchDiscoveredBook(button){
+ const isbn=String(button.dataset.isbn||"");
+ const manga=state.currentDetail,discovery=state.frDiscovery;
+ if(!manga||currentFrenchDiscoveryId()!==Number(manga.id)||
+    discovery?.mangaId!==Number(manga.id)||!/^[0-9]{13}$/.test(isbn)||
+    !discovery.result?.items?.some(item=>item.verified_isbn===true&&item.isbn13===isbn))return;
+ button.disabled=true;
+ const preview=document.querySelector("#edition-preview");
+ if(preview)preview.innerHTML='<p class="info">'+L("loading")+'</p>';
+ try{
+  // Re-verify this exact ISBN independently of the broad title search.
+  const record=await request("/collection/isbn/"+isbn);
+  if(currentFrenchDiscoveryId()!==Number(manga.id))return;
+  if(record?.verified_isbn!==true||record.isbn13!==isbn)
+    throw Error(t(state.lang,"frSearchMismatch"));
+  state.editionPreview=record;
+  const target=document.querySelector("#edition-preview");
+  if(target){
+    target.innerHTML=editionPreview(record,state.lang,t,escapeHtml);
+    target.scrollIntoView({behavior:"smooth",block:"center"});
+  }
+ }catch(error){
+  const target=document.querySelector("#edition-preview");
+  if(target)target.innerHTML='<div class="message">'+e(error.message||t(state.lang,"frSearchMismatch"))+'</div>';
+  button.disabled=false;
+ }
+}
 async function refreshFrenchCollection(){
  const manga=state.currentDetail;
  if(!manga)return;
@@ -655,6 +723,7 @@ async function refreshFrenchCollection(){
   if(routeInfo().view!=="detail"||Number(routeInfo().id)!==Number(manga.id))return;
   state.frenchCollection=result;
   target.innerHTML=collectionPanel(result,state.libraryDetail,state.lang,t,escapeHtml);
+  mountFrenchDiscovery();
  }catch(error){toast(error?.message||t(state.lang,"error"));}
 }
 async function searchFrenchIsbn(form){
@@ -922,6 +991,7 @@ root.addEventListener("click",async event=>{
  if(action==="bulk-apply")return applyBulkCsv(button);
  if(action==="bulk-compare")return reconcileBulkCounts(button);
  if(action==="edition-confirm")return confirmFrenchEdition(button);
+ if(action==="fr-discovery-select")return verifyFrenchDiscoveredBook(button);
  if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
  if(action==="catalog-prev"||action==="catalog-next"){
@@ -961,6 +1031,7 @@ async function manualSearch(){
 root.addEventListener("submit",event=>{
  if(event.target.id==="library-editor"){event.preventDefault();saveLibrary(event.target);}
  if(event.target.id==="edition-isbn-form"){event.preventDefault();searchFrenchIsbn(event.target);}
+ if(event.target.id==="fr-discovery-form"){event.preventDefault();searchFrenchBooks(event.target);}
  if(event.target.id==="bulk-resolve-search-form"){event.preventDefault();searchBulkManga(event.target);}
 });
 root.addEventListener("change",async event=>{
