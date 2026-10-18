@@ -217,6 +217,16 @@ export const STRINGS = {
     advisorFrenchRegistered:"✓ ISBN français enregistré",advisorFrenchUnknown:"Édition française non documentée",
     advisorFrenchCaution:"Un ISBN français enregistré est une notice bibliographique, pas une preuve de disponibilité commerciale. Les thèmes ne garantissent pas l'âge conseillé.",
 
+    advisorEditionExpand:"Éditions françaises référencées",
+    advisorEditionRefs:"ISBN enregistrés",
+    advisorEditionPublisher:"Éditeur",
+    advisorEditionPublisherUnknown:"non renseigné",
+    advisorEditionTome:"Tome",
+    advisorEditionKnownTomes:"Numéros de tomes référencés",
+    advisorEditionSource:"Notice source",
+    advisorEditionMore:"autres notices (consulter la fiche)",
+    advisorEditionCaution:"Uniquement les ISBN enregistrés et associés à cette œuvre. Formats classique/Deluxe/Perfect distincts ; UNKNOWN signifie format non établi. Ce n’est ni la liste exhaustive des parutions, ni une confirmation de stock en magasin.",
+
     advisorNarrativeEvidence:"Indices narratifs documentés",
     advisorNarrativeMissing:"Non vérifié dans cette fiche",
     advisorStoryINVESTIGATION:"Enquête",
@@ -505,6 +515,16 @@ export const STRINGS = {
     advisorProof:"Matches your request",
     advisorFrenchRegistered:"✓ French ISBN registered",advisorFrenchUnknown:"French edition not documented",
     advisorFrenchCaution:"A registered French ISBN is a bibliographic record, not proof of commercial availability. Themes do not verify suitability for age.",
+
+    advisorEditionExpand:"Registered French editions",
+    advisorEditionRefs:"recorded ISBNs",
+    advisorEditionPublisher:"Publisher",
+    advisorEditionPublisherUnknown:"not supplied",
+    advisorEditionTome:"Volume",
+    advisorEditionKnownTomes:"Registered volume numbers",
+    advisorEditionSource:"Source record",
+    advisorEditionMore:"more records (see manga page)",
+    advisorEditionCaution:"Only ISBNs registered and linked to this work. Classic/Deluxe/Perfect formats remain separate; UNKNOWN means format undetermined. Not a full release checklist or confirmation of store availability.",
 
     advisorNarrativeEvidence:"Documented narrative clues",
     advisorNarrativeMissing:"Not verified in this record",
