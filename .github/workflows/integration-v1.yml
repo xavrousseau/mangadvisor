@@ -123,6 +123,9 @@ jobs:
       - name: Contrôler Streamlit ordinateur et mobile
         run: python tests/smoke/browser_smoke.py
 
+      - name: Vérifier la persistance des réactions et les exclusions
+        run: python tests/smoke/feedback_smoke.py
+
       - name: Captures d'écran et diagnostic
         if: always()
         uses: actions/upload-artifact@v4
