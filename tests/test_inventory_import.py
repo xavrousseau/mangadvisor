@@ -3,7 +3,7 @@ import unittest
 from fastapi import HTTPException
 from apps.api.app.inventory_import import (
     parse_inventory, attach_inventory_matches, preview_hash, UNSPECIFIED,
-    pending_key, pending_hash, SCHEMA,
+    pending_key, pending_hash, suspicious_title_encoding, SCHEMA,
 )
 
 
@@ -91,6 +91,13 @@ class ImportInventoryTests(unittest.TestCase):
         self.assertNotIn("manga_id INTEGER NOT NULL",SCHEMA.split("CREATE TABLE IF NOT EXISTS user_manga_inventory_pending")[1])
         self.assertIn("PRIMARY KEY (user_id, source_key)",SCHEMA)
         self.assertIn("user_manga_inventory_pending",SCHEMA)
+
+    def test_mojibake_cannot_be_frozen_as_an_owner_title(self):
+        self.assertTrue(suspicious_title_encoding("Kaiju nÂ°8"))
+        self.assertTrue(suspicious_title_encoding("TÃ´gen Anki"))
+        self.assertTrue(suspicious_title_encoding("Hellâ" + chr(128) + chr(153) + "s Paradise"))
+        self.assertFalse(suspicious_title_encoding("Kaiju n°8"))
+        self.assertFalse(suspicious_title_encoding("Hell’s Paradise"))
 
     def test_pending_identity_is_stable_and_changed_claims_conflict(self):
         row=parse_inventory(CSV)[0]
