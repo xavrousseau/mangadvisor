@@ -4,13 +4,13 @@ export const ADVISOR_PROMPTS={
  fr:[
   "Je veux une enquête psychologique sans horreur ni gore, pas trop longue, idéalement en français.",
   "J'ai envie d'une série douce et réconfortante.",
-  "Une aventure fantastique assez longue.",
+  "Surprends-moi selon mes goûts, avec une belle découverte.",
   "Je cherche un manga de mystère terminé avec une édition française obligatoire."
  ],
  en:[
   "I want a mystery, preferably in a Deluxe French edition, not too long.",
   "Something cozy and comforting.",
-  "A long fantasy adventure.",
+  "Surprise me with manga based on my tastes.",
   "A finished mystery with a required French edition."
  ]
 };
@@ -94,8 +94,8 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
     '<h3>'+e(m.title||"Manga")+'</h3>'+
     '<p class="mood-card-meta">'+rating(m)+' · '+published(m.status)+
      (m.volumes?' · '+e(m.volumes)+' '+L("moodVolumes"):'')+'</p>'+
-    '<div class="mood-evidence"><strong>'+L("advisorProof")+'</strong>'+
-    '<div class="tag-row">'+chips(mood)+'</div></div>'+
+    (response.discovery_source==="library_tags"?"":'<div class="mood-evidence"><strong>'+L("advisorProof")+'</strong>'+
+    '<div class="tag-row">'+chips(mood)+'</div></div>')+
     (common.length?'<div class="mood-evidence"><strong>'+L("moodAffinity")+'</strong>'+
      '<div class="tag-row">'+chips(common)+'</div></div>':"")+
     (Array.isArray(m.variety_evidence)&&m.variety_evidence.length?
