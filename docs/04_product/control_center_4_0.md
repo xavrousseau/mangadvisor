@@ -39,7 +39,13 @@ Une réinstallation est **non destructive par défaut** : elle ne supprime ni vo
 
 ## Mise à jour en un clic — option 28
 
-Sur un clone Git, l'option 28 refuse les changements non enregistrés sur les fichiers suivis, effectue une **sauvegarde avec restauration de test**, lance un git pull en avance rapide uniquement, réapplique les schémas additifs, reconstruit les services et termine par un diagnostic. Les collections et volumes sont préservés. Docker et l'application doivent être démarrés avant cette option pour permettre la sauvegarde. Avec une installation ZIP, la mise à jour Git automatique n'est pas disponible ; l'outil l'indique.
+Sur un clone Git, l'option 28 inspecte d'abord les **fichiers suivis modifiés**, en distinguant les avertissements Windows de conversion de lignes (LF/CRLF) des véritables changements Git. S'il existe des modifications suivies, elle les liste et demande une **autorisation explicite** : par défaut, la réponse « non » annule sans rien changer. Si l'utilisateur confirme, elle effectue **d'abord la sauvegarde PostgreSQL avec restauration de vérification**, puis dépose les changements suivis (y compris les changements indexés) dans **une sauvegarde locale Git stash**, sans les écraser ni les réappliquer automatiquement. La sauvegarde locale reste consultable via `git stash list`, y compris si le pull échoue. Les fichiers ignorés `.env`, `private-data/`, `backups/` ne font pas partie de ce stash.
+
+L'option continue ensuite par `git pull --ff-only origin main`, schémas additifs, reconstruction Docker et diagnostic. Elle refuse les branches autres que `main` et ne supprime aucun volume. Si l'utilisateur a réellement personnalisé du code, les modifications conservées dans stash doivent être **réexaminées manuellement avant réapplication**, car elles peuvent être incompatibles avec le nouveau code. Pour un clone ZIP, Git automatique n'est pas disponible.
+
+Git utilise désormais le fichier `.gitattributes` : LF pour les sources exécutées dans Linux/Docker et CRLF pour les scripts `.cmd` / `.ps1` sous Windows. Cela diminue les avertissements lors des prochaines opérations ; **des modifications déjà présentes dans ton clone ne sont pas supprimées par cette règle**.
+
+**Premier déblocage d'une ancienne option 28 :** comme l'ancien script s'arrête avant de récupérer les corrections, lancer `git status --short` depuis le dossier Mangadvisor pour connaître les fichiers concernés. Ne pas utiliser `git reset --hard`, `git clean -fd` ou `docker compose down -v`. Si tu choisis de mettre de côté les changements suivis, `git stash push -m "mangadvisor-avant-premiere-mise-a-jour"`, suivi de l'option 28, constitue une solution non destructive (le stash reste disponible).
 
 ## Tests, limites et données françaises
 
