@@ -3,14 +3,14 @@ Script : run_jikan_pipeline.py
 
 Rôle :
     Orchestrer le pipeline Jikan de bout en bout :
-    1. nettoyage optionnel de la table PostgreSQL
-    2. extraction depuis l'API Jikan
-    3. chargement des JSON dans PostgreSQL
+    1. extraction depuis le fournisseur configure (Tenrai par defaut)
+    2. chargement des JSON dans PostgreSQL
+    3. mise a jour additive du catalogue
 
 Exemples :
     python pipelines/engine/scripts/run_jikan_pipeline.py
     python pipelines/engine/scripts/run_jikan_pipeline.py --start-page 1 --end-page 3 --limit 10
-    python pipelines/engine/scripts/run_jikan_pipeline.py --reset-db --start-page 1 --end-page 3
+    # --reset-db est volontairement interdit
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     Parse les arguments de ligne de commande.
     """
     parser = argparse.ArgumentParser(
-        description="Lancer le pipeline Jikan complet : reset optionnel + extraction + chargement."
+        description="Ancien pipeline conserve pour compatibilite, non destructif."
     )
     parser.add_argument(
         "--start-page",
@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reset-db",
         action="store_true",
-        help="Vide la table jikan_manga_source avant le chargement.",
+        help="Option obsolete, refusee pour proteger la mangatheque.",
     )
     return parser.parse_args()
 
@@ -86,24 +86,6 @@ def run_python_script(script_path: Path, args: list[str]) -> None:
         raise RuntimeError(
             f"Le script {script_path.name} a échoué avec le code {result.returncode}."
         )
-
-
-def reset_jikan_source_table() -> None:
-    """
-    Vide complètement la table source Jikan.
-    """
-    print("--------------------------------------------------")
-    print("Nettoyage PostgreSQL : jikan_manga_source")
-    print("--------------------------------------------------")
-
-    conn = get_postgres_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE TABLE jikan_manga_source RESTART IDENTITY;")
-        conn.commit()
-        print("[run_jikan_pipeline] table jikan_manga_source vidée avec succès.")
-    finally:
-        conn.close()
 
 
 def refresh_canonical_catalog() -> None:
@@ -137,6 +119,12 @@ def main() -> None:
     """
     args = parse_args()
 
+    if args.reset_db:
+        raise ValueError(
+            "--reset-db est desactive definitivement pour preserver "
+            "les donnees et les associations existantes. "
+            "Utilise l'option 25 du menu Mangadvisor."
+        )
     if args.start_page < 1:
         raise ValueError("start-page doit être >= 1")
     if args.end_page < args.start_page:
@@ -169,9 +157,6 @@ def main() -> None:
 
     run_python_script(extract_script, extract_args)
     print()
-    if args.reset_db:
-        reset_jikan_source_table()
-        print()
     run_python_script(load_script, [])
     print()
     refresh_canonical_catalog()
