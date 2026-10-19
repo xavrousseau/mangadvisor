@@ -244,7 +244,7 @@ def suspicious_title_encoding(value: str) -> bool:
     Prevent saving corrupted source claims under a stable source key:
     later fixes should not have to overwrite a falsely preserved title.
     """
-    sequences = ("Ã©", "Ã´", "Ã¯", "Â°", "â\\x80", "â€")
+    sequences = ("Ã©", "Ã´", "Ã¯", "Â°", "â" + chr(128), "â€")
     return any(part in value for part in sequences)
 
 
