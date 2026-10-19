@@ -26,7 +26,7 @@ L'option **29** vérifie dorénavant la connexion HTTPS au fournisseur configur�
 
 Pour une première installation sur Windows : **télécharge le dépôt GitHub (ZIP ou Git), démarre Docker Desktop, double-clique sur mangadvisor.cmd et choisis l'option 22 — Installer de A à Z**. Aucun Python, psql ou terminal technique à installer sur Windows : les opérations data fonctionnent dans Docker.
 
-L'assistant prépare le fichier .env avec des secrets aléatoires, crée les tables PostgreSQL, démarre l'application, **extrait les JSON Jikan SEARCH + TOP, les charge dans PostgreSQL, construit le catalogue et récupère les recommandations communautaires**, vérifie API/SQL/UI, effectue une sauvegarde testée et propose l'aperçu puis l'import confirmé de ta bibliothèque personnelle (CSV à placer dans private-data/mangatheque.csv). Les éditions françaises ISBN sont à compléter séparément après vérification BnF.
+L'assistant prépare le fichier .env avec des secrets aléatoires, crée les tables PostgreSQL, démarre l'application, **extrait les JSON Tenrai SEARCH + TOP, les charge dans PostgreSQL, construit le catalogue et récupère les recommandations communautaires**, vérifie API/SQL/UI, effectue une sauvegarde testée et propose l'aperçu puis l'import confirmé de ta bibliothèque personnelle (CSV à placer dans private-data/mangatheque.csv). Les éditions françaises ISBN sont à compléter séparément après vérification BnF.
 
 Les options **23 à 29** permettent ensuite de refaire chaque opération sans réinstallation : configuration, tables, catalogue, recommandations, diagnostic, **mise à jour Git + sauvegarde + Docker** et diagnostic réseau Docker/Tenrai (29). Les étapes 25 et 26 vérifient maintenant l'accès externe avant de lancer leurs extractions. Les options historiques de maintenance, sauvegarde et import sont conservées ; l'ancien sous-menu 12 a été remplacé par un alias de compatibilité vers l'option 25. **L'option 22 n'efface jamais tes volumes**, et l'option destructive 11 doit rester exceptionnelle et volontaire.
 
@@ -47,13 +47,13 @@ Dans **Ma bibliothèque**, le volet **Mon inventaire physique par édition** aff
 
 Voir : [Tableau des éditions physiques 3.9](docs/04_product/physical_inventory_dashboard_3_9.md).
 
-### Importer ton inventaire avec confirmation (option 21 — Mangadvisor 3.8)
+### Importer ton inventaire avec confirmation (option 21)
 
 Après avoir effectué une **sauvegarde validée (option 17)**, place le CSV privé dans `private-data/mangatheque.csv`. Démarre l'application et choisis l'**option 21**. Le script rapproche seulement les œuvres aux titres correspondants de façon exacte et unique, puis affiche un **aperçu sans écriture** : lignes prêtes, éditions distinctes, lignes ambiguës et données préexistantes. Une confirmation textuelle explicite est obligatoire avant l'import, notamment pour accepter un import partiel.
 
 Les quantités par **édition déclarée** sont conservées séparément des ISBN vérifiés. Une œuvre absente de la bibliothèque est ajoutée comme « Possédée » pour éviter qu'elle soit recommandée ; **aucune note, favori, statut existant ou tome lu n'est écrasé**. Un titre manquant ou homonyme reste à vérifier. Les fichiers et rapports restent exclusivement dans `private-data/`, ignoré par Git.
 
-Voir [Import sécurisé 3.8](docs/04_product/safe_inventory_import_3_8.md).
+Voir [Import sécurisé historique 3.8](docs/04_product/safe_inventory_import_3_8.md) et [Conservation des titres en attente 4.3](docs/04_product/inventaire_en_attente_4_3.md).
 
 ### Tester ta vraie mangathèque sans importer les données (option 20)
 
