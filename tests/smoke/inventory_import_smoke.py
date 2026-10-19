@@ -64,10 +64,10 @@ def main() -> None:
 
     # Existing explicit rejection of a different work must not be silently
     # converted to ownership by a physical inventory declaration.
-    conflict=req("/inventory/preview",{"csv_content":(
-        "serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier\\n"
-        "Demo CI 05;1;0;0\\n"
-    ).replace("\\\\n","\\n")})
+    conflict=req("/inventory/preview",{"csv_content":
+        "serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier\n"
+        "Demo CI 05;1;0;0\n"
+    })
     assert conflict["items"][0]["status"]=="REVIEW_LIBRARY_CONFLICT",conflict
 
     first=req("/inventory/preview",{"csv_content":fixture()})
