@@ -8,6 +8,9 @@ from pydantic import BaseModel, Field
 from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
 from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
+from apps.api.app.library_seed_selection import (
+    choose_representative_sources, evidence_summary,
+)
 from apps.api.app.collection import create_collection_router, ensure_collection_schema
 from apps.api.app.collection_bulk import collection_import_router
 from apps.api.app.inventory_import import inventory_router,ensure_inventory_schema
@@ -1856,7 +1859,7 @@ def recommend_from_library(
             updated_at DESC,
             popularity ASC NULLS LAST
 
-        LIMIT 10;
+        LIMIT 100;
     """
 
     all_library_ids_sql = """
@@ -1975,6 +1978,18 @@ def recommend_from_library(
             name ASC;
     """
 
+    # Read only verified catalogue genres/themes for at most 100 candidate
+    # source works. Ownership itself is never treated as a user's rating.
+    seed_tags_sql = """
+        SELECT mg.manga_id, ('g:' || LOWER(g.name)) AS tag
+          FROM manga_genre mg JOIN genre g ON g.id = mg.genre_id
+         WHERE mg.manga_id = ANY(%(seed_ids)s)
+        UNION
+        SELECT mt.manga_id, ('t:' || LOWER(t.name)) AS tag
+          FROM manga_theme mt JOIN theme t ON t.id = mt.theme_id
+         WHERE mt.manga_id = ANY(%(seed_ids)s)
+    """
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(positive_sources_sql, {"user_id": DEFAULT_USER_ID})
@@ -1988,6 +2003,13 @@ def recommend_from_library(
 
             cur.execute(profile_tags_sql, {"user_id": DEFAULT_USER_ID})
             tag_rows = cur.fetchall()
+            if len(positive_sources_available) > 5:
+                cur.execute(seed_tags_sql, {
+                    "seed_ids": [item["id"] for item in positive_sources_available],
+                })
+                seed_tag_rows = cur.fetchall()
+            else:
+                seed_tag_rows = []
 
     if not positive_sources_available:
         raise HTTPException(
@@ -1998,26 +2020,29 @@ def recommend_from_library(
             ),
         )
 
-    high_confidence_sources = [
-        source
-        for source in positive_sources_available
-        if source.get("is_favorite") is True
-        or (
-            source.get("user_score") is not None
-            and float(source.get("user_score")) >= 8.5
-        )
-    ]
-
-    if len(high_confidence_sources) >= 3:
-        positive_sources_used = high_confidence_sources[:5]
-        source_selection_rule = (
-            "Sources haute confiance : favoris et/ou notes utilisateur >= 8.5."
-        )
-    else:
-        positive_sources_used = positive_sources_available[:5]
-        source_selection_rule = (
-            "Sources positives principales : favoris, notes, statuts lus/en cours/envie."
-        )
+    tags_by_manga: dict[int, set[str]] = {}
+    for entry in seed_tag_rows:
+        tags_by_manga.setdefault(int(entry["manga_id"]), set()).add(entry["tag"])
+    positive_sources_used, seed_strategy = choose_representative_sources(
+        positive_sources_available, tags_by_manga
+    )
+    signal_quality = evidence_summary(positive_sources_available)
+    source_selection_rule = {
+        "EXPLICIT_FAVORITES_OR_HIGH_RATINGS": (
+            "Priorite aux favoris et notes explicites >= 8.5."
+        ),
+        "SMALL_LIBRARY": (
+            "Petite bibliotheque : sources triees selon les lectures, notes et favoris."
+        ),
+        "RECORDED_ATTRIBUTE_DIVERSITY": (
+            "Diversification des sources par genres et themes attestes au catalogue, "
+            "avec priorite aux lectures et notes de l'utilisateur."
+        ),
+        "WEIGHTED_FALLBACK_NO_TAGS": (
+            "Genres et themes absents : utilisation prudente des meilleures sources "
+            "disponibles, sans inventer de preferences."
+        ),
+    }[seed_strategy]
 
     library_manga_ids = {
         row["manga_id"] if isinstance(row, dict) else row[0]
@@ -2140,6 +2165,14 @@ def recommend_from_library(
     profile_summary = {
         "status_counts": status_counts,
         "source_selection_rule": source_selection_rule,
+        "source_sampling_strategy": seed_strategy,
+        "preference_evidence": signal_quality["level"],
+        "evidence_warning": signal_quality["warning"],
+        "recorded_seed_attribute_count": len(set().union(*(
+            tags_by_manga.get(int(item["id"]), set())
+            for item in positive_sources_used
+        ))) if positive_sources_used else 0,
+        "positive_source_pool_capped": len(positive_sources_available) >= 100,
         "positive_source_count_available": len(positive_sources_available),
         "positive_source_count_used": len(positive_sources_used),
         "top_genres": grouped_tags["genre"],

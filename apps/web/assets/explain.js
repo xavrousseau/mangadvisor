@@ -53,7 +53,7 @@ export function explainProfile(response) {
     : Array.isArray(response.sources) ? response.sources : [];
   const sources = sourceItems
     .filter(x => x && typeof x.title === "string" && x.title.trim())
-    .slice(0, 6)
+    .slice(0, 8)
     .map(x => ({
       title: x.title,
       favorite: x.is_favorite === true,
