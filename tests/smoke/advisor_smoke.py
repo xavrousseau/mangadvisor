@@ -31,6 +31,29 @@ def main():
     assert ai_result["count"]>0,ai_result
     assert all("mood_matches" in row for row in ai_result["recommendations"]),ai_result
 
+    # From a blank conversation, the user's actual positive library is enough
+    # to offer an evidence-based surprise, without inventing an explicit mood.
+    surprise=request("Surprends-moi selon mes goûts")
+    assert surprise["status"]=="results",surprise
+    assert surprise["context"]["mood"] is None,surprise
+    assert surprise["context"]["profile_discovery"] is True,surprise
+    assert surprise["context"]["recommendation_balance"]=="EXPLORE",surprise
+    assert surprise["discovery_source"]=="library_tags",surprise
+    assert surprise["personalized"] is True,surprise
+    assert surprise["count"]>0,surprise
+    assert all(m["affinity_matches"]["genres"] or m["affinity_matches"]["themes"]
+               for m in surprise["recommendations"]),surprise
+    assert all(m["title"] not in ("Naruto","Monster","Vinland Saga")
+               for m in surprise["recommendations"]),surprise
+    # A multi-turn strict French filter does not silently relax or change mode.
+    surprise_fr=request("Français obligatoire",surprise["context"])
+    assert surprise_fr["status"]=="results",surprise_fr
+    assert surprise_fr["context"]["profile_discovery"] is True,surprise_fr
+    assert surprise_fr["context"]["french"]=="REQUIRE",surprise_fr
+    assert all(m["french_recorded"] for m in surprise_fr["recommendations"]),surprise_fr
+    disabled=request("Surprends-moi sans mes goûts")
+    assert disabled["status"]=="clarify",disabled
+
     first=request("Un manga d'action ou d'aventure, plutôt long et terminé")
     assert first["status"]=="results",first
     assert first["count"]>0,first
