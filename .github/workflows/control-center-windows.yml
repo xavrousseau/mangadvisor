@@ -63,3 +63,39 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Relance de configuration impossible." }
           $secondHash = (Get-FileHash .env -Algorithm SHA256).Hash
           if ($firstHash -ne $secondHash) { throw "Le .env existant a ete modifie." }
+
+      - name: Verifier une requete psql avec identifiants sans vraie base
+        shell: powershell
+        run: |
+          # Dot-source the script in Environment mode; then replace docker in memory.
+          # This executes Get-Count on Windows PowerShell 5.1 and catches
+          # a newline breaking '-U' into a second PowerShell statement.
+          . .\cmd\control-center.ps1 -Action Environment
+          $script:received = @()
+          function docker {
+            $script:received = @($args)
+            $global:LASTEXITCODE = 0
+            "103"
+          }
+          $actual = Get-Count "manga"
+          if ($actual -ne 103) { throw "Compte de mangas incorrect : $actual" }
+          $received = $script:received
+          if ($received[0] -ne "exec" -or $received[2] -ne "psql") {
+            throw "docker exec psql doit etre invoque comme une commande unique."
+          }
+          $u = [array]::IndexOf($received,"-U")
+          $d = [array]::IndexOf($received,"-d")
+          $c = [array]::IndexOf($received,"-c")
+          if ($u -lt 0 -or $d -lt 0 -or $c -lt 0) {
+            throw "Des arguments psql sont absents."
+          }
+          if ($received[$u + 1] -ne (Config "POSTGRES_USER") -or
+              $received[$d + 1] -ne (Config "POSTGRES_DB")) {
+            throw "Identifiants psql differents du .env local."
+          }
+          if ($received[$c + 1] -ne "SELECT COUNT(*) FROM manga;") {
+            throw "Requete SQL incorrecte."
+          }
+          $blocked = $false
+          try { Get-Count "not_a_real_table" | Out-Null } catch { $blocked = $true }
+          if (-not $blocked) { throw "La liste autorisee des tables n'est pas appliquee." }

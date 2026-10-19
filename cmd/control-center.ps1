@@ -154,9 +154,15 @@ function Get-Count([string]$Table) {
              "demographic","manga_demographic","manga_recommendation_edge",
              "user_manga_inventory_declaration","user_manga_library","manga_fr_edition")
   if ($Table -notin $allowed) { throw "Table non autorisee." }
-  $result=@(& docker exec mangadvisor_postgres psql -X -At -v ON_ERROR_STOP=1
-             -U (Config "POSTGRES_USER") -d (Config "POSTGRES_DB")
-             -c "SELECT COUNT(*) FROM $Table;" 2>&1)
+  # Pass every psql option as one native process invocation.
+  # In Windows PowerShell, a bare newline before -U would split the command:
+  # psql would connect as root, then PowerShell would try to execute '-U'.
+  $psqlArgs=@("exec","mangadvisor_postgres","psql","-X","-At",
+              "-v","ON_ERROR_STOP=1",
+              "-U",(Config "POSTGRES_USER"),
+              "-d",(Config "POSTGRES_DB"),
+              "-c","SELECT COUNT(*) FROM $Table;")
+  $result=@(& docker @psqlArgs 2>&1)
   Assert-Exit "Impossible d'interroger la table $Table. Initialiser d'abord les tables."
   $count=0
   if (![int]::TryParse(([string]$result[-1]).Trim(),[ref]$count)) {
