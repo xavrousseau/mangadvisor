@@ -1,5 +1,6 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
+import { physicalInventoryMarkup } from "./physical-inventory-view.js";
 import { createIsbnScanner } from "./isbn-scanner.js";
 import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js";
 import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS,ADVISOR_BALANCE_PROMPTS} from "./advisor-view.js";
@@ -348,6 +349,11 @@ async function renderLibrary(token){
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
  '<div id="library-results">'+loadingCards(10)+'</div>'+
+ '<section class="physical-inventory-section"><details id="physical-inventory-workspace" open>'+
+ '<summary>▤ '+L("physicalTitle")+'</summary>'+
+ '<p class="page-desc">'+L("physicalIntro")+'</p>'+
+ '<div id="physical-inventory-results"><div class="info">'+L("loading")+'</div></div>'+
+ '</details></section>'+
  '<section class="bulk-workspace"><details id="bulk-import-workspace"'+(state.bulkResolver?' open':'')+'><summary>⌑ '+L("bulkTitle")+'</summary>'+
  '<p class="page-desc">'+L("bulkIntro")+'</p>'+
  '<div class="bulk-steps"><div class="field"><label for="bulk-csv-file">'+L("bulkFile")+'</label>'+
@@ -364,7 +370,20 @@ async function renderLibrary(token){
  '<a href="http://localhost:8502" class="btn-link" target="_blank" rel="noopener">'+L("openLegacy")+' ↗</a></div>';
  if(!mount(html,token))return;
  if(state.bulkResolver)drawBulkResolver();
+ void updatePhysicalInventory(token);
  await updateLibrary(token);
+}
+async function updatePhysicalInventory(token){
+ const host=document.querySelector("#physical-inventory-results");
+ if(!host)return;
+ try{
+  const physical=await request("/inventory/declarations");
+  if(token===renderToken && routeInfo().view==="library")
+    host.innerHTML=physicalInventoryMarkup(physical,state.lang,t,escapeHtml);
+ }catch(err){
+  if(token===renderToken && routeInfo().view==="library")
+    host.innerHTML='<p class="collection-caveat">'+L("physicalUnavailable")+'</p>';
+ }
 }
 async function updateLibrary(token){
  const out=document.querySelector("#library-results");if(!out||renderToken!==token)return;
@@ -398,12 +417,13 @@ async function renderDetail(token,id){
  try{
   const manga=state.detailCache[id]||await request("/mangas/"+id);
   state.detailCache[id]=manga;state.currentDetail=manga;
-  const [urls,libraryItem,translation,frCollection]=await Promise.all([
+  const [urls,libraryItem,translation,frCollection,physicalInventory]=await Promise.all([
     covers([manga]),readLibraryItem(manga),
     state.lang==="fr"&&manga.synopsis?request("/localization/synopsis",{
       method:"POST",data:{manga_id:id,lang:"fr"}
     }).catch(()=>null):Promise.resolve(null),
-    request("/collection/mangas/"+id+"/editions").catch(()=>null)
+    request("/collection/mangas/"+id+"/editions").catch(()=>null),
+    request("/inventory/declarations?manga_id="+id).catch(()=>null)
   ]);
   if(token!==renderToken)return;
   state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.editionPreview=null;
@@ -441,6 +461,10 @@ async function renderDetail(token,id){
     '<div class="form-action-row"><label class="check"><input type="checkbox" name="favorite"'+(libraryItem?.is_favorite?' checked':'')+'>'+L("favorite")+'</label>'+
     '<div class="actions">'+(libraryItem?'<button type="button" data-action="remove-library" class="btn btn-small">'+L("removeLibrary")+'</button>':'')+
     '<button class="btn btn-primary" type="submit">'+L(libraryItem?"updateLibrary":"addLibrary")+'</button></div></div></form>'+
+   (physicalInventory?.items?.length?
+     '<section class="physical-inventory-detail"><h2 class="section-title">'+L("physicalTitle")+'</h2>'+
+     physicalInventoryMarkup(physicalInventory,state.lang,t,escapeHtml,{compact:true})+
+     '</section>':"")+
    '<div id="collection-book-panel">'+(frCollection?collectionPanel(frCollection,libraryItem,state.lang,t,escapeHtml)+
        bibliographyPanel(escapeHtml,t,state.lang,manga.title)+
        enrichmentPanel(escapeHtml,t,state.lang):
