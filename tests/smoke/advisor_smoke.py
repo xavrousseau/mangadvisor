@@ -69,6 +69,20 @@ def main():
     assert all(x["french_editions"]["registered_isbn_count"]==0
                for x in second["recommendations"][1:]),second
 
+    # The user can change the discovery balance without losing a single filter.
+    diversified=request("Surprends-moi avec une sélection inattendue",second["context"])
+    assert diversified["context"]["recommendation_balance"]=="EXPLORE",diversified
+    assert diversified["context"]["french"]=="PREFER",diversified
+    assert diversified["context"]["length"]=="LONG",diversified
+    assert diversified["status"]=="results",diversified
+    assert diversified["recommendations"][0]["title"]=="Demo CI 08",diversified
+    assert all("variety_evidence" in m for m in diversified["recommendations"]),diversified
+
+    close=request("Je veux une sélection très proche de mes goûts",diversified["context"])
+    assert close["context"]["recommendation_balance"]=="CLOSE",close
+    assert close["context"]["french"]=="PREFER",close
+    assert close["recommendations"][0]["title"]=="Demo CI 08",close
+
     soft_format=request("Je préfère une édition Deluxe",second["context"])
     assert soft_format["context"]["preferred_edition_kind"]=="DELUXE",soft_format
     assert soft_format["context"]["require_edition_kind"] is False,soft_format
