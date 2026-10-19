@@ -325,6 +325,20 @@ def main() -> int:
     print(f"Erreurs                       : {total_errors}")
     print("==================================================")
 
+    # A complete provider outage must not be reported as a successful import.
+    # Preserve any previously loaded recommendations and let the menu offer
+    # a safe retry. Partial extractions remain usable but visibly incomplete.
+    if total_errors and not (total_api_calls or total_skipped):
+        print(
+            "[recommendations] ECHEC : aucun manga n'a pu etre extrait ou "
+            "relire son cache. Relancer l'option 29 (reseau), puis 26."
+        )
+        return 1
+    if total_errors:
+        print(
+            f"[recommendations] ATTENTION : {total_errors} mangas en erreur. "
+            "Relancer l'option 26 pour completer les fichiers manquants."
+        )
     return 0
 
 
