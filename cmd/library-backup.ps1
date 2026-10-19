@@ -19,7 +19,7 @@ $compose=@("--env-file",$envFile,
 function Assert-Ok([string]$message) {
   if ($LASTEXITCODE -ne 0) { throw "$message (code $LASTEXITCODE)" }
 }
-function Docker([string[]]$CommandArgs, [string]$Message) {
+function Run-Docker([string[]]$CommandArgs, [string]$Message) {
   & docker @CommandArgs
   Assert-Ok $Message
 }
@@ -60,7 +60,7 @@ function Backup-Path([string]$given) {
 }
 function Drop-Verification([string]$name) {
   if ($name -notmatch '^ma_verify_[a-f0-9]{8}$') { throw "Base de verification invalide." }
-  Docker @("exec",$containerName,"dropdb","--if-exists","--force","-U",$script:pgUser,$name) "Echec nettoyage base de verification"
+  Run-Docker @("exec",$containerName,"dropdb","--if-exists","--force","-U",$script:pgUser,$name) "Echec nettoyage base de verification"
 }
 function Restore-Test([string]$archive,[switch]$KeepDatabase) {
   # Uses a fresh isolated database, never the live Mangadvisor database.
@@ -68,10 +68,10 @@ function Restore-Test([string]$archive,[switch]$KeepDatabase) {
   $remote="/tmp/ma_check_$(Token).dump"
   $created=$false
   try {
-    Docker @("cp",$archive,("{0}:{1}" -f $containerName,$remote)) "Copie binaire impossible"
-    Docker @("exec",$containerName,"createdb","-U",$script:pgUser,"-T","template0",$testDb) "Creation base de verification impossible"
+    Run-Docker @("cp",$archive,("{0}:{1}" -f $containerName,$remote)) "Copie binaire impossible"
+    Run-Docker @("exec",$containerName,"createdb","-U",$script:pgUser,"-T","template0",$testDb) "Creation base de verification impossible"
     $created=$true
-    Docker @("exec",$containerName,"pg_restore","-U",$script:pgUser,
+    Run-Docker @("exec",$containerName,"pg_restore","-U",$script:pgUser,
       "--exit-on-error","--single-transaction","--no-owner","--no-acl",
       "-d",$testDb,$remote) "Restauration de test PostgreSQL echouee"
     $found=& docker exec $containerName psql -X -v ON_ERROR_STOP=1 -U $script:pgUser -d $testDb -At -c "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('manga','user_manga_library','manga_fr_edition','user_manga_volume');"
@@ -94,10 +94,10 @@ function Create-Backup {
   $remote="/tmp/ma_dump_$(Token).dump"
   try {
     Write-Host "Sauvegarde PostgreSQL coherente en cours..."
-    Docker @("exec",$containerName,"pg_dump","-U",$script:pgUser,"-d",$script:pgDb,"-Fc","-Z","6","-f",$remote) "pg_dump echoue"
+    Run-Docker @("exec",$containerName,"pg_dump","-U",$script:pgUser,"-d",$script:pgDb,"-Fc","-Z","6","-f",$remote) "pg_dump echoue"
     & docker exec $containerName pg_restore --list $remote | Out-Null
     Assert-Ok "Archive produite invalide"
-    Docker @("cp",("{0}:{1}" -f $containerName,$remote),$local) "Copie du fichier echouee"
+    Run-Docker @("cp",("{0}:{1}" -f $containerName,$remote),$local) "Copie du fichier echouee"
     $manifest=[ordered]@{
       format="mangadvisor-pg-custom-v1"
       file=$filename
