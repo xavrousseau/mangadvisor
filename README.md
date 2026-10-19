@@ -8,7 +8,7 @@ Pour une première installation sur Windows : **télécharge le dépôt GitHub (
 
 L'assistant prépare le fichier .env avec des secrets aléatoires, crée les tables PostgreSQL, démarre l'application, **extrait les JSON Jikan SEARCH + TOP, les charge dans PostgreSQL, construit le catalogue et récupère les recommandations communautaires**, vérifie API/SQL/UI, effectue une sauvegarde testée et propose l'aperçu puis l'import confirmé de ta bibliothèque personnelle (CSV à placer dans private-data/mangatheque.csv). Les éditions françaises ISBN sont à compléter séparément après vérification BnF.
 
-Les options **23 à 28** permettent ensuite de refaire chaque opération sans réinstallation : configuration, tables, catalogue, recommandations, diagnostic et **mise à jour Git + sauvegarde + Docker**. Les options historiques 1 à 21 restent disponibles. **L'option 22 n'efface jamais tes volumes**, et l'option destructive 11 doit rester exceptionnelle et volontaire.
+Les options **23 à 29** permettent ensuite de refaire chaque opération sans réinstallation : configuration, tables, catalogue, recommandations, diagnostic, **mise à jour Git + sauvegarde + Docker** et diagnostic réseau Docker/Jikan (29). Les étapes 25 et 26 vérifient maintenant l'accès externe avant de lancer leurs extractions. Les options historiques 1 à 21 restent disponibles. **L'option 22 n'efface jamais tes volumes**, et l'option destructive 11 doit rester exceptionnelle et volontaire.
 
 Voir [le guide complet du centre de pilotage 4.0](docs/04_product/control_center_4_0.md).
 

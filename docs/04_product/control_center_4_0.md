@@ -30,6 +30,7 @@ Une réinstallation est **non destructive par défaut** : elle ne supprime ni vo
 | **26** | Extraire et charger les recommandations communautaires | Upserts relations, sans reset |
 | **27** | Diagnostiquer bases et application | Lecture seule |
 | **28** | Sauvegarde vérifiée, mise à jour Git, rebuild Docker, diagnostic | Préserve les volumes |
+| **29** | Vérification DNS et accès HTTPS depuis le conteneur Docker vers Jikan et un site témoin | Lecture seule |
 | **17 à 19** | Sauvegarder, revérifier, restaurer après confirmation | Restauration seulement sur demande |
 | **20 et 21** | Simuler la collection, importer après aperçu et confirmation | Option 21 uniquement |
 | **13 à 16** | Scanner mobile HTTPS et IA Ollama locale optionnelle | Aucun effacement de bibliothèque |
@@ -47,3 +48,11 @@ L'import CSV conserve les déclarations physiques par édition mais ne prétend 
 Le diagnostic contrôle l'infrastructure réelle, mais pas la qualité artistique des recommandations ni l'identification certaine de tous les titres. Vérifier les fiches, les couvertures, la correspondance des mangas de ta collection, les éditions et les exclusions des recommandations dans l'interface. Une CI GitHub réussie ne remplace pas un test du PC.
 
 En cas d'échec Jikan (réseau ou quotas), relancer l'option 25 sans suppression. En cas d'échec SQL, corriger puis relancer 24. Pour un inventaire non reconnu, enrichir le catalogue avant d'importer plutôt que d'inventer une correspondance. L'option 6 donne accès aux logs et 27 permet de reprendre les contrôles.
+
+## Erreur : Network is unreachable / impossible de joindre Jikan
+
+Si l'extraction affiche **Errno 101 : Network is unreachable**, c'est le conteneur Docker **engine** qui n'a pas pu joindre Internet. Ce n'est ni une erreur PostgreSQL ni une limite de quota Jikan. Le chargement est interrompu sans suppression des volumes.
+
+Le centre de pilotage vérifie désormais le réseau **avant les options 25 et 26**, et propose aussi **29 — Diagnostic réseau Docker/Jikan** à la demande. Ce contrôle est en lecture seule et teste DNS + connexion TCP/TLS vers api.jikan.moe, ainsi qu'un site témoin : il ne change aucune configuration réseau.
+
+Pour dépanner : ouvrir https://api.jikan.moe/v4/manga?page=1&limit=1 dans le navigateur de Windows. Si Windows arrive à joindre Jikan mais pas Docker, essayer **Docker Desktop > Troubleshoot > Restart Docker Desktop**. Si nécessaire, examiner **Docker Desktop > Settings > Resources > Proxies** et les règles VPN/pare-feu. Si ni Windows ni Docker ne peuvent joindre le site, corriger d'abord l'accès du PC. Relancer **29**, puis **25** lorsque l'accès HTTPS de Jikan est confirmé. **Ne pas utiliser 11/Nuke** pour une erreur réseau.
