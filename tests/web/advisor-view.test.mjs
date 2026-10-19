@@ -151,3 +151,35 @@ test("a first-click personalized surprise shows honest library evidence, not emp
  assert.doesNotMatch(html,/advisorProof/);
  assert.match(html,/data-go="\/manga\/12"/);
 });
+
+
+test("advisor evidence audit discloses real metrics without inventing a success rate",()=>{
+ const manga={id:51,title:"Real title",genres:["Mystery"],themes:["Psychological"],
+  mood_matches:{genres:["Mystery"],themes:[]},
+  affinity_matches:{genres:["Mystery"],themes:[]},
+  narrative_matches:[],variety_evidence:[]};
+ const reply={count:1,personalized:true,context:{recommendation_balance:"BALANCED"},
+  recommendations:[manga],quality_diagnostic:{
+    scope:"displayed_catalogue_results_only",mode:"BALANCED",
+    examined_count:42,returned_count:1,unique_manga_count:1,
+    tag_evidence_count:1,unique_recorded_tags:2,
+    affinity_evidence_count:1,mean_pairwise_tag_overlap:null,
+    candidate_pool_capped:false
+  }};
+ const markup=advisorResultsMarkup(reply,{
+  L,e,tr:e,poster:()=>"",rating:()=>"",published:()=>"",
+ });
+ assert.match(markup,/<details class="advisor-quality">/);
+ assert.match(markup,/advisorQualityShown/);
+ assert.match(markup,/advisorQualityExamined/);
+ assert.match(markup,/42/);
+ assert.match(markup,/advisorQualityCaution/);
+ assert.doesNotMatch(markup,/NaN|undefined|Infinity|compatibilityPercentage/);
+ reply.quality_diagnostic.mean_pairwise_tag_overlap=0.375;
+ reply.quality_diagnostic.candidate_pool_capped=true;
+ const limited=advisorResultsMarkup(reply,{
+  L,e,tr:e,poster:()=>"",rating:()=>"",published:()=>"",
+ });
+ assert.match(limited,/38%/);
+ assert.match(limited,/advisorQualityWindow/);
+});
