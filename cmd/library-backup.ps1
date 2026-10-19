@@ -162,7 +162,7 @@ try {
   # Verify an independent safety copy of the CURRENT database before switching.
   $null=Create-Backup
   $restoredDb=Restore-Test $archive -KeepDatabase
-  & docker compose @compose --profile legacy stop api web ui engine
+  & docker compose @compose stop api web engine
   Assert-Ok "Impossible d'arreter les services applicatifs"
   $null=Admin-Sql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$pgDb' AND pid<>pg_backend_pid();"
   $q=[char]34
@@ -182,7 +182,7 @@ catch {
 }
 finally {
   if ($restoredDb) { Drop-Verification $restoredDb }
-  # Restart only the supported site 8501; legacy 8502 stays opt-in.
+  # Restart only the single supported Web site at 8501.
   & docker compose @compose up -d api web
   if ($LASTEXITCODE -ne 0) { Write-Warning "Relancer mangadvisor.cmd option 3 pour les services Web." }
 }
