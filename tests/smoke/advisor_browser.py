@@ -27,6 +27,15 @@ def run(page,device):
     expect(page.locator(".advisor-message.is-assistant").first).to_be_visible()
     expect(page.locator(".advisor-card").first).to_be_visible(timeout=30000)
     expect(page.locator(".advisor-card").first).to_contain_text("ISBN français enregistré")
+    expect(page.locator(".advisor-quality")).to_be_visible()
+    page.locator(".advisor-quality > summary").click()
+    expect(page.locator(".advisor-quality-body")).to_contain_text(
+        "Candidats examinés")
+    expect(page.locator(".advisor-quality-body")).to_contain_text(
+        "Genres et thèmes distincts")
+    expect(page.locator(".advisor-quality-body")).to_contain_text(
+        "pas une probabilité")
+
     first_titles=page.locator(".advisor-card h3").all_inner_texts()
     assert first_titles,device
     # One-tap diversity controls are a normal conversational follow-up.
