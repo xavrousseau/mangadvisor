@@ -79,10 +79,10 @@ class FeedbackLearningTests(unittest.TestCase):
         ])
         context=AdvisorContext(mood="ACTION",recommendation_balance="CLOSE")
         prefs={"genres":set(),"themes":set()}
-        old=score_candidates([manga(1,["Action","Adventure"]),
-                              manga(2,["Action"])],context,prefs,2)
-        new=score_candidates([manga(1,["Action","Adventure"]),
-                              manga(2,["Action"])],context,prefs,2,profile)
+        old=score_candidates([manga(1,["Adventure"],score=8.0),
+                              manga(2,["Action"],score=8.1)],context,prefs,2)
+        new=score_candidates([manga(1,["Adventure"],score=8.0),
+                              manga(2,["Action"],score=8.1)],context,prefs,2,profile)
         self.assertEqual(old[0]["id"],2)
         self.assertEqual(new[0]["id"],1)
         self.assertEqual(new[0]["feedback_evidence"]["interested_tags"],["Adventure"])
