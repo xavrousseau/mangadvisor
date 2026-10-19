@@ -3,6 +3,7 @@ import unittest
 from fastapi import HTTPException
 from apps.api.app.inventory_import import (
     parse_inventory, attach_inventory_matches, preview_hash, UNSPECIFIED,
+    pending_key, pending_hash, SCHEMA,
 )
 
 
@@ -78,6 +79,28 @@ class ImportInventoryTests(unittest.TestCase):
                                         [{"manga_id":15,"library_status":"READ"}])
         self.assertNotEqual(preview_hash(base,1),preview_hash(changed,1))
         self.assertNotEqual(preview_hash(base,1),preview_hash(base,2))
+
+    def test_unmatched_entries_can_be_preserved_without_guessed_manga_ids(self):
+        rows=parse_inventory(CSV)
+        preview=attach_inventory_matches(rows,CATALOG[:1],[],[])
+        self.assertEqual(preview["items"][-1]["status"],"REVIEW_MISSING")
+        missing=preview["items"][-1]
+        self.assertIsNone(missing["manga_id"])
+        self.assertEqual(pending_key(missing),"Inventaire!A31")
+        self.assertEqual(len(pending_hash(missing)),64)
+        self.assertNotIn("manga_id INTEGER NOT NULL",SCHEMA.split("CREATE TABLE IF NOT EXISTS user_manga_inventory_pending")[1])
+        self.assertIn("PRIMARY KEY (user_id, source_key)",SCHEMA)
+        self.assertIn("user_manga_inventory_pending",SCHEMA)
+
+    def test_pending_identity_is_stable_and_changed_claims_conflict(self):
+        row=parse_inventory(CSV)[0]
+        self.assertEqual(pending_key(row),"Inventaire!A29")
+        changed={**row,"main_volumes":99}
+        self.assertEqual(pending_key(changed),pending_key(row))
+        self.assertNotEqual(pending_hash(changed),pending_hash(row))
+        relabel={**row,"entry_title":"Changed owner title"}
+        self.assertNotEqual(pending_hash(relabel),pending_hash(row))
+        self.assertEqual(pending_hash(row),pending_hash(dict(row)))
 
     def test_malformed_or_ambiguous_inventory_is_rejected(self):
         bad=[
