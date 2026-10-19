@@ -11,6 +11,12 @@
 
 Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
 
+### Voir les éditions physiques dans l'application (Mangadvisor 3.9)
+
+Dans **Ma bibliothèque**, le volet **Mon inventaire physique par édition** affiche les éditions déclarées d'une même œuvre et leurs quantités séparées. Chaque fiche manga affiche également les éditions physiques déclarées, distinctes des livres par **ISBN réellement vérifiés**. Cela ne crée ni ISBN, ni tomes lus, ni séries supposées complètes. Le volet est vide jusqu'à l'import confirmé du CSV personnel.
+
+Voir : [Tableau des éditions physiques 3.9](docs/04_product/physical_inventory_dashboard_3_9.md).
+
 ### Importer ton inventaire avec confirmation (option 21 — Mangadvisor 3.8)
 
 Après avoir effectué une **sauvegarde validée (option 17)**, place le CSV privé dans `private-data/mangatheque.csv`. Démarre l'application et choisis l'**option 21**. Le script rapproche seulement les œuvres aux titres correspondants de façon exacte et unique, puis affiche un **aperçu sans écriture** : lignes prêtes, éditions distinctes, lignes ambiguës et données préexistantes. Une confirmation textuelle explicite est obligatoire avant l'import, notamment pour accepter un import partiel.
