@@ -77,3 +77,9 @@ L'ancien sous-menu Jikan (option 12) a été fusionné fonctionnellement avec l'
 Le site utilisateur est exclusivement **http://localhost:8501**. L'ancien Streamlit **8502** reste présent en code uniquement pour les tests ; `docker compose --profile legacy up ui` est réservé au développement et non requis par le menu Windows. Les options de démarrage standard et le centre de pilotage arrêtent proprement toute ancienne instance 8502 sans effacer ses données.
 
 Si l'API est recréée après Nginx, son adresse IP peut changer sur le réseau Docker. Le proxy Web utilise désormais `resolver 127.0.0.11` pour rafraîchir automatiquement cette adresse tout en retirant le préfixe `/api` et en préservant les paramètres d'URL. L'option **27** distingue maintenant trois cas : API directe indisponible, site HTML indisponible, ou proxy / bibliothèque indisponible (dont `HTTP 502`). Aucune purge Docker n'est nécessaire.
+
+## Stabilisation 4.4 (API, sauvegarde et bibliothèque)
+
+Le site Web attend dorénavant le **healthcheck réel** de FastAPI (connexion PostgreSQL), et le diagnostic 27 conserve son contrôle du proxy Nginx. L'option 17 de sauvegarde vérifie aussi, dans la base temporaire restaurée, les tables `user_manga_inventory_declaration` et `user_manga_inventory_pending` si elles figurent dans l'archive. Un ancien outil indépendant utilisant `--reset-db` est explicitement bloqué. La page « Ma bibliothèque » sépare statut, éventuelle note et nombre d'exemplaires physiques **déclarés** ; aucun ISBN n'est inféré.
+
+Le nom affiché suit la priorité **titre français explicitement vérifié (si disponible) → titre anglais fourni par la source → titre principal → titre japonais**. À ce jour, il n'existe pas de registre général de titres français officiellement vérifiés ; les couvertures peuvent être celles des éditions japonaises. Voir le [rapport d'audit et la suite](../03_technical/audit_transversal_4_4.md).
