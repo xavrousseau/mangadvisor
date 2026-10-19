@@ -79,8 +79,10 @@ function Check-Docker {
 }
 function Compose([string[]]$Arguments) {
   $all=@("--env-file",$envFile)+$composeFiles+$Arguments
-  $aiSetting=@(Get-Content -LiteralPath $envFile | Where-Object {
-    $_ -match '^\s*OLLAMA_ENABLED\s*=\s*true\s*
+  $aiRaw=@(Get-Content -LiteralPath $envFile | Where-Object {
+    $_ -like "OLLAMA_ENABLED=true"
+  })
+  if ($aiRaw.Count -gt 0) { $all=@("--profile","ai")+$all }
   Run "docker" (@("compose")+$all) "Echec de Docker Compose"
 }
 function Wait-Postgres {
