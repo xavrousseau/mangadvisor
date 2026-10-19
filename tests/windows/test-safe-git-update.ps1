@@ -35,7 +35,7 @@ if ($LASTEXITCODE -ne 0) { throw "Remote push failed" }
 [IO.File]::WriteAllText((Join-Path $working "README.txt"),("My valuable local changes"+[Environment]::NewLine),(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $working ".env"),("POSTGRES_PASSWORD=LOCAL_TEST_DO_NOT_STASH"+[Environment]::NewLine),(New-Object Text.UTF8Encoding($false)))
 New-Item -ItemType Directory -Path (Join-Path $working "private-data") | Out-Null
-[IO.File]::WriteAllText((Join-Path $working "private-data" "my-manga.csv"),("PRIVATE_INVENTORY_TEST"+[Environment]::NewLine),(New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path (Join-Path $working "private-data") "my-manga.csv"),("PRIVATE_INVENTORY_TEST"+[Environment]::NewLine),(New-Object Text.UTF8Encoding($false)))
 
 # Read real Update. Mock Docker/SQL and validate PostgreSQL backup order.
 . (Join-Path $PWD "cmd/control-center.ps1") -Action Environment
