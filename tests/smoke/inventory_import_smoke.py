@@ -33,8 +33,8 @@ def fixture(value=3) -> str:
         "serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier;"
         "statut_releve;ligne_source;oeuvre_commune;edition_declaree;format_catalogue_provisoire\n"
         "Naruto;72;2;0;Possede;Inventaire!A4;;;\n"
-        f"Demo CI 05 Version X;{value};0;0;Possede;Inventaire!A5;Demo CI 05;Version X;INCONNU\n"
-        "Demo CI 05 Version Y;4;1;0;Possede;Inventaire!A6;Demo CI 05;Version Y;INCONNU\n"
+        f"Demo CI 16 Version X;{value};0;0;Possede;Inventaire!A5;Demo CI 16;Version X;INCONNU\n"
+        "Demo CI 16 Version Y;4;1;0;Possede;Inventaire!A6;Demo CI 16;Version Y;INCONNU\n"
         "Inconnu de CI;2;0;0;Possede;Inventaire!A7;;;\n"
     )
 
@@ -57,10 +57,18 @@ def main() -> None:
         "delimiter":",","dry_run":False,"default_status":"WANT_TO_READ",
     })
     assert library_row("Naruto")==before_naruto,"Legacy CSV overwrote a user's reading"
-    before_demo=library_row("Demo CI 05")
+    before_demo=library_row("Demo CI 16")
     assert before_demo is None,before_demo
     before=req("/inventory/declarations")
     assert before["count"]==0,before
+
+    # Existing explicit rejection of a different work must not be silently
+    # converted to ownership by a physical inventory declaration.
+    conflict=req("/inventory/preview",{"csv_content":(
+        "serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier\\n"
+        "Demo CI 05;1;0;0\\n"
+    ).replace("\\\\n","\\n")})
+    assert conflict["items"][0]["status"]=="REVIEW_LIBRARY_CONFLICT",conflict
 
     first=req("/inventory/preview",{"csv_content":fixture()})
     assert len(first["items"])==4,first
@@ -85,14 +93,14 @@ def main() -> None:
 
     rows=req("/inventory/declarations")["items"]
     assert len(rows)==3,rows
-    versions=[r for r in rows if r["work_title"]=="Demo CI 05"]
+    versions=[r for r in rows if r["work_title"]=="Demo CI 16"]
     assert len(versions)==2,versions
     assert {r["edition_declared"] for r in versions}=={"Version X","Version Y"},versions
     assert {r["main_volumes"] for r in versions}=={3,4},versions
     assert sum(r["duplicate_copies"] for r in versions)==1,versions
     assert all("isbn" not in r for r in versions),versions
     assert library_row("Naruto")==before_naruto,"Existing notes/scores/reads modified"
-    created=library_row("Demo CI 05")
+    created=library_row("Demo CI 16")
     assert created["library_status"]=="OWNED",created
     assert created["owned_volumes"] is None and created["read_volumes"] is None,created
     assert created["user_score"] is None,created
@@ -115,7 +123,7 @@ def main() -> None:
         "accept_partial":True,
     })["created_declarations"]==0,"Existing edition count was overwritten"
     assert {r["main_volumes"] for r in req("/inventory/declarations")["items"]
-            if r["work_title"]=="Demo CI 05"}=={3,4}
+            if r["work_title"]=="Demo CI 16"}=={3,4}
 
     # Test user-facing guarded recommendation integration; imported works
     # are now excluded by the existing user_manga_library SQL constraints.
@@ -123,7 +131,7 @@ def main() -> None:
         "message":"Je cherche un manga d'action ou d'aventure",
         "context":{},"lang":"fr","limit":12,
     })
-    assert 5 not in [m["id"] for m in suggestions.get("recommendations",[])],suggestions
+    assert created["manga_id"] not in [m["id"] for m in suggestions.get("recommendations",[])],suggestions
     print("OK: preview->token->partial opt-in->import; exact work, distinct editions; "
           "no overwritten reads/notes; no invented ISBN; idempotent; post-import rec exclusion.")
 
