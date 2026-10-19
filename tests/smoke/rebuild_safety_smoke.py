@@ -74,8 +74,19 @@ def main():
         "sql/schema/005_build_theme_demographic_from_jikan.sql",
     ]
     for iteration in (1,2):
-        for filename in scripts:
-            sql((ROOT/filename).read_text(encoding="utf-8"))
+        if iteration == 1:
+            # The actual SQL scripts, as used by legacy Windows maintenance.
+            for filename in scripts:
+                sql((ROOT/filename).read_text(encoding="utf-8"))
+        else:
+            # Exercise the exact Python entry point used by option 12 Jikan.
+            # The API container has psycopg and the dev volume maps the repo.
+            subprocess.run(
+                COMPOSE + ["exec","-T","api","python","-c",
+                    "from pipelines.engine.scripts.run_jikan_pipeline "
+                    "import refresh_canonical_catalog; refresh_canonical_catalog()"],
+                check=True,cwd=ROOT,timeout=80,
+            )
         after=snapshot()
         for key in ("canonical_ids","library","editions","reading"):
             assert before[key]==after[key],(iteration,key,before[key],after[key])
