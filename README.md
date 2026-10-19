@@ -1,6 +1,6 @@
 # Mangadvisor
 
-**Ta mangathèque, tes découvertes et ton conseiller manga personnel.** Application locale PC + mobile, avec catalogue multi-sources, bibliothèque, éditions françaises ISBN et recommandations explicables. Interface sombre/orange, français/anglais, sans abonnement.
+**Ta mangathèque, tes découvertes et ton conseiller manga personnel.** Application locale PC + mobile, avec catalogue Tenrai, enrichissement BnF des éditions françaises, bibliothèque et recommandations explicables. Interface sombre/orange, français/anglais, sans abonnement.
 
 [Structure actuelle du dépôt](docs/03_technical/project_structure.md) · [Compte rendu du nettoyage 4.1](docs/03_technical/cleanup_4_1.md)
 
