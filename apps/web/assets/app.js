@@ -9,6 +9,7 @@ import { enrichmentPanel, enrichmentResults, reconcileEnrichment, mergeEnrichmen
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
+import { preferredMangaTitle, declaredCountsByManga, libraryCardMeta } from "./library-display.js";
 import { explainRecommendation, explainProfile, explainVerifiedSources } from "./explain.js";
 import {
   PRESETS, ACCENTS, DEFAULT_APPEARANCE,
@@ -88,7 +89,7 @@ function stars(m){return m.score===null||m.score===undefined?L("unrecognized"):"
 function badges(list,limit=4){return (list||[]).slice(0,limit).map(x=>'<span class="pill">'+tr(x)+'</span>').join("");}
 function card(m,urls){
  const status=publication(state.lang,m.status);
- return '<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(m.title||"Manga")+'</h3>'+
+ return '<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(preferredMangaTitle(m,state.lang))+'</h3>'+
  '<p class="manga-card-meta">'+stars(m)+' · '+e(status)+'</p><button class="card-open" data-go="/manga/'+e(m.manga_id||m.id)+'">'+L("details")+' &rarr;</button></div></article>';
 }
 function loadingCards(n=8){return '<div class="manga-grid" aria-busy="true">'+Array.from({length:n},()=>'<div class="skeleton"></div>').join("")+'</div>';}
@@ -248,7 +249,7 @@ async function renderHome(token){
        ?'<div class="home-progress">'+e(item.read_volumes)+' / '+e(total)+' '+L("homeProgress")+'</div>':'';
      return '<article class="home-reading-card">'+poster(item,urls)+
        '<div class="home-reading-body"><span class="pill accent">'+e(libraryStatus(state.lang,item.library_status))+'</span>'+
-       '<h3>'+e(item.title||"Manga")+'</h3>'+progress+
+       '<h3>'+e(preferredMangaTitle(item,state.lang))+'</h3>'+progress+
        '<button class="card-open" data-go="/manga/'+e(item.manga_id)+'">'+L("details")+' →</button></div></article>';
    }).join("")+'</div>':
     '<div class="home-empty"><span aria-hidden="true">▤</span><p>'+L("homeContinueMissing")+'</p>'+
@@ -394,14 +395,18 @@ async function updateLibrary(token){
   const params=new URLSearchParams({limit:"25",offset:String((state.libraryPage-1)*24)});
   if(state.libraryQuery)params.set("q",state.libraryQuery);
   if(state.libraryStatus)params.set("status",state.libraryStatus);
-  const res=await request("/library?"+params);
+  const [res,physical]=await Promise.all([
+    request("/library?"+params),
+    request("/inventory/declarations").catch(()=>null),
+  ]);
   const items=(res.items||[]).slice(0,24),hasNext=(res.items||[]).length>24;
+  const declared=declaredCountsByManga(physical);
   const urls=await covers(items);
   if(renderToken!==token)return;
   const html=items.length?'<div class="list-head"><span>'+L("page")+' '+state.libraryPage+' · '+items.length+' '+L("showing")+'</span></div>'+
-   '<div class="manga-grid">'+items.map(m=>'<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(m.title)+'</h3>'+
-   '<p class="manga-card-meta">'+e(libraryStatus(state.lang,m.library_status))+' · '+(m.is_favorite?'♥ ':'')+
-   (m.user_score!=null?'★ '+score(m.user_score)+'/10':'—')+'</p><button class="card-open" data-go="/manga/'+m.manga_id+'">'+L("details")+' →</button></div></article>').join("")+'</div>':
+   '<div class="manga-grid">'+items.map(m=>'<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(preferredMangaTitle(m,state.lang))+'</h3>'+
+   '<p class="manga-card-meta">'+e(libraryCardMeta({...m,library_status:libraryStatus(state.lang,m.library_status)},declared,state.lang))+
+   (m.is_favorite?' ♥':'')+'</p><button class="card-open" data-go="/manga/'+m.manga_id+'">'+L("details")+' →</button></div></article>').join("")+'</div>':
    emptyBox("▤",L("libraryEmpty"),L("libraryEmptyHelp"),L("startExplore"),"/discover");
   out.innerHTML=html+paginate(state.libraryPage,hasNext,"library");
  }catch(err){if(token===renderToken)out.innerHTML=errorBox(err);}
