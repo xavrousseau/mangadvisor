@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from apps.api.app.mood_discovery import MOODS, match_mood, preference_overlap
 from apps.api.app.narrative_evidence import narrative_matches
 from apps.api.app.advisor_editions import fetch_recommended_editions
+from apps.api.app.advisor_quality import quality_diagnostic
 
 router = APIRouter(prefix="/advisor", tags=["Conversational manga advisor"])
 Mood = Literal["DARK", "COMFORT", "ACTION", "MYSTERY", "ROMANCE", "FANTASY"]
@@ -413,6 +414,7 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
     # Lazy import: advisor_ai imports AdvisorContext but cannot write SQL or manga.
     from apps.api.app.advisor_ai import (
         LocalAiUnavailable, ai_status, interpret_with_ollama, local_ai_enabled,
+        reconcile_ai_intent,
     )
 
     @router.get("/ai-status")
@@ -432,11 +434,12 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         ai_requested=local_ai_enabled()
         if ai_requested:
             try:
-                context,changes,more=interpret_with_ollama(
+                proposed,changes,more=interpret_with_ollama(
                     payload.message,payload.context,payload.lang
                 )
-                # Explicit caveats are kept by the audited lexical interpreter.
-                _,_,_,warnings=interpret(payload.message,payload.context)
+                context,changes,more,warnings=reconcile_ai_intent(
+                    payload.message,payload.context,proposed,changes,more
+                )
                 result=resolve_advisor(payload,context,changes,more,warnings)
                 result["ai_mode"]="local_ai"
                 return result
@@ -606,6 +609,11 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         interpretation=describe_context(context,payload.lang)
         data["interpreted_criteria"]=interpretation
         data["discovery_source"]="library_tags" if profile_only else "requested_mood"
+        data["quality_diagnostic"] = quality_diagnostic(
+            chosen, examined=len(candidates),
+            pool_limited=len(candidates)>=500,
+            personalized=personalized, mode=context.recommendation_balance,
+        )
         data.update(
             status="results" if chosen else "empty",
             recommendations=chosen,count=len(chosen),
