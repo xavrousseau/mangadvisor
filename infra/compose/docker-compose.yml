@@ -55,6 +55,13 @@ services:
       OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+    # Start the Web UI only after FastAPI is ready to handle real SQL calls.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 10s
+      timeout: 6s
+      start_period: 30s
+      retries: 10
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,7 +96,7 @@ services:
       UI_PORT: ${UI_PORT}
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     networks:
       - mangadvisor_network
 
@@ -102,7 +109,7 @@ services:
     container_name: mangadvisor_web
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     networks:
       - mangadvisor_network
 
