@@ -98,6 +98,7 @@ def upsert_jikan_manga_batch(conn: Connection, rows: list[dict[str, Any]]) -> in
 
     sql = """
     INSERT INTO jikan_manga_source (
+        source_name,
         mal_id,
         title,
         title_english,
@@ -122,6 +123,7 @@ def upsert_jikan_manga_batch(conn: Connection, rows: list[dict[str, Any]]) -> in
         raw_json
     )
     VALUES (
+        %(source_name)s,
         %(mal_id)s,
         %(title)s,
         %(title_english)s,
@@ -147,6 +149,7 @@ def upsert_jikan_manga_batch(conn: Connection, rows: list[dict[str, Any]]) -> in
     )
     ON CONFLICT (mal_id)
     DO UPDATE SET
+        source_name = EXCLUDED.source_name,
         title = EXCLUDED.title,
         title_english = EXCLUDED.title_english,
         title_japanese = EXCLUDED.title_japanese,
