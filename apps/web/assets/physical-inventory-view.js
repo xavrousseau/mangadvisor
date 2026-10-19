@@ -17,7 +17,7 @@ export function physicalInventoryMarkup(data, lang, translate, escape, {compact=
     groups.get(id).editions.push(item);
   }
   const stats=data.summary||{};
-  if(!groups.size){
+  if(!groups.size && !(Array.isArray(data.pending?.items) && data.pending.items.length)){
     return '<section class="physical-inventory-empty"><p>'+L("physicalEmpty")+'</p>'+
       '<p class="collection-caveat">'+L("physicalImportHelp")+'</p></section>';
   }
