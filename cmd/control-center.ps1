@@ -318,12 +318,55 @@ function Update {
   if (!(Test-Path (Join-Path $root ".git"))) {
     throw "Ce dossier n'est pas un clone Git : impossible de faire git pull automatiquement."
   }
-  & git -C $root diff --quiet
-  Assert-Exit "Des fichiers suivis ont ete modifies localement : mise a jour annulee"
-  & git -C $root diff --cached --quiet
-  Assert-Exit "Des modifications sont en attente dans Git : mise a jour annulee"
+  $branchName=@(& git -C $root branch --show-current)
+  Assert-Exit "Impossible de connaitre la branche Git active"
+  if ($branchName.Count -ne 1 -or ([string]$branchName[0]).Trim() -cne "main") {
+    throw "Mise a jour reservee a la branche main. Branche actuelle : $($branchName -join ', ')"
+  }
+
+  # A CRLF warning alone is harmless. Unlike 'git diff --quiet', porcelain
+  # reports precisely which tracked files Git considers modified, including
+  # staged changes. Ignored secrets and private data are never stashed.
+  $trackedChanges=@(& git -C $root status --porcelain=v1 --untracked-files=no)
+  Assert-Exit "Impossible de lire l'etat du depot Git"
+  $needsStash=$trackedChanges.Count -gt 0
+  if ($needsStash) {
+    Say "Modifications locales detectees par Git"
+    Write-Host ("Git signale {0} chemin(s) modifies. Les avertissements LF/CRLF ne suffisent pas a expliquer ces changements." -f $trackedChanges.Count)
+    $trackedChanges | Select-Object -First 30 | ForEach-Object { Write-Host ("  " + $_) }
+    if ($trackedChanges.Count -gt 30) { Write-Host "  ... autres fichiers modifies non affiches." }
+    Write-Host "Ces modifications seront GARDEES dans une sauvegarde Git locale (stash)."
+    Write-Host "Elles ne seront pas remises automatiquement dans le code mis a jour."
+    Write-Host "Les fichiers ignores (.env, private-data, backups) et les volumes Docker ne sont pas inclus."
+    if (!(Confirm "Sauvegarder ces modifications suivies dans Git puis poursuivre ?" $false)) {
+      throw "Mise a jour annulee : aucun changement Git effectue."
+    }
+  }
+
+  # Validate a consistent database backup BEFORE changing any tracked file.
   Backup
-  Run "git" @("-C",$root,"pull","--ff-only","origin","main") "Git pull a echoue"
+  $stashCreated=$false
+  if ($needsStash) {
+    $label="mangadvisor-avant-maj-$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+    Run "git" @("-C",$root,"stash","push","-m",$label) "Impossible de sauvegarder les modifications locales"
+    $remaining=@(& git -C $root status --porcelain=v1 --untracked-files=no)
+    Assert-Exit "Impossible de confirmer la sauvegarde Git locale"
+    if ($remaining.Count -gt 0) {
+      throw "Certains fichiers suivis sont encore modifies apres stash : mise a jour annulee."
+    }
+    $stashCreated=$true
+    Write-Host "Modifications locales sauvegardees sous le nom : $label"
+    Write-Host "Pour les retrouver plus tard : git stash list"
+  }
+  try {
+    Run "git" @("-C",$root,"pull","--ff-only","origin","main") "Git pull a echoue"
+  } catch {
+    if ($stashCreated) {
+      Write-Warning "La sauvegarde Git stash est conservee. Ne supprime pas le depot."
+      Write-Host "Voir la sauvegarde des modifications : git stash list"
+    }
+    throw
+  }
   Initialize-Database
   Start-Application
   Diagnostic
