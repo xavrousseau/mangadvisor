@@ -57,10 +57,13 @@ def check():
                 failures.append(f"Python syntax error: {relative}: {exc}")
         elif suffix in (".js", ".mjs"):
             examined["JavaScript files"] += 1
-            for reference in re.findall(r'''(?:from\s*|import\s*)["'](\./[^"']+\.js)["']''', content):
-                dependency = (target.parent / reference).resolve()
-                if not dependency.is_file() or ROOT not in dependency.parents:
-                    failures.append(f"Broken JavaScript dependency {relative}: {reference}")
+            # Test files intentionally load JS source as strings/data: URLs.
+            # Only browser module imports resolve against their own directory.
+            if relative.as_posix().startswith("apps/web/assets/"):
+                for reference in re.findall(r'''(?:from\s*|import\s*)["'](\./[^"']+\.js)["']''', content):
+                    dependency = (target.parent / reference).resolve()
+                    if not dependency.is_file() or ROOT not in dependency.parents:
+                        failures.append(f"Broken JavaScript dependency {relative}: {reference}")
         elif suffix == ".md":
             examined["documentation files"] += 1
             # Historic V1 documents may contain obsolete conceptual links.
