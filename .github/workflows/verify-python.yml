@@ -21,26 +21,20 @@ jobs:
       - name: Installer les dépendances UI
         run: python -m pip install -r apps/ui/requirements.txt
       - name: Vérifier la syntaxe Python
-        run: python -m compileall -q apps/api apps/ui pipelines/engine tests
-      - name: Vérifier la syntaxe des modules web
+        run: python -m compileall -q apps/api apps/ui pipelines/engine tests tools
+      - name: Auditer chaque fichier suivi et les contrats Docker/Web/SQL
+        run: python tools/audit_repository.py --strict
+      - name: Verifier la syntaxe de tous les modules web
         shell: bash
         run: |
-          node --input-type=module --check < apps/web/assets/i18n.js
-          node --input-type=module --check < apps/web/assets/app.js
-          node --input-type=module --check < apps/web/assets/home.js
-          node --input-type=module --check < apps/web/assets/explain.js
-          node --input-type=module --check < apps/web/assets/appearance.js
-          node --input-type=module --check < apps/web/assets/collection-view.js
-          node --input-type=module --check < apps/web/assets/physical-inventory-view.js
-          node --input-type=module --check < apps/web/assets/isbn-scanner.js
-          node --input-type=module --check < apps/web/assets/mood-view.js
-          node --input-type=module --check < apps/web/assets/advisor-view.js
-          node --input-type=module --check < apps/web/assets/advisor-editions.js
-          node --input-type=module --check < apps/web/assets/bulk-import-view.js
-          node --input-type=module --check < apps/web/assets/unknown-isbn-view.js
-          node --input-type=module --check < apps/web/assets/bibliography-view.js
-          node --input-type=module --check < apps/web/assets/enrichment-view.js
-      - name: Tester les sélections de l'accueil personnalisé
-        run: node --test tests/web/home.test.mjs tests/web/explain.test.mjs tests/web/appearance.test.mjs tests/web/collection.test.mjs tests/web/physical-inventory.test.mjs tests/web/bulk-import.test.mjs tests/web/unknown-isbn.test.mjs tests/web/bibliography.test.mjs tests/web/enrichment.test.mjs tests/web/isbn-scanner.test.mjs tests/web/mood-view.test.mjs tests/web/advisor-view.test.mjs tests/web/advisor-editions.test.mjs
+          set -euo pipefail
+          for script in apps/web/assets/*.js; do
+            node --input-type=module --check < "$script"
+          done
+      - name: Tester tous les composants web (liste automatique)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/web/*.test.mjs
       - name: Tester la découverte et les couvertures
         run: python -m unittest discover -s tests -p 'test_*.py' -v
