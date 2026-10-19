@@ -24,7 +24,7 @@ PATCHABLE_FIELDS = frozenset({
     "mood", "secondary_mood", "length", "only_finished", "french",
     "preferred_edition_kind", "require_edition_kind", "use_library",
     "avoid_romance", "avoid_horror", "avoid_gore",
-    "narrative_preferences", "min_score",
+    "narrative_preferences", "min_score", "recommendation_balance",
 })
 MAX_GENERATION_BYTES = 16_384
 MODEL_TIMEOUT_SECONDS = 40
@@ -132,8 +132,12 @@ def interpret_with_ollama(
         "require_edition_kind (boolean), use_library (boolean), "
         "avoid_romance, avoid_horror, avoid_gore (booleans), "
         "narrative_preferences (list chosen from INVESTIGATION|PSYCHOLOGICAL|SURVIVAL), "
-        "min_score (number 0 to 10). "
+        "min_score (number 0 to 10), recommendation_balance (CLOSE|BALANCED|EXPLORE). "
         "SHORT means 1-12 volumes, LONG means 13 or more. "
+        "CLOSE means similar picks in original relevance order, BALANCED a mix, "
+        "EXPLORE diverse but still relevant catalog picks. When the user says "
+        "surprise me or discover unexpected manga, choose EXPLORE; for more of "
+        "the same kind choose CLOSE. Do not relax any hard filter. "
         "French REQUIRE only for explicitly mandatory French ISBN; 'ideally' PREFER. "
         "Edition REQUIRE only if format is explicitly mandatory; otherwise false. "
         "Negated horror/gore/romance must use avoid_* instead of choosing that mood. "
