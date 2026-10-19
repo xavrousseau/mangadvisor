@@ -20,7 +20,7 @@ from apps.api.app.advisor import make_advisor_router
 
 app = FastAPI(
     title="Mangadvisor API",
-    version="0.8.7",
+    version="4.4.0",
     description="API de recommandation manga pour Mangadvisor.",
 )
 
