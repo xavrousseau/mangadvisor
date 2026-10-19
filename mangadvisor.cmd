@@ -33,6 +33,12 @@ echo   14 - Arreter le scanner mobile HTTPS
 echo   15 - Installer et activer le conseiller IA local
 echo   16 - Arreter le conseiller IA local
 echo.
+echo   Sauvegarde de la mangatheque
+echo   ---------------------------
+echo   17 - Sauvegarder et verifier
+echo   18 - Verifier la derniere sauvegarde
+echo   19 - Restaurer (confirmation obligatoire)
+echo.
 echo   Q  - Quitter
 echo.
 echo ============================================================
@@ -64,6 +70,10 @@ if /I "%CHOICE%"=="13" start "Mangadvisor - Mobile HTTPS" cmd /k powershell -NoP
 if /I "%CHOICE%"=="14" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto menu
 if /I "%CHOICE%"=="15" start "Mangadvisor - IA locale" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" & goto menu
 if /I "%CHOICE%"=="16" start "Mangadvisor - Arreter IA" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" -Stop & goto menu
+
+if /I "%CHOICE%"=="17" start "Mangadvisor - Sauvegarde" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Backup & goto menu
+if /I "%CHOICE%"=="18" start "Mangadvisor - Verification sauvegarde" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Verify & goto menu
+if /I "%CHOICE%"=="19" start "Mangadvisor - Restauration securisee" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Restore & goto menu
 
 if /I "%CHOICE%"=="12" goto jikan_menu
 
