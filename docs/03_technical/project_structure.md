@@ -26,7 +26,7 @@ L'ancien sous-menu **12** n'est plus proposé. Le numéro 12 reste un alias temp
 | infra/docker/ | Images Docker des services actifs |
 | apps/web/ | **Interface principale** HTML/CSS/JS sur port UI_PORT (8501 par défaut) |
 | apps/api/ | API FastAPI, catalogue, recommandations, ISBN et bibliothèque |
-| apps/ui/ | Interface Streamlit secondaire, maintenue pour les tests/diagnostics, port 8502 |
+| apps/ui/ | Prototype Streamlit historique : profil Docker optionnel `legacy`, réservé aux tests ; non démarré sur le PC par défaut |
 | pipelines/engine/scripts/ | Extraction du catalogue, chargement SQL, enrichissement communautaire, vérifications |
 | pipelines/engine/src/load/ | Écriture PostgreSQL depuis les JSON |
 | sql/schema/001…007 | Tables et mises à jour additives (les scripts 003/005 construisent le catalogue) |
@@ -50,7 +50,7 @@ L'ancien sous-menu **12** n'est plus proposé. Le numéro 12 reste un alias temp
 
 Les services pgvector et Meilisearch sont prévus dans l'infrastructure ; cela **ne signifie pas** que les embeddings ou l'indexation Meilisearch complète sont systématiquement calculés et alimentés. AniList, MangaNews et le pipeline multi-sources complet décrit dans les documents V1 restent des pistes de développement, pas des étapes garanties.
 
-L'application dispose de deux interfaces (Web principale et Streamlit avancé) : ce n'est pas une copie accidentelle. Elles ne doivent pas être fusionnées ou supprimées avant migration explicite des fonctions encore utilisées.
+Une seule interface utilisateur est démarrée par défaut : **Web sur 8501**. Le prototype Streamlit reste dans le code sous profil Docker optionnel `legacy` uniquement pour les tests historiques. Il n'est pas supprimé tant que ses anciennes fonctions et tests n'ont pas été migrés. Le proxy Web valide l'API par le DNS interne Docker (127.0.0.11) après changement d'IP du conteneur.
 
 ## Ce que le nettoyage 4.1 a retiré
 
