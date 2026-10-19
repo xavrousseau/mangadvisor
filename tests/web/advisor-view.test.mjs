@@ -130,3 +130,24 @@ test("variety evidence escapes catalog strings and refuses unknown HTML",()=>{
  assert.match(html,/&lt;img src=x/);
  assert.match(html,/data-value="BALANCED" aria-pressed="true"/);
 });
+
+
+test("a first-click personalized surprise shows honest library evidence, not empty mood tags",()=>{
+ assert.match(ADVISOR_PROMPTS.fr[2],/Surprends-moi/);
+ assert.match(ADVISOR_PROMPTS.en[2],/Surprise me/);
+ const manga={id:12,title:"A genuine library suggestion",
+  genres:["Action"],themes:[],
+  mood_matches:{genres:[],themes:[]},
+  affinity_matches:{genres:["Action"],themes:[]},
+  variety_evidence:[],french_recorded:false};
+ const result={count:1,personalized:true,discovery_source:"library_tags",
+               context:{recommendation_balance:"EXPLORE"},recommendations:[manga]};
+ const html=advisorResultsMarkup(result,{
+   L,e,tr:e,poster:()=>"<span>poster</span>",
+   rating:()=>"",published:()=>"",
+ });
+ assert.match(html,/moodAffinity/);
+ assert.match(html,/Action/);
+ assert.doesNotMatch(html,/advisorProof/);
+ assert.match(html,/data-go="\/manga\/12"/);
+});
