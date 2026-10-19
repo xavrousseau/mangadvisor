@@ -9,7 +9,7 @@
 3. La configuration privée **.env** est générée uniquement si absente, à partir de **.env.example**, avec deux clés aléatoires distinctes pour PostgreSQL et Meilisearch. Les répertoires privés **backups/** et **private-data/** sont créés.
 4. Démarrer PostgreSQL et Meilisearch, attendre la disponibilité de la base et appliquer les scripts SQL **001 → 002 → 004 → 006 → 007** (tables sources, catalogue, tags, recommandations, bibliothèque). Ces créations sont additives.
 5. Construire les images Docker et démarrer l'API et les interfaces, qui initialisent de manière additive les tables des éditions françaises et de l'inventaire.
-6. **Extraction Jikan** : choisir les pages SEARCH et TOP (40 et 10 par défaut, 25 notices maximum par page). Les scripts extraient les JSON dans **data/raw/jikan/search/** et **data/raw/jikan/top/**.
+6. **Extraction manga via Tenrai (scripts historiques Jikan)** : choisir les pages SEARCH et TOP (40 et 10 par défaut, 25 notices maximum par page). Les scripts extraient les JSON dans **data/raw/jikan/search/** et **data/raw/jikan/top/**.
 7. **Chargement SQL Jikan** : exécuter le chargeur des sources search et top, puis les reconstructions SQL **003 → 004 → 005** pour remplir **jikan_manga_source**, **manga**, **genre**, **manga_genre**, **theme**, **manga_theme**, **demographic** et **manga_demographic**. Ces mises à jour ne vident pas le catalogue.
 8. **Recommandations communautaires** : extraire les relations Jikan entre œuvres puis les charger dans **manga_recommendation_edge** ; 50 mangas à enrichir par défaut. Les données déjà téléchargées peuvent être réutilisées.
 9. **Diagnostic** : vérifier la santé API, PostgreSQL, les compteurs SQL, une requête de recherche et l'ouverture de la page Web.
@@ -56,3 +56,14 @@ Si l'extraction affiche **Errno 101 : Network is unreachable**, c'est le contene
 Le centre de pilotage vérifie désormais le réseau **avant les options 25 et 26**, et propose aussi **29 — Diagnostic réseau Docker/Jikan** à la demande. Ce contrôle est en lecture seule et teste DNS + connexion TCP/TLS vers api.jikan.moe, ainsi qu'un site témoin : il ne change aucune configuration réseau.
 
 Pour dépanner : ouvrir https://api.jikan.moe/v4/manga?page=1&limit=1 dans le navigateur de Windows. Si Windows arrive à joindre Jikan mais pas Docker, essayer **Docker Desktop > Troubleshoot > Restart Docker Desktop**. Si nécessaire, examiner **Docker Desktop > Settings > Resources > Proxies** et les règles VPN/pare-feu. Si ni Windows ni Docker ne peuvent joindre le site, corriger d'abord l'accès du PC. Relancer **29**, puis **25** lorsque l'accès HTTPS de Jikan est confirmé. **Ne pas utiliser 11/Nuke** pour une erreur réseau.
+
+## Source du catalogue manga depuis le 1er octobre 2026
+
+**Attention :** le fournisseur public Jikan `api.jikan.moe` a officiellement été arrêté le 1er octobre 2026 ([annonce des mainteneurs](https://github.com/jikan-me/jikan-rest/issues/613)). Mangadvisor utilise désormais **[Tenrai v1](https://api.tenrai.org/documentation)**, qui documente un format compatible avec Jikan pour les recherches et les recommandations mangas.
+
+L'URL `https://api.tenrai.org/v1` est utilisée automatiquement, **même si ton ancien fichier .env ne comporte pas encore la nouvelle variable**. Si besoin, elle peut être définie dans `.env` via `MANGA_API_BASE_URL=https://api.tenrai.org/v1`. Aucune clé payante n'est nécessaire, les limitations publiques restent applicables (120 appels/minute, 4 appels/seconde). Le fournisseur est encore en bêta : une coupure est possible.
+
+Les scripts historiques dont le nom contient « Jikan » et les dossiers `data/raw/jikan/` sont conservés pour compatibilité avec les bases et tests déjà existants, **mais les nouveaux JSON enregistrent le fournisseur réel** ; les écritures SQL conservent également `source_name=tenrai`. Le chargement est additif et les associations aux mangas existants restent basées sur les identifiants MyAnimeList (`mal_id`).
+
+L'option **29** vérifie dorénavant la connexion HTTPS au fournisseur configuré **et une vraie réponse manga JSON**. Après mise à jour, relancer 29 puis 25 pour charger le catalogue, 26 pour les recommandations. Aucune réinstallation ni suppression de volume n'est requise.
+
