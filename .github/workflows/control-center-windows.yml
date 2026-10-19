@@ -75,6 +75,14 @@ jobs:
           $secondHash = (Get-FileHash .env -Algorithm SHA256).Hash
           if ($firstHash -ne $secondHash) { throw "Le .env existant a ete modifie." }
 
+      - name: Tester la mise a jour Git en clone Windows jetable
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-safe-git-update.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Le parcours de mise a jour Git securisee est invalide."
+          }
+
       - name: Verifier une requete psql avec identifiants sans vraie base
         shell: powershell
         run: |
