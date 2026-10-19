@@ -1,0 +1,65 @@
+name: Centre de pilotage Windows
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      - name: Verifier la syntaxe PowerShell 5.1
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          $path = Join-Path $PWD "cmd\control-center.ps1"
+          [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | Format-List | Out-String | Write-Host
+            throw "Erreurs de syntaxe PowerShell dans le centre de pilotage."
+          }
+
+      - name: Verifier le menu Windows
+        shell: powershell
+        run: |
+          $menu = [IO.File]::ReadAllText((Join-Path $PWD "mangadvisor.cmd"))
+          foreach ($number in @(22,23,24,25,26,27,28)) {
+            $fragment = ('if /I "%CHOICE%"=="' + $number + '"')
+            if (-not $menu.Contains($fragment)) {
+              throw "Option $number absente du menu."
+            }
+          }
+          if (-not $menu.Contains("cmd\control-center.ps1")) {
+            throw "L'orchestrateur n'est pas branche au menu."
+          }
+
+      - name: Verifier la configuration initiale sans Docker
+        shell: powershell
+        run: |
+          if (Test-Path .env) { throw "Le fichier .env ne doit pas etre commite." }
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File cmd\control-center.ps1 -Action Environment
+          if ($LASTEXITCODE -ne 0) { throw "Creation du .env impossible." }
+          $firstHash = (Get-FileHash .env -Algorithm SHA256).Hash
+          $pairs = @{}
+          Get-Content .env | ForEach-Object {
+            if ($_ -match '^([^#=]+)=(.*)$') { $pairs[$matches[1]] = $matches[2] }
+          }
+          if ($pairs.POSTGRES_PASSWORD.Length -lt 32 -or $pairs.MEILI_MASTER_KEY.Length -lt 32) {
+            throw "Les secrets generes sont trop faibles."
+          }
+          if ($pairs.POSTGRES_PASSWORD -eq $pairs.MEILI_MASTER_KEY -or $pairs.POSTGRES_PASSWORD -eq 'changeme') {
+            throw "Les secrets generes doivent etre differents et aleatoires."
+          }
+          if (-not (Test-Path private-data) -or -not (Test-Path backups)) {
+            throw "Dossiers prives absents."
+          }
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File cmd\control-center.ps1 -Action Environment
+          if ($LASTEXITCODE -ne 0) { throw "Relance de configuration impossible." }
+          $secondHash = (Get-FileHash .env -Algorithm SHA256).Hash
+          if ($firstHash -ne $secondHash) { throw "Le .env existant a ete modifie." }
