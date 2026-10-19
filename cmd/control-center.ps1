@@ -316,6 +316,17 @@ function Inventory {
     Assert-Exit "Echec de l'import de la mangatheque"
   }
 }
+function Benchmark-Inventory {
+  $csv=Join-Path $root "private-data\mangatheque.csv"
+  if (!(Test-Path -LiteralPath $csv -PathType Leaf)) {
+    Write-Host "Benchmark personnel ignore : pas de CSV local."
+    return
+  }
+  Say "Benchmark de la mangatheque et du conseiller (lecture seule)"
+  $scriptFile=Join-Path $root "cmd\benchmark-mangatheque.ps1"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptFile -CsvFile $csv
+  Assert-Exit "Benchmark personnel impossible. Relance l'option 20 apres diagnostic"
+}
 function Update {
   Say "Mise a jour sans suppression des donnees"
   Ensure-Environment
@@ -400,8 +411,17 @@ function Wizard {
     $null=Read-Host "Appuie sur Entree quand la copie est faite (ou pour ignorer)"
   }
   Inventory
-  Diagnostic
+  # Protect any newly imported ownership claims before diagnostic/quality calls.
   Backup
+  Diagnostic
+  # The audit never writes SQL and its report stays under private-data.
+  # An unavailable benchmark must not undo or invalidate a safe installation.
+  try {
+    Benchmark-Inventory
+  } catch {
+    Write-Warning ("Benchmark facultatif non abouti : " + $_.Exception.Message)
+    Write-Host "Relance l'option 20 une fois le conseiller operationnel."
+  }
   Say "Fin de l'assistant"
   Write-Host ("Ouvre http://localhost:" + (Config "UI_PORT"))
   Write-Host "Menu 13 : mobile HTTPS ; menu 15 : IA locale facultative."
