@@ -66,6 +66,25 @@ class LibrarySeedSelectionTests(unittest.TestCase):
         self.assertEqual(chosen[0]["id"], 11)
         self.assertEqual(evidence_tier(sources[10]), 2)
 
+    def test_a_low_rated_read_book_is_not_treated_as_favorite(self):
+        disliked = owned(42)
+        disliked.update(library_status="READ", user_score=5.0, positive_weight=1)
+        self.assertEqual(evidence_tier(disliked), 0)
+        self.assertEqual(evidence_summary([disliked])["level"], "OWNERSHIP_ONLY")
+
+    def test_tags_are_queried_in_recommendations_endpoint_only(self):
+        from pathlib import Path
+        source = (Path(__file__).resolve().parents[1] / "apps/api/app/main.py").read_text("utf-8")
+        profile = source.split('@app.get("/library/profile")', 1)[1].split(
+            '@app.post("/recommendations/feedback")', 1
+        )[0]
+        recommendations = source.split('@app.post("/recommendations/library")', 1)[1].split(
+            '@app.get("/recommendations/similar")', 1
+        )[0]
+        self.assertNotIn("seed_tag_rows", profile)
+        self.assertIn('seed_tag_rows = cur.fetchall()', recommendations)
+        self.assertIn('choose_representative_sources(', recommendations)
+
     def test_no_tags_fallback_stable_and_no_artificial_confidence(self):
         sources = [owned(i) for i in range(1, 22)]
         first, strategy = choose_representative_sources(sources, {})
