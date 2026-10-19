@@ -150,7 +150,7 @@ function Engine([string[]]$Arguments) {
   Compose (@("run","--rm","engine","python")+$Arguments)
 }
 function Network {
-  Say "Diagnostic HTTPS Docker : Jikan et acces Internet"
+  Say "Diagnostic HTTPS Docker : fournisseur manga et acces Internet"
   Ensure-Environment
   Check-Docker
   Engine @("pipelines/engine/scripts/check_network.py")
@@ -177,7 +177,7 @@ function Get-Count([string]$Table) {
   return $count
 }
 function Load-Catalogue {
-  Say "Alimentation du catalogue Jikan"
+  Say "Alimentation du catalogue (Tenrai, compatible Jikan)"
   Ensure-Environment
   Check-Docker
   Compose @("up","-d","postgres","meilisearch")
@@ -208,7 +208,7 @@ function Load-Catalogue {
   if ($catalogCount -eq 0) { throw "Catalogue vide : import Jikan non valide." }
 }
 function Load-Recommendations {
-  Say "Recommandations communautaires Jikan"
+  Say "Recommandations communautaires (Tenrai)"
   Ensure-Environment
   Check-Docker
   Compose @("up","-d","postgres","meilisearch")
