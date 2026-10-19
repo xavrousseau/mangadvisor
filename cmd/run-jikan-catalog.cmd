@@ -84,18 +84,10 @@ if errorlevel 1 (
 
 echo.
 echo --------------------------------------------------
-echo 3/6 - Nettoyage table source jikan_manga_source
+echo 3/6 - Conservation des sources et upsert non destructif
 echo --------------------------------------------------
-
-docker exec -i mangadvisor_postgres sh -c "psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d $POSTGRES_DB" -c "TRUNCATE TABLE jikan_manga_source;"
-
-if errorlevel 1 (
-    echo.
-    echo ERREUR : impossible de vider jikan_manga_source.
-    pause
-    exit /b 1
-)
-
+echo Les notices Jikan existantes sont conservees.
+echo Seules les lignes presentes dans les nouveaux JSON sont mises a jour.
 echo.
 echo --------------------------------------------------
 echo 4/6 - Chargement PostgreSQL search + top
