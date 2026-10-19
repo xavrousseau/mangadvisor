@@ -20,7 +20,8 @@ function Assert-Ok([string]$message) {
   if ($LASTEXITCODE -ne 0) { throw "$message (code $LASTEXITCODE)" }
 }
 function Run-Docker([string[]]$CommandArgs, [string]$Message) {
-  & docker @CommandArgs
+  # Never leak Docker stdout into the PowerShell function return value.
+  & docker @CommandArgs | Out-Null
   Assert-Ok $Message
 }
 function Db-Setting([string]$key) {
