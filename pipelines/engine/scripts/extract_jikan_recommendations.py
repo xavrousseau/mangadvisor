@@ -19,6 +19,7 @@ Exemple :
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 import time
@@ -38,14 +39,16 @@ from load.postgres_loader import get_postgres_connection  # noqa: E402
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 RAW_RECOMMENDATIONS_DIR = PROJECT_ROOT / "data" / "raw" / "jikan" / "recommendations"
 
-JIKAN_BASE_URL = "https://api.jikan.moe/v4"
+JIKAN_BASE_URL = os.getenv("MANGA_API_BASE_URL", "https://api.tenrai.org/v1").rstrip("/")
 
 
 def save_json(data: dict[str, Any], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with output_path.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+        # Historical file paths preserve compatibility; record the actual API provider.
+        source = "tenrai" if JIKAN_BASE_URL.startswith("https://api.tenrai.org/") else "jikan"
+        json.dump({**data, "mangadvisor_source": source}, file, ensure_ascii=False, indent=2)
 
 
 def fetch_jikan_with_retry(
@@ -69,7 +72,10 @@ def fetch_jikan_with_retry(
                 time.sleep(wait_seconds)
 
             response.raise_for_status()
-            return response.json()
+            payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+                raise ValueError("Reponse du fournisseur manga incompatible : 'data' doit etre une liste.")
+            return payload
 
         except requests.RequestException as exc:
             last_error = exc
