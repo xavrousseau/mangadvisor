@@ -12,7 +12,7 @@ Les options **23 à 28** permettent ensuite de refaire chaque opération sans r�
 
 Voir [le guide complet du centre de pilotage 4.0](docs/04_product/control_center_4_0.md).
 
-## Pour démarrer sur Windows
+## Démarrage habituel sur Windows (base déjà initialisée)
 
 1. Installer et démarrer **Docker Desktop**. Placer le dépôt GitHub sur le PC.
 2. À la racine, exécuter **mangadvisor.cmd**, puis choisir **3 — Build + démarrage**.
