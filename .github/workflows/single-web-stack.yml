@@ -40,6 +40,28 @@ jobs:
             echo "ERREUR: API en hot-reload dans l'environnement utilisateur."
             exit 1
           fi
+      - name: Initialiser les tables sur PostgreSQL de CI avant FastAPI
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.local.yml"
+          $BASE up -d postgres meilisearch
+          for attempt in $(seq 1 60); do
+            if $BASE exec -T postgres pg_isready -U manga_ci -d mangadvisor_ci >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then echo "PostgreSQL CI indisponible"; exit 1; fi
+            sleep 2
+          done
+          for source in \
+            sql/schema/001_jikan_source_tables.sql \
+            sql/schema/002_canonical_manga_tables.sql \
+            sql/schema/004_add_theme_demographic_tables.sql \
+            sql/schema/006_add_jikan_recommendation_tables.sql \
+            sql/schema/007_add_user_library_tables.sql; do
+            $BASE exec -T postgres psql -X -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci < "$source"
+          done
+          echo "Tables prêtes avant démarrage FastAPI (identique à l'option 22)."
       - name: Construire et demarrer la version stable sans Streamlit
         shell: bash
         run: |
