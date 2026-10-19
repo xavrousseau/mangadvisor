@@ -22,6 +22,14 @@ def run(page,device):
     expect(page.locator(".advisor-card").first).to_contain_text("ISBN français enregistré")
     first_titles=page.locator(".advisor-card h3").all_inner_texts()
     assert first_titles,device
+    # One-tap diversity controls are a normal conversational follow-up.
+    expect(page.locator('[data-action="advisor-balance"]')).to_have_count(3)
+    page.locator('[data-action="advisor-balance"][data-value="EXPLORE"]').click()
+    expect(page.locator('[data-action="advisor-balance"][data-value="EXPLORE"]')).to_have_attribute(
+        "aria-pressed","true",timeout=30000)
+    expect(page.locator(".advisor-card").first).to_be_visible(timeout=30000)
+    expect(page.locator(".advisor-message.is-assistant").last).to_contain_text("découvertes variées")
+    page.screenshot(path=str(DIR/f"{device}-advisor-variety.png"),full_page=True)
     chat(page,"Français obligatoire")
     expect(page.locator(".advisor-card")).to_have_count(1,timeout=25000)
     expect(page.locator(".advisor-card h3").first).to_have_text("Demo CI 08")
