@@ -207,6 +207,22 @@ def preview_hash(review: dict[str, Any], user_id: int) -> str:
     return hashlib.sha256(contents).hexdigest()
 
 
+
+def summarize_declarations(items: list[dict[str, Any]]) -> dict[str, int]:
+    """Physical counts are owner declarations, NOT verified ISBN or reading data."""
+    return {
+        "works": len({int(row["manga_id"]) for row in items}),
+        "edition_entries": len(items),
+        "main_volumes": sum(int(row["main_volumes"]) for row in items),
+        "identical_duplicates": sum(int(row["duplicate_copies"]) for row in items),
+        "other_editions_unidentified": sum(int(row["other_editions_unknown"]) for row in items),
+        "physical_total_declared": sum(
+            int(row["main_volumes"]) + int(row["duplicate_copies"])
+            + int(row["other_editions_unknown"]) for row in items
+        ),
+    }
+
+
 def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -> APIRouter:
     router = APIRouter(prefix="/inventory", tags=["Inventaire physique privé"])
 
@@ -305,7 +321,9 @@ def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -
         }
 
     @router.get("/declarations")
-    def declarations() -> dict[str, Any]:
+    def declarations(manga_id: int | None = None) -> dict[str, Any]:
+        if manga_id is not None and manga_id < 1:
+            raise HTTPException(status_code=422, detail="Identifiant manga invalide.")
         with connection_factory() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -316,11 +334,14 @@ def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -
                     FROM user_manga_inventory_declaration d
                     JOIN manga m ON m.id=d.manga_id
                     WHERE d.user_id=%(user_id)s
+                      AND (%(manga_id)s::integer IS NULL OR d.manga_id=%(manga_id)s)
                     ORDER BY m.title,d.edition_key
                     LIMIT 1000;
-                """,{"user_id":user_id})
+                """,{"user_id":user_id,"manga_id":manga_id})
                 rows=cur.fetchall()
         return {"count":len(rows),"items":rows,
-                "scope":"owner_declared_unverified_editions_not_isbn_books"}
+                "summary":summarize_declarations(rows),
+                "scope":"owner_declared_unverified_editions_not_isbn_books",
+                "limited":len(rows)==1000}
 
     return router
