@@ -461,6 +461,8 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         # recognizes this explicit intent and then retrieves real library tags.
         if context.mood is None and PROFILE_DISCOVERY.search(normalize(payload.message)):
             context.profile_discovery = True
+            if "profile_discovery" not in changes:
+                changes = [*changes, "profile_discovery"]
         if context.mood is not None:
             context.profile_discovery = False
         profile_only = context.mood is None and context.profile_discovery and context.use_library
