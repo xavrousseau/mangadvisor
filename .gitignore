@@ -38,3 +38,6 @@ mobile-local/
 
 # Archives de mangatheque privees : ne jamais les envoyer sur GitHub.
 backups/
+
+# Inventaires personnels, correspondances catalogue et rapports de tests privés
+data/private/
