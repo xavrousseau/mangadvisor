@@ -14,7 +14,7 @@ $backups=Join-Path $root "backups"
 $containerName="mangadvisor_postgres"
 $compose=@("--env-file",$envFile,
   "-f",(Join-Path $root "infra/compose/docker-compose.yml"),
-  "-f",(Join-Path $root "infra/compose/docker-compose.dev.yml"))
+  "-f",(Join-Path $root "infra/compose/docker-compose.local.yml"))
 
 function Assert-Ok([string]$message) {
   if ($LASTEXITCODE -ne 0) { throw "$message (code $LASTEXITCODE)" }
