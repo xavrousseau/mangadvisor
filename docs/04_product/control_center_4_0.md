@@ -15,7 +15,7 @@
 9. **Diagnostic** : vérifier la santé API, PostgreSQL, les compteurs SQL, une requête de recherche et l'ouverture de la page Web.
 10. **Sauvegarde vérifiée** : créer un dump PostgreSQL et valider une restauration de test dans une base isolée.
 11. **Import facultatif de collection** : placer un fichier CSV compatible dans **private-data/mangatheque.csv**. Un aperçu est exécuté sans écriture. L'import réel exige ensuite deux confirmations et exclut les titres ambigus ou non reconnus.
-12. Nouveau diagnostic. Pour obtenir une sauvegarde contenant la bibliothèque importée, relancer **17 — Sauvegarder et vérifier**, puis copier les archives sur un autre support.
+12. Nouveau diagnostic, puis **sauvegarde finale automatique vérifiée**, y compris si une bibliothèque vient d'être importée. Copier ensuite les archives sur un autre support.
 
 Une réinstallation est **non destructive par défaut** : elle ne supprime ni volume Docker, ni configuration .env existante, ni données de la mangathèque. Pour repartir d'une base vierge malgré des données existantes, sauvegarder d'abord avec 17 puis utiliser **11 — Nuke** séparément et volontairement. **11 est irréversible sans sauvegarde**.
 
