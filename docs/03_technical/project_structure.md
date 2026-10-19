@@ -1,6 +1,6 @@
-# Structure actuelle de Mangadvisor (4.1)
+# Structure actuelle de Mangadvisor (4.x)
 
-> Ce document décrit les fichiers exécutés **aujourd'hui**, et non le plan d'architecture V1.
+> Ce document décrit les fichiers exécutés **aujourd'hui**, et non le plan d'architecture V1. Voir aussi [l'audit transversal 4.4](audit_transversal_4_4.md) pour l'inventaire fichier par fichier et les limites des tests.
 
 ## Point d'entrée Windows
 
