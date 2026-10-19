@@ -16,6 +16,10 @@ from apps.api.app.mood_discovery import MOODS, match_mood, preference_overlap
 from apps.api.app.narrative_evidence import narrative_matches
 from apps.api.app.advisor_editions import fetch_recommended_editions
 from apps.api.app.advisor_quality import quality_diagnostic
+from apps.api.app.advisor_feedback import (
+    FEEDBACK_SQL, empty_feedback, build_feedback_profile,
+    feedback_evidence, feedback_summary,
+)
 
 router = APIRouter(prefix="/advisor", tags=["Conversational manga advisor"])
 Mood = Literal["DARK", "COMFORT", "ACTION", "MYSTERY", "ROMANCE", "FANTASY"]
@@ -302,8 +306,11 @@ def select_balanced_candidates(
 def score_candidates(
     rows: list[dict[str, Any]], context: AdvisorContext,
     preferences: dict[str, set[str]], limit: int,
+    feedback: dict[str, dict[str, dict[str, int]]] | None = None,
 ) -> list[dict[str, Any]]:
     selected = []
+    if feedback is None:
+        feedback = empty_feedback()
     mood_list = [x for x in (context.mood,context.secondary_mood) if x]
     for item in rows:
         tags={str(tag).casefold() for kind in ("genres","themes")
@@ -325,6 +332,7 @@ def score_candidates(
         # Every requested mood must have a documented matching tag.
         if hits < len(mood_list):continue
         affinity = preference_overlap(item,preferences)
+        reaction = feedback_evidence(item, feedback, preferences)
         verified = int(item.get("french_record_count") or 0)>0
         french_score = 24 if context.french=="PREFER" and verified else 0
         preferred_format=bool(
@@ -337,12 +345,18 @@ def score_candidates(
         rank = (
             18*len(matches["genres"]) + 21*len(matches["themes"])
             + min(20, 5*len(affinity["genres"])+7*len(affinity["themes"]))
-            + french_score + format_score + story_bonus + 2*float(item.get("score") or 0)
+            + french_score + format_score + story_bonus
+            + reaction["interest_bonus"] - reaction["rejection_penalty"]
+            + 2*float(item.get("score") or 0)
         )
         selected.append((rank,float(item.get("score") or 0),
                          -int(item.get("popularity") or 99999999),-int(item["id"]),{
             **{k:v for k,v in item.items() if k!="synopsis"},
             "mood_matches":matches,"affinity_matches":affinity,
+            "feedback_evidence":{
+                "interested_tags":reaction["interested_tags"],
+                "repeated_rejection_tags":reaction["repeated_rejection_tags"],
+            },
             "narrative_matches":story_evidence,
             "narrative_unverified":[concept for concept in context.narrative_preferences
                                     if not any(e["concept"]==concept for e in story_evidence)],
@@ -577,6 +591,7 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                 JOIN theme t ON t.id=mt.theme_id
         """
         preferences:dict[str,set[str]]={"genres":set(),"themes":set()}
+        feedback=empty_feedback()
         with connection_factory() as conn:
             with conn.cursor() as cur:
                 # Read personal evidence before candidate SQL; in profile-only
@@ -585,8 +600,13 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                     cur.execute(preference_sql,{"user_id":user_id})
                     for row in cur.fetchall():
                         preferences[row["kind"]].add(row["tag"])
+                if context.use_library:
+                    cur.execute(FEEDBACK_SQL,{"user_id":user_id})
+                    feedback=build_feedback_profile(cur.fetchall())
                 if profile_only:
-                    if not any(preferences.values()):
+                    if not any(preferences.values()) and not any(
+                        feedback["interested"][kind] for kind in ("genres","themes")
+                    ):
                         data.update(status="clarify",reply=(
                             "Je n'ai pas encore assez de lectures favorites ou bien notées pour te surprendre. "
                             "Ajoute quelques lectures ou choisis une ambiance."
@@ -595,19 +615,32 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                             "Add some manga to your library or choose a mood."
                         ))
                         return data
-                    params["genres"]=sorted(preferences["genres"])
-                    params["themes"]=sorted(preferences["themes"])
+                    # Interest is weaker than loved/positively read titles.
+                    # Use it as a fallback to populate source tags for a sparse
+                    # library; do not mislabel it as an actual reading.
+                    params["genres"]=sorted(
+                        preferences["genres"] | set(feedback["interested"]["genres"])
+                    )
+                    params["themes"]=sorted(
+                        preferences["themes"] | set(feedback["interested"]["themes"])
+                    )
                 cur.execute(sql,params)
                 candidates=cur.fetchall()
-        chosen=score_candidates(candidates,context,preferences,payload.limit)
+        chosen=score_candidates(
+            candidates,context,preferences,payload.limit,feedback=feedback
+        )
         edition_summaries=fetch_recommended_editions(
             connection_factory,[row["id"] for row in chosen]
         ) if chosen else {}
         for row in chosen:
             row["french_editions"]=edition_summaries.get(row["id"])
-        personalized=context.use_library and any(preferences.values())
+        personalized=context.use_library and (
+            any(preferences.values()) or any(feedback["interested"][kind]
+                                             for kind in ("genres","themes"))
+        )
         interpretation=describe_context(context,payload.lang)
         data["interpreted_criteria"]=interpretation
+        data["feedback_learning"]=feedback_summary(feedback)
         data["discovery_source"]="library_tags" if profile_only else "requested_mood"
         data["quality_diagnostic"] = quality_diagnostic(
             chosen, examined=len(candidates),
@@ -619,10 +652,10 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             recommendations=chosen,count=len(chosen),
             personalized=personalized,
             reply=(
-                (("Je me base sur les genres et thèmes de tes lectures favorites ou bien notées pour te surprendre. "
+                (("Je me base sur les genres et thèmes de tes lectures appréciées ou des mangas qui t'intéressent. "
                    "Les suggestions restent issues du catalogue ; un ISBN n'est pas une preuve de stock."
                    if is_fr else
-                   "I used genres and themes from your favorite or highly-rated readings. "
+                   "I used recorded genres and themes from titles you enjoyed or want to read. "
                    "Every pick comes from the catalog; an ISBN doesn't confirm stock.")
                   if profile_only else
                  ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "

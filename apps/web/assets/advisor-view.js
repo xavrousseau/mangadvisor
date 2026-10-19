@@ -68,6 +68,8 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
  const balance=["CLOSE","BALANCED","EXPLORE"].includes(response?.context?.recommendation_balance)
   ?response.context.recommendation_balance:"BALANCED";
  const diagnostic=response.quality_diagnostic;
+ const learning=response.feedback_learning?.scope==="existing_library_statuses"
+  ?response.feedback_learning:null;
  const safeCount=value=>Number.isInteger(value)&&value>=0?value:0;
  const quality=diagnostic?.scope==="displayed_catalogue_results_only"
   ?'<details class="advisor-quality"><summary>'+L("advisorQualityTitle")+'</summary>'+
@@ -79,6 +81,12 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
       (diagnostic.mean_pairwise_tag_overlap!=null && Number.isFinite(diagnostic.mean_pairwise_tag_overlap) ?
         '<span>'+L("advisorQualityOverlap")+': <strong>'+Math.round(diagnostic.mean_pairwise_tag_overlap*100)+'%</strong></span>':"")+
       (diagnostic.candidate_pool_capped?'<p>'+L("advisorQualityWindow")+'</p>':"")+
+      (learning && (learning.interested_tag_count||learning.repeated_rejection_tag_count)?
+         '<span>'+L("advisorLearningInterest")+': <strong>'+
+           safeCount(learning.interested_tag_count)+'</strong></span>'+
+         '<span>'+L("advisorLearningRefusals")+': <strong>'+
+           safeCount(learning.repeated_rejection_tag_count)+'</strong></span>'+
+         '<p>'+L("advisorLearningCaution")+'</p>':"")+
       '<p>'+L("advisorQualityCaution")+'</p>'+
     '</div></details>':"";
  const controls='<div class="advisor-balance-controls" role="group" aria-label="'+L("advisorBalanceChoose")+'">'+
@@ -103,6 +111,12 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
     '<small>'+L(x.source==="catalog_tag"?"advisorStoryTag":"advisorStorySynopsis")+': '+
     e(x.matched||"")+'</small></span>').join("");
    const missingBadges=unmatched.filter(safeConcept).map(id=>L("advisorStory"+id)).join(", ");
+   const interested=Array.isArray(m.feedback_evidence?.interested_tags)?
+     m.feedback_evidence.interested_tags.slice(0,3):[];
+   const rejected=Array.isArray(m.feedback_evidence?.repeated_rejection_tags)?
+     m.feedback_evidence.repeated_rejection_tags.slice(0,3):[];
+   const safeTags=tags=>tags.filter(t=>typeof t==="string").map(t=>
+     '<span class="pill">'+e(t)+'</span>').join("");
    return '<article class="rec-card advisor-card">'+poster(m)+
     '<div class="rec-body"><span class="rec-rank">'+L("advisorPick")+' #'+(i+1)+'</span>'+
     '<h3>'+e(m.title||"Manga")+'</h3>'+
@@ -112,6 +126,12 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
     '<div class="tag-row">'+chips(mood)+'</div></div>')+
     (common.length?'<div class="mood-evidence"><strong>'+L("moodAffinity")+'</strong>'+
      '<div class="tag-row">'+chips(common)+'</div></div>':"")+
+    (interested.length?'<div class="mood-evidence advisor-feedback-interest"><strong>'+
+      L("advisorInterestedEvidence")+'</strong><div class="tag-row">'+
+      safeTags(interested)+'</div></div>':"")+
+    (rejected.length?'<div class="mood-evidence advisor-feedback-rejection"><strong>'+
+      L("advisorRefusalEvidence")+'</strong><div class="tag-row">'+
+      safeTags(rejected)+'</div></div>':"")+
     (Array.isArray(m.variety_evidence)&&m.variety_evidence.length?
       '<div class="mood-evidence advisor-variety"><strong>'+L("advisorVarietyEvidence")+'</strong>'+
       '<div class="tag-row">'+chips(m.variety_evidence)+'</div></div>':"")+
