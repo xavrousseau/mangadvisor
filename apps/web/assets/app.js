@@ -125,7 +125,7 @@ function shell(){
   ];
   return '<div class="layout"><aside class="sidebar" aria-label="Navigation principale"><a href="/" class="brand" data-go="/">'+
   '<div class="logo-mark">M</div><div class="logo-word">mangadvisor<span>.</span><small>YOUR MANGA UNIVERSE</small></div></a>'+
-  '<div class="sidebar-caption">Mangadvisor 1.0</div><nav class="nav">'+navItems.map(([view,url,icon,key])=>
+  '<div class="sidebar-caption">Mangadvisor</div><nav class="nav">'+navItems.map(([view,url,icon,key])=>
     '<button class="nav-link '+(active===view?'active':'')+'" data-go="'+url+'"'+(active===view?' aria-current="page"':'')+
     '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+L(key)+'</span></button>').join("")+
   '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p></div></aside>'+
