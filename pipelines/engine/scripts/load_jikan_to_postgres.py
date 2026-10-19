@@ -242,6 +242,10 @@ def collect_rows_from_files(
             total_items_read += 1
 
             transformed = transform_jikan_item(item)
+            if transformed is not None:
+                transformed["source_name"] = (
+                    "tenrai" if payload.get("mangadvisor_source") == "tenrai" else "jikan"
+                )
 
             if transformed is None:
                 invalid_in_file += 1
