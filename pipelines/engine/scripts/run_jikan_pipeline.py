@@ -131,10 +131,8 @@ def main() -> None:
     print(f"Reset DB : {'oui' if args.reset_db else 'non'}")
     print()
 
-    if args.reset_db:
-        reset_jikan_source_table()
-        print()
-
+    # Always extract successfully BEFORE any explicitly requested source reset.
+    # A remote Jikan outage must never erase previously downloaded source data.
     extract_args = [
         "--start-page",
         str(args.start_page),
@@ -146,6 +144,9 @@ def main() -> None:
 
     run_python_script(extract_script, extract_args)
     print()
+    if args.reset_db:
+        reset_jikan_source_table()
+        print()
     run_python_script(load_script, [])
     print()
 
