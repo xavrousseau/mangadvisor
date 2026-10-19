@@ -49,6 +49,14 @@ def main() -> None:
     assert health["database"]=="mangadvisor_ci","REFUS: base CI uniquement"
     before_naruto=library_row("Naruto")
     assert before_naruto and before_naruto["library_status"]=="READ",before_naruto
+    # Legacy generic CSV reimport must not erase an existing manga's notes,
+    # scores, favorites or reading status even when sparse/wrong fields arrive.
+    req("/library/import/csv",{
+        "csv_content":"title,library_status,user_score,is_favorite,owned_volumes,read_volumes,notes\n"
+                      "Naruto,OWNED,0,false,0,0,SHOULD_NOT_OVERWRITE\n",
+        "delimiter":",","dry_run":False,"default_status":"WANT_TO_READ",
+    })
+    assert library_row("Naruto")==before_naruto,"Legacy CSV overwrote a user's reading"
     before_demo=library_row("Demo CI 05")
     assert before_demo is None,before_demo
     before=req("/inventory/declarations")
