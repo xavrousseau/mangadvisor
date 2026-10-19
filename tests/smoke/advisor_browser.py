@@ -16,6 +16,13 @@ def run(page,device):
     page.locator('[data-action="rec-mode"][data-value="advisor"]').click()
     expect(page.locator(".advisor-studio")).to_be_visible(timeout=20000)
     expect(page.locator(".advisor-suggestion")).to_have_count(4)
+    # From zero history, the example prompt uses actual positive-library tags.
+    page.locator(".advisor-suggestion").nth(2).click()
+    expect(page.locator(".advisor-card").first).to_be_visible(timeout=30000)
+    expect(page.locator(".advisor-message.is-assistant").last).to_contain_text(
+        "genres et thèmes de tes lectures",timeout=25000)
+    page.screenshot(path=str(DIR/f"{device}-advisor-library-surprise.png"),full_page=True)
+    page.locator('[data-action="advisor-reset"]').click()
     chat(page,"Je cherche un mystère plutôt long, terminé, idéalement en français")
     expect(page.locator(".advisor-message.is-assistant").first).to_be_visible()
     expect(page.locator(".advisor-card").first).to_be_visible(timeout=30000)

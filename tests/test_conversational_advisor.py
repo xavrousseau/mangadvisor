@@ -73,8 +73,9 @@ class ConversationalAdvisorTests(unittest.TestCase):
             AdvisorRequest(message="a"*501)
         ctx,changes,_,_=interpret("Surprends-moi avec un chef-d'œuvre",AdvisorContext())
         self.assertIsNone(ctx.mood)
-        self.assertEqual(changes,["recommendation_balance"])
+        self.assertEqual(changes,["recommendation_balance","profile_discovery"])
         self.assertEqual(ctx.recommendation_balance,"EXPLORE")
+        self.assertTrue(ctx.profile_discovery)
 
     def test_rank_requires_each_requested_mood_and_source_tags(self):
         candidates=[

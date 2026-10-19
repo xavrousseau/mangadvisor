@@ -33,6 +33,7 @@ class AdvisorContext(BaseModel):
     require_edition_kind: bool = False
     use_library: bool = True
     recommendation_balance: DiscoveryBalance = "BALANCED"
+    profile_discovery: bool = False  # user-requested library-first discovery without mood
     avoid_romance: bool = False
     avoid_horror: bool = False
     avoid_gore: bool = False
@@ -101,6 +102,11 @@ BALANCE_CLOSE = re.compile(
 BALANCE_BALANCED = re.compile(
     r"\b(varie\w*|equilibre\w*|balanced|variety|diversifi\w*)\b"
 )
+# Profile-first surprise is an explicit opt-in, never a random catalog guess.
+PROFILE_DISCOVERY = re.compile(
+    r"\b(surprend\w*|surprise me|recommande.moi|recommend me|"
+    r"selon mes gouts|according to my taste|based on my tastes)\b"
+)
 RATING = re.compile(r"\b(?:note|score|rating)\s*(?:minimum|min|de|d.au moins|>=|superieure a)?\s*(\d{1,2}(?:[.,]\d)?)\s*(?:/10)?\b")
 
 def normalize(text: str) -> str:
@@ -129,6 +135,7 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
     if moods:
         current.mood = moods[0]
         current.secondary_mood = moods[1] if len(moods)>1 else None
+        current.profile_discovery = False
         changes.append("mood")
         if current.mood == "ROMANCE":
             current.avoid_romance = False
@@ -204,6 +211,9 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
     elif BALANCE_BALANCED.search(normalized):
         current.recommendation_balance = "BALANCED"
         changes.append("recommendation_balance")
+    if PROFILE_DISCOVERY.search(normalized) and current.mood is None:
+        current.profile_discovery = True
+        changes.append("profile_discovery")
     if LIBRARY_OFF.search(normalized):
         current.use_library = False;changes.append("use_library")
     elif LIBRARY_ON.search(normalized):
@@ -351,6 +361,9 @@ def describe_context(context:AdvisorContext,lang:str)->str:
     }
     parts=[labels[mood][0 if fr else 1]
            for mood in (context.mood,context.secondary_mood) if mood]
+    if context.profile_discovery and context.mood is None:
+        parts.append("selon tes lectures documentées" if fr
+                     else "from your recorded readings")
     if context.length=="SHORT":
         parts.append("12 tomes maximum" if fr else "up to 12 volumes")
     elif context.length=="LONG":
@@ -444,10 +457,19 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         changes:list[str],more:bool,warnings:list[str],
     )->dict[str,Any]:
         """Only this audited code chooses and explains manga from PostgreSQL."""
+        # The local LLM cannot set profile_discovery directly. The server
+        # recognizes this explicit intent and then retrieves real library tags.
+        if context.mood is None and PROFILE_DISCOVERY.search(normalize(payload.message)):
+            context.profile_discovery = True
+            if "profile_discovery" not in changes:
+                changes = [*changes, "profile_discovery"]
+        if context.mood is not None:
+            context.profile_discovery = False
+        profile_only = context.mood is None and context.profile_discovery and context.use_library
         data={"context":context.model_dump(),"changes":changes,
               "limitations":warnings,"recommendations":[],"count":0,"personalized":False}
         is_fr=payload.lang=="fr"
-        if context.mood is None:
+        if context.mood is None and not profile_only:
             data.update(status="clarify",reply=(
                 "Quelle ambiance cherches-tu : sombre, mystère, action, romance, fantastique ou douceur ?"
                 if is_fr else "What mood: dark, mystery, action, romance, fantasy or cozy?"
@@ -481,11 +503,14 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                JOIN manga_fr_edition ee ON ee.id=v.edition_id
                WHERE v.user_id=%(user_id)s AND ee.manga_id=m.id
                  AND (v.is_owned=TRUE OR v.is_read=TRUE))""",
-            """(EXISTS (SELECT 1 FROM manga_genre mg JOIN genre g ON g.id=mg.genre_id
+        ]
+        # In mood-first mode tags come from the explicit mood. In library-first
+        # mode the same clause is populated with VERIFIED positive-library tags.
+        tag_condition = """(EXISTS (SELECT 1 FROM manga_genre mg JOIN genre g ON g.id=mg.genre_id
                WHERE mg.manga_id=m.id AND LOWER(g.name)=ANY(%(genres)s))
              OR EXISTS (SELECT 1 FROM manga_theme mt JOIN theme t ON t.id=mt.theme_id
-               WHERE mt.manga_id=m.id AND LOWER(t.name)=ANY(%(themes)s)))""",
-        ]
+               WHERE mt.manga_id=m.id AND LOWER(t.name)=ANY(%(themes)s)))"""
+        conditions.append(tag_condition)
         if context.only_finished is True:
             conditions.append("LOWER(COALESCE(m.status,''))='finished'")
         if context.only_finished is False:
@@ -551,12 +576,26 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         preferences:dict[str,set[str]]={"genres":set(),"themes":set()}
         with connection_factory() as conn:
             with conn.cursor() as cur:
-                cur.execute(sql,params)
-                candidates=cur.fetchall()
+                # Read personal evidence before candidate SQL; in profile-only
+                # mode the tags become bounded SQL filters, never model output.
                 if context.use_library:
                     cur.execute(preference_sql,{"user_id":user_id})
                     for row in cur.fetchall():
                         preferences[row["kind"]].add(row["tag"])
+                if profile_only:
+                    if not any(preferences.values()):
+                        data.update(status="clarify",reply=(
+                            "Je n'ai pas encore assez de lectures favorites ou bien notées pour te surprendre. "
+                            "Ajoute quelques lectures ou choisis une ambiance."
+                            if is_fr else
+                            "I need a few favorite or highly-rated readings first. "
+                            "Add some manga to your library or choose a mood."
+                        ))
+                        return data
+                    params["genres"]=sorted(preferences["genres"])
+                    params["themes"]=sorted(preferences["themes"])
+                cur.execute(sql,params)
+                candidates=cur.fetchall()
         chosen=score_candidates(candidates,context,preferences,payload.limit)
         edition_summaries=fetch_recommended_editions(
             connection_factory,[row["id"] for row in chosen]
@@ -566,16 +605,23 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         personalized=context.use_library and any(preferences.values())
         interpretation=describe_context(context,payload.lang)
         data["interpreted_criteria"]=interpretation
+        data["discovery_source"]="library_tags" if profile_only else "requested_mood"
         data.update(
             status="results" if chosen else "empty",
             recommendations=chosen,count=len(chosen),
             personalized=personalized,
             reply=(
-                ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "
-                 "Les ISBN français ne prouvent pas la disponibilité en magasin."
-                 if is_fr else
-                 "I understood: "+interpretation+". These picks use actual catalog tags and literal synopsis clues. "
-                 "Recorded French ISBNs do not confirm store availability.")
+                (("Je me base sur les genres et thèmes de tes lectures favorites ou bien notées pour te surprendre. "
+                   "Les suggestions restent issues du catalogue ; un ISBN n'est pas une preuve de stock."
+                   if is_fr else
+                   "I used genres and themes from your favorite or highly-rated readings. "
+                   "Every pick comes from the catalog; an ISBN doesn't confirm stock.")
+                  if profile_only else
+                 ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "
+                  "Les ISBN français ne prouvent pas la disponibilité en magasin."
+                  if is_fr else
+                  "I understood: "+interpretation+". These picks use actual catalog tags and literal synopsis clues. "
+                  "Recorded French ISBNs do not confirm store availability."))
                 if chosen else
                 ("J'ai compris : "+interpretation+". Aucun titre documenté ne réunit ces critères. Essaie d'assouplir la longueur, la langue ou l'ambiance."
                  if is_fr else
