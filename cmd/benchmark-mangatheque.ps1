@@ -150,6 +150,8 @@ foreach($scenario in $requests) {
     owned_matches_from_file=$owned
     diagnostic=$result.quality_diagnostic
     feedback=$result.feedback_learning
+    personalization_basis=$result.personalization_basis
+    ownership_evidence=$result.ownership_evidence
   }
 }
 if (-not (Test-Path -LiteralPath $privateDir)) {
@@ -213,7 +215,8 @@ Write-Host "INVENTAIRE: $($rows.Count) entrees, $($totals.main) principaux, $($t
 Write-Host "MATCHS: $($matches.Count) identifiables, $($exact.Count) directs, $($fuzzy.Count) flous, $(@($preview.not_found_items).Count) absents, $($collisions.Count) collisions ambigues."
 Write-Host "EDITIONS: $($editionGroups.Count) groupe(s) de versions physiques distinctes d'une meme oeuvre (ISBN non verifies)."
 foreach($scenario in $scenarios) {
-  Write-Host "CONSEILLER $($scenario.name): $($scenario.count) propositions, $(@($scenario.owned_matches_from_file).Count) recoupement(s) sur titres relies avec certitude."
+  $basis=if ($scenario.personalization_basis) {[string]$scenario.personalization_basis} else {"non_precisee"}
+  Write-Host "CONSEILLER $($scenario.name): $($scenario.count) propositions, $(@($scenario.owned_matches_from_file).Count) recoupement(s) sur titres relies avec certitude ; base=$basis."
 }
 foreach($item in $comparison) {
   Write-Host "EVOLUTION $($item.scenario): $($item.new_suggestion_count) nouvelles propositions depuis le test precedent."
