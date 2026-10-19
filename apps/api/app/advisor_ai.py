@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from apps.api.app.advisor import AdvisorContext
+from apps.api.app.advisor import AdvisorContext, interpret, RESET, normalize
 
 # Only pre-existing, validated recommendation filters may be set by the model.
 PATCHABLE_FIELDS = frozenset({
@@ -109,6 +109,69 @@ def parse_intent_response(
         raise LocalAiUnavailable("Invalid model filters") from exc
     changes = sorted(set(updates) | ({"reset"} if parsed.get("reset") else set()))
     return context, changes, parsed.get("more", False)
+
+
+def reconcile_ai_intent(
+    message: str,
+    prior: AdvisorContext,
+    proposed: AdvisorContext,
+    changes: list[str],
+    more: bool,
+) -> tuple[AdvisorContext, list[str], bool, list[str]]:
+    """Preserve explicit lexical constraints even when the local model disagrees.
+
+    The local LLM is untrusted: it can add valid preferences, but cannot make
+    documented exclusions, mandatory ISBN rules or edition requirements vanish
+    by omitting or contradicting them. Text recognized by the deterministic
+    parser wins for that field. All flags still use the existing strict Pydantic
+    schema. No catalogue rows or private notes are sent to the model.
+
+    Explicit reset is handled server-side even if the model ignores it.
+    """
+    guided, guided_changes, guided_more, warnings = interpret(message, prior)
+    if RESET.search(normalize(message)):
+        # A model that misses "recommençons" must not keep the old filters.
+        values = AdvisorContext().model_dump()
+        for key in changes:
+            if key in values:
+                values[key] = getattr(proposed, key)
+        proposed = AdvisorContext.model_validate(values)
+    merged = proposed.model_copy(deep=True)
+    authoritative = {
+        "avoid_romance", "avoid_horror", "avoid_gore",
+        "french", "preferred_edition_kind", "require_edition_kind",
+        "length", "only_finished", "use_library",
+        "recommendation_balance", "min_score",
+    }
+    for key in set(guided_changes) & authoritative:
+        setattr(merged, key, getattr(guided, key))
+    # If the older request demanded a strict constraint, require an
+    # *explicit recognized* relaxation before accepting a relaxed model delta.
+    for key in ("avoid_romance", "avoid_horror", "avoid_gore"):
+        if getattr(prior, key) and not getattr(merged, key) and key not in guided_changes:
+            setattr(merged, key, True)
+    if prior.french == "REQUIRE" and merged.french != "REQUIRE" and "french" not in guided_changes:
+        merged.french = "REQUIRE"
+    if (prior.require_edition_kind and not merged.require_edition_kind
+        and "preferred_edition_kind" not in guided_changes
+        and "require_edition_kind" not in guided_changes):
+        merged.require_edition_kind = True
+        merged.preferred_edition_kind = prior.preferred_edition_kind
+    if merged.avoid_romance:
+        if merged.mood == "ROMANCE":
+            merged.mood = None
+        if merged.secondary_mood == "ROMANCE":
+            merged.secondary_mood = None
+    if merged.mood == merged.secondary_mood:
+        merged.secondary_mood = None
+    if not merged.preferred_edition_kind:
+        merged.require_edition_kind = False
+    # Preserve the server-owned profile mode. Only the explicit request
+    # parser / API resolver can activate it.
+    merged.profile_discovery = guided.profile_discovery
+    merged = AdvisorContext.model_validate(merged.model_dump(), strict=True)
+    return (merged, sorted(set(changes) | set(guided_changes)),
+            more or guided_more, warnings)
 
 
 def interpret_with_ollama(
