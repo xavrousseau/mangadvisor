@@ -33,6 +33,10 @@ Inventaire de **300 fichiers suivis** sur `main` via l'arbre GitHub, couvrant le
 - **Avant :** l'option Jikan principale ne chargeait que `jikan_manga_source`, sans mettre à jour automatiquement la table `manga` et les relations genres/thèmes nécessaires aux recommandations.
 - **Après :** synchronisation additive du catalogue et des tags après chargement source, utilisant les scripts SQL sécurisés ci-dessus.
 
+### A5 — Chargement des recommandations communautaires remplaçant le graphe trop tôt (ÉLEVÉ)
+- **Avant :** l'option `--reset` de `load_jikan_recommendations_to_postgres.py` vidait `manga_recommendation_edge` puis commençait à parcourir les fichiers, sans transaction unique avec le rechargement. Un fichier endommagé ou une sortie vide pouvait effacer les anciennes relations.
+- **Après :** les fichiers sont lus en premier. Si des fichiers sont corrompus ou si aucune relation valide n'existe, le remplacement est refusé. Pour les données valides, `DELETE` et toutes les insertions/upserts sont effectués dans **la même transaction**, et commit uniquement après l'insertion complète ; un échec SQL n'est pas validé.
+
 ## Cohérence des composants existants
 
 | Zone | Constat |
@@ -58,7 +62,7 @@ Inventaire de **300 fichiers suivis** sur `main` via l'arbre GitHub, couvrant le
 
 ## Tests de non-régression ajoutés
 
-- `tests/test_repository_safety.py` : interdiction de `TRUNCATE` / `DROP TABLE` dans les reconstructions canoniques, configuration réelle des identifiants, priorité de l'environnement et refus d'un mot de passe absent.
+- `tests/test_repository_safety.py` : interdiction de `TRUNCATE` / `DROP TABLE` dans les reconstructions canoniques, configuration réelle des identifiants, priorité de l'environnement et refus d'un mot de passe absent. Vérification supplémentaire : refus de remplacer un graphe Jikan par des données vides et absence de commit après une erreur d'insertion.
 - `tests/smoke/rebuild_safety_smoke.py` : sur **mangadvisor_ci / manga_ci exclusivement**, mise à jour répétée du catalogue Jikan, conservation stricte de la correspondance identifiants manga, bibliothèque, ISBN et statuts de lecture, ajout/idempotence des liens tags. CI interdite sur une base personnelle.
 
 ## Conclusion
