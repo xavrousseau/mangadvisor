@@ -10,8 +10,8 @@ echo ==================================================
 echo.
 
 pushd "%ROOT_DIR%"
-rem Ne pas laisser tourner l'ancien site Streamlit apres un restart.
-%COMPOSE_CMD% --profile legacy stop ui
+rem Retire seulement le conteneur Streamlit historique, jamais les volumes.
+call "%~dp0retire-legacy-ui.cmd"
 if errorlevel 1 (
     popd
     endlocal

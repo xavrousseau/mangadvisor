@@ -10,8 +10,8 @@ echo ==================================================
 echo.
 
 pushd "%ROOT_DIR%"
-rem L'ancienne interface Streamlit 8502 est desormais facultative.
-%COMPOSE_CMD% --profile legacy stop ui
+rem Retire seulement le conteneur Streamlit historique, jamais les volumes.
+call "%~dp0retire-legacy-ui.cmd"
 if errorlevel 1 (
   popd
   exit /b 1

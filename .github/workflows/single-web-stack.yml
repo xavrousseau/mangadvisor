@@ -1,0 +1,117 @@
+name: Mangadvisor - installation stable mono-interface
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  stable-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Creer la configuration de test jetable
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          sed -i 's/^POSTGRES_DB=.*/POSTGRES_DB=mangadvisor_ci/' .env
+          sed -i 's/^POSTGRES_USER=.*/POSTGRES_USER=manga_ci/' .env
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci_test_only_password/' .env
+          sed -i 's/^MEILI_MASTER_KEY=.*/MEILI_MASTER_KEY=ci_only_long_master_key/' .env
+          sed -i 's/^UI_PORT=.*/UI_PORT=8501/' .env
+          sed -i 's/^API_PORT=.*/API_PORT=8000/' .env
+      - name: Verifier l'architecture stable et ses ports
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.local.yml"
+          $BASE config --quiet
+          services="$($BASE config --services)"
+          printf '%s\n' "$services"
+          printf '%s\n' "$services" | grep -Fx web
+          if printf '%s\n' "$services" | grep -Fx ui; then
+            echo "ERREUR: Streamlit est expose dans le compose stable."
+            exit 1
+          fi
+          $BASE config | grep -F '127.0.0.1'
+          if $BASE config | grep -q -- '--reload'; then
+            echo "ERREUR: API en hot-reload dans l'environnement utilisateur."
+            exit 1
+          fi
+      - name: Initialiser les tables sur PostgreSQL de CI avant FastAPI
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.local.yml"
+          $BASE up -d postgres meilisearch
+          for attempt in $(seq 1 60); do
+            if $BASE exec -T postgres pg_isready -U manga_ci -d mangadvisor_ci >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then echo "PostgreSQL CI indisponible"; exit 1; fi
+            sleep 2
+          done
+          for source in \
+            sql/schema/001_jikan_source_tables.sql \
+            sql/schema/002_canonical_manga_tables.sql \
+            sql/schema/004_add_theme_demographic_tables.sql \
+            sql/schema/006_add_jikan_recommendation_tables.sql \
+            sql/schema/007_add_user_library_tables.sql; do
+            $BASE exec -T postgres psql -X -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci < "$source"
+          done
+          echo "Tables prêtes avant démarrage FastAPI (identique à l'option 22)."
+      - name: Construire et demarrer la version stable sans Streamlit
+        shell: bash
+        run: |
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.local.yml up -d --build postgres meilisearch api web
+      - name: Valider les vrais appels WEB et SQL apres demarrage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, time, urllib.request
+          for i in range(70):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:8501/api/health",timeout=5) as r:
+                      assert json.load(r).get("status")=="ok"
+                  with urllib.request.urlopen("http://127.0.0.1:8501/api/library?limit=1",timeout=5) as r:
+                      assert isinstance(json.load(r).get("items"),list)
+                  with urllib.request.urlopen("http://127.0.0.1:8501/",timeout=5) as r:
+                      assert b"Mangadvisor" in r.read()
+                  break
+              except Exception as e:
+                  if i==69: raise RuntimeError("WEB/API stable indisponible") from e
+                  time.sleep(2)
+          print("Site WEB, API et bibliotheque OK sans hot-reload ni Streamlit")
+          PY
+          if docker ps --format '{{.Names}}' | grep -Fx mangadvisor_ui; then
+            echo "Ancien conteneur Streamlit encore actif"
+            exit 1
+          fi
+      - name: Tester la persistance des JSON entre extractions Docker temporaires
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.local.yml"
+          $BASE run --rm engine python -c "from pathlib import Path; p=Path('/workspace/data/raw/ci_persistence_probe.txt');p.parent.mkdir(parents=True,exist_ok=True);p.write_text('persisted',encoding='utf-8')"
+          $BASE run --rm engine python -c "from pathlib import Path; assert Path('/workspace/data/raw/ci_persistence_probe.txt').read_text(encoding='utf-8')=='persisted'"
+          test -f data/raw/ci_persistence_probe.txt
+          sudo rm -f data/raw/ci_persistence_probe.txt
+          echo "Data/raw partage de maniere persistante sans montage du code source complet."
+      - name: Diagnostic uniquement si echec
+        if: failure()
+        shell: bash
+        run: |
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.local.yml ps || true
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.local.yml logs --tail=70 api web postgres || true
+      - name: Arreter les conteneurs de CI sans supprimer les volumes
+        if: always()
+        shell: bash
+        run: |
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.local.yml down --remove-orphans || true

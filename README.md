@@ -13,11 +13,13 @@ Le site unique est servi sur **http://127.0.0.1:8501**. Le catalogue privilégie
 `mangadvisor.cmd` reste l'entrée Windows. Les dossiers privés et les volumes Docker ne doivent jamais être supprimés pour une mise à jour. L'option **17** effectue une sauvegarde et une restauration de vérification ; le diagnostic **27** vérifie la communication du site avec l'API. Les difficultés de réconciliation d'alias français, le gel des dépendances et la séparation Docker dev/stable sont documentées comme travaux futurs.
 
 
-## Une interface unique depuis Mangadvisor 4.2
+## Une seule interface et un Docker stable (Mangadvisor 4.5)
 
-Le **site principal** est sur `http://127.0.0.1:8501`, servi par Nginx et `apps/web/`. Le vieux prototype Streamlit `apps/ui/` (anciennement exposé sur 8502) reste disponible uniquement pour les développeurs/tests sous le profil Docker `legacy` et ne figure plus dans les liens du site.
+Le seul site du menu utilisateur est **http://127.0.0.1:8501** (Nginx + Web). Le Compose principal ne contient plus le service Streamlit. Le prototype Python `apps/ui/` subsiste temporairement comme référence de migration **dans l'overlay de tests `docker-compose.dev.yml` seulement**, avec le profil `legacy`; il n'est plus déployé par les commandes Windows normales. Lors du prochain démarrage, l'ancien conteneur `mangadvisor_ui` est arrêté puis retiré **sans effacer de volume**.
 
-Le proxy Nginx résout dynamiquement l'adresse du conteneur FastAPI. Un redémarrage ou une recréation d'API ne doit plus produire une erreur `HTTP 502` durable sur 8501. **L'option 27** vérifie désormais les URL `/api/health` et `/api/library?limit=1` empruntées par le navigateur : le simple affichage HTML ne suffit plus à déclarer le site opérationnel. Les options 3, 4 et le centre de pilotage arrêtent sans détruire l'éventuel ancien conteneur UI 8502.
+Les scripts du menu utilisent maintenant **`docker-compose.local.yml`** : images Docker construites, API sans hot-reload, ports liés à `127.0.0.1`, seul le répertoire `data/raw/` est monté dans le moteur pour conserver les réponses Tenrai entre plusieurs tâches. L'ancien `docker-compose.dev.yml` monte le code source et active `--reload` **uniquement pour le développement et les tests automatisés**, jamais pour l'utilisation courante.
+
+Le proxy Nginx résout dynamiquement l'adresse du conteneur FastAPI. Un redémarrage ou une recréation d'API ne doit plus produire une erreur `HTTP 502` durable sur 8501. **L'option 27** vérifie désormais les URL `/api/health` et `/api/library?limit=1` empruntées par le navigateur : le simple affichage HTML ne suffit plus à déclarer le site opérationnel. Les options 3, 4 et le centre de pilotage retirent l'ancien conteneur UI 8502 sans toucher à PostgreSQL ni aux volumes.
 
 En cas de 502, consulter le diagnostic 27 et les logs de `mangadvisor_web` / `mangadvisor_api`. Éviter `Nuke` : le proxy n'exige aucune réinitialisation de données.
 
@@ -45,7 +47,7 @@ Voir [le guide complet du centre de pilotage 4.0](docs/04_product/control_center
 
 1. Installer et démarrer **Docker Desktop**. Placer le dépôt GitHub sur le PC.
 2. À la racine, exécuter **mangadvisor.cmd**, puis choisir **3 — Build + démarrage**.
-3. Ouvrir **http://localhost:8501** : c'est l'unique interface de Mangadvisor lancée par défaut. Le prototype Streamlit 8502 ne démarre plus automatiquement ; il reste réservé aux tests via le profil Docker `legacy`.
+3. Ouvrir **http://localhost:8501** : c'est l'unique interface de Mangadvisor lancée par défaut. Le conteneur Streamlit 8502 est retiré du parcours utilisateur ; son ancien code reste provisoirement utilisable dans l'overlay de développement pour vérifier les fonctions à migrer.
 4. Naviguer dans **Découvrir**, **Ma bibliothèque** et **Pour moi → Mon conseiller**.
 
 Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
@@ -104,12 +106,12 @@ Le modèle local augmente la souplesse de compréhension mais n'est pas encore u
 
 ## Architecture
 
-Sources publiques et notices autorisées → pipelines Python → PostgreSQL + pgvector / Meilisearch → API FastAPI → interface Web. Docker Compose orchestre PostgreSQL, Meilisearch, API et interfaces. Ollama est un **service facultatif**, non accessible de l'extérieur.
+Sources publiques et notices autorisées → pipelines Python → PostgreSQL + pgvector / Meilisearch → API FastAPI → interface Web. Docker Compose orchestre PostgreSQL, Meilisearch, API et une seule interface Web. Ollama est un **service facultatif**, non accessible de l'extérieur.
 
 Répertoires :
 - apps/api : API et moteur de recommandation.
 - apps/web : interface PC/mobile.
-- apps/ui : ancien prototype Streamlit conservé pour les tests, non lancé par défaut.
+- apps/ui : ancien prototype Streamlit exclu des démarrages utilisateur, conservé provisoirement pour la migration et les tests.
 - pipelines : ingestion et normalisation des sources.
 - infra : Docker, réseau, HTTPS local.
 - tests : tests unitaires, API PostgreSQL jetable, Chromium PC/mobile.

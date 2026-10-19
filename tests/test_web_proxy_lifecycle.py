@@ -19,7 +19,11 @@ class WebProxyLifecycleTests(unittest.TestCase):
 
     def test_historical_streamlit_is_opt_in_only(self):
         compose = (ROOT / "infra/compose/docker-compose.yml").read_text(encoding="utf-8")
-        self.assertIn('profiles: ["legacy"]', compose)
+        self.assertNotIn("\\n  ui:\\n", compose)
+        stable = (ROOT / "infra/compose/docker-compose.local.yml").read_text("utf-8")
+        self.assertNotIn("\\n  ui:\\n", stable)
+        legacy = (ROOT / "infra/compose/docker-compose.dev.yml").read_text("utf-8")
+        self.assertIn('profiles: ["legacy"]', legacy)
         app = (ROOT / "apps/web/assets/app.js").read_text(encoding="utf-8")
         self.assertNotIn("http://localhost:8502", app)
         self.assertNotIn("127.0.0.1:8502", app)
@@ -28,11 +32,16 @@ class WebProxyLifecycleTests(unittest.TestCase):
         for relative in ("cmd/start.cmd", "cmd/up.cmd", "cmd/restart.cmd"):
             with self.subTest(script=relative):
                 code = (ROOT / relative).read_text(encoding="utf-8")
-                self.assertIn("--profile legacy stop ui", code)
+                self.assertIn("retire-legacy-ui.cmd", code)
                 self.assertNotIn("down -v", code)
                 self.assertNotIn("volume rm", code)
         control = (ROOT / "cmd/control-center.ps1").read_text(encoding="utf-8")
-        self.assertIn('Compose @("--profile","legacy","stop","ui")', control)
+        self.assertIn('legacyArgs+@("stop","ui")', control)
+        self.assertIn('legacyArgs+@("rm","-f","ui")', control)
+        retire = (ROOT / "cmd/retire-legacy-ui.cmd").read_text("utf-8")
+        self.assertIn("--profile legacy stop ui", retire)
+        self.assertIn("--profile legacy rm -f ui", retire)
+        self.assertNotIn("--volumes", retire)
         self.assertIn("/api/health", control)
         self.assertIn("/api/library?limit=1", control)
         self.assertNotIn("down -v", control)

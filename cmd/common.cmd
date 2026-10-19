@@ -3,7 +3,8 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
 
 set "COMPOSE_FILE_1=%ROOT_DIR%\infra\compose\docker-compose.yml"
-set "COMPOSE_FILE_2=%ROOT_DIR%\infra\compose\docker-compose.dev.yml"
+rem User menu always uses the stable local stack; Docker dev overlay is CI only.
+set "COMPOSE_FILE_2=%ROOT_DIR%\infra\compose\docker-compose.local.yml"
 set "ENV_FILE=%ROOT_DIR%\.env"
 
 rem L'IA n'est incluse au demarrage normal qu'apres l'activation explicite.
