@@ -1,4 +1,4 @@
-# Mangadvisor 3.8 — safe import of a private physical collection.
+# Mangadvisor 3.8  -  safe import of a private physical collection.
 # Windows PowerShell 5.1/7. All requests go ONLY to loopback.
 param([string]$CsvFile="",[switch]$PreviewOnly,[switch]$CiApply)
 $ErrorActionPreference="Stop"
@@ -21,7 +21,7 @@ $preview=Invoke-RestMethod -Method Post -Uri "$api/inventory/preview" -TimeoutSe
 $path=Join-Path $private ("inventaire_apercu_{0}_{1}.json" -f (Get-Date -Format "yyyyMMdd_HHmmss"),([guid]::NewGuid().ToString("N")).Substring(0,6))
 $preview | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $path -Encoding UTF8
 Write-Host ""
-Write-Host "========= MANGADVISOR 3.8 — APERCU SANS ECRITURE ========="
+Write-Host "========= MANGADVISOR 3.8  -  APERCU SANS ECRITURE ========="
 Write-Host "Fichier : $CsvFile"
 Write-Host "Quantites physiques declarees : $($preview.declared_physical_volumes)"
 Write-Host "Nouvelles declarations fiables : $($preview.ready)"
@@ -29,11 +29,11 @@ Write-Host "Deja presentes sans changement : $($preview.unchanged)"
 Write-Host "A examiner manuellement : $($preview.review)"
 Write-Host "Rapport local prive : $path"
 foreach($entry in @($preview.items | Where-Object {$_.status -like "REVIEW_*"} | Select-Object -First 25)) {
-  Write-Host ("[A VERIFIER] ligne {0}: {1} — {2}" -f $entry.line,$entry.entry_title,$entry.status)
+  Write-Host ("[A VERIFIER] ligne {0}: {1}  -  {2}" -f $entry.line,$entry.entry_title,$entry.status)
 }
 foreach($entry in @($preview.items | Where-Object {$_.status -eq "READY"} | Select-Object -First 6)) {
   $format=if($entry.edition_declared){$entry.edition_declared}else{"edition non precisee"}
-  Write-Host ("[PRET] {0} — {1} ({2} tomes principaux)" -f $entry.catalog_title,$format,$entry.main_volumes)
+  Write-Host ("[PRET] {0}  -  {1} ({2} tomes principaux)" -f $entry.catalog_title,$format,$entry.main_volumes)
 }
 if ($preview.ready -le 0) { Write-Host "Aucune nouvelle ligne fiable : aucune ecriture."; exit 0 }
 if ($PreviewOnly) { Write-Host "Mode APERCU : aucune modification de la base."; exit 0 }

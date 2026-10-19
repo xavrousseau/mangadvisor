@@ -114,7 +114,7 @@ foreach($group in @($matches | Group-Object -Property matched_manga_id | Where-O
       manga_id=$group.Name
       titles=@($sourceRows | ForEach-Object {$_.serie})
       count=$matched.Count
-      note="Correspondance ambiguë : editions insuffisamment verifiees"
+      note="Correspondance ambigue : editions insuffisamment verifiees"
     }
   }
 }
@@ -218,4 +218,4 @@ foreach($item in $comparison) {
   Write-Host "EVOLUTION $($item.scenario): $($item.new_suggestion_count) nouvelles propositions depuis le test precedent."
 }
 Write-Host "Rapport local prive: $dest"
-Write-Host "AUCUNE DONNEE IMPORTÉE OU MODIFIÉE."
+Write-Host "AUCUNE DONNEE IMPORTEE OU MODIFIEE."

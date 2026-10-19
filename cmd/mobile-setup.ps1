@@ -1,4 +1,4 @@
-# Mangadvisor Mobile — private Wi-Fi HTTPS, only when explicitly enabled.
+# Mangadvisor Mobile - private Wi-Fi HTTPS, only when explicitly enabled.
 param([switch]$Stop)
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
