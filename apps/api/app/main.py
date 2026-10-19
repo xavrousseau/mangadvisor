@@ -1684,13 +1684,6 @@ def get_library_profile() -> dict[str, Any]:
 
             cur.execute(profile_tags_sql, {"user_id": DEFAULT_USER_ID})
             tag_rows = cur.fetchall()
-            if len(positive_sources_available) > 5:
-                cur.execute(seed_tags_sql, {
-                    "seed_ids": [item["id"] for item in positive_sources_available],
-                })
-                seed_tag_rows = cur.fetchall()
-            else:
-                seed_tag_rows = []
 
     status_counts = {
         row["library_status"]: row["count"]
@@ -2010,6 +2003,13 @@ def recommend_from_library(
 
             cur.execute(profile_tags_sql, {"user_id": DEFAULT_USER_ID})
             tag_rows = cur.fetchall()
+            if len(positive_sources_available) > 5:
+                cur.execute(seed_tags_sql, {
+                    "seed_ids": [item["id"] for item in positive_sources_available],
+                })
+                seed_tag_rows = cur.fetchall()
+            else:
+                seed_tag_rows = []
 
     if not positive_sources_available:
         raise HTTPException(
