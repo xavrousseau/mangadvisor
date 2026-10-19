@@ -66,7 +66,8 @@ if defined RESET_FLAG (
 echo.
 
 pushd "%ROOT_DIR%"
-python pipelines\engine\scripts\run_jikan_pipeline.py %RESET_FLAG% --start-page %START_PAGE% --end-page %END_PAGE% --limit %LIMIT%
+REM Executer dans le conteneur engine : aucun Python ou psycopg local requis.
+%COMPOSE_CMD% run --rm engine python pipelines/engine/scripts/run_jikan_pipeline.py %RESET_FLAG% --start-page %START_PAGE% --end-page %END_PAGE% --limit %LIMIT%
 set "RC=%ERRORLEVEL%"
 popd
 
