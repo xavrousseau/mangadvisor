@@ -101,3 +101,19 @@ Les outils Windows **20 (benchmark)** et **21 (import prive)** utilisent mainten
 Le workflow Linux `single-web-stack.yml` lance maintenant un **test d'integration reel dans Docker et PostgreSQL, avec des donnees fictives et une base jetable** : JSON Tenrai compatibles (SEARCH et TOP) -> chargeur SQL -> tables canoniques -> genres/themes/publics -> recommandations communautaires -> API Web. Une seconde execution controle l'absence de doublons, la stabilite des identifiants et la conservation d'un suivi utilisateur cree pour le test. Le workflow Windows valide le port personnalise et le rejet des adresses ou ports dangereux.
 
 **Portee exacte :** ce test valide l'assemblage et la persistance, sans solliciter le fournisseur externe (qui peut etre temporairement indisponible) et sans acceder a la mangatheque privee du PC. L'extraction HTTPS reelle et la pertinence des correspondances doivent toujours etre verifiees lors de l'utilisation sur Windows.
+
+
+## Découverte basée sur la collection non notée (4.7)
+
+Après un import CSV, la bibliothèque possède des statuts **OWNED** et des éditions déclarées, mais n'invente aucune note ou appréciation. Le conseiller **« Surprends-moi selon mes goûts »** suit désormais cet ordre de confiance :
+
+1. **Lectures appréciées, notes et favoris** : priorité aux tags des mangas véritablement appréciés ou positivement lus.
+2. **Mangas qui intéressent l'utilisateur** (`WANT_TO_READ`) : signal distinct, moins fort qu'une lecture appréciée.
+3. **Collection seulement** (`owned_collection_only`) : **uniquement en découverte explicitement demandée**, quand les signaux précédents manquent. Le conseiller cherche les genres et thèmes documentés présents dans **au moins deux œuvres canoniques différentes** de la bibliothèque `OWNED`, non notées et non favorites. Plusieurs éditions physiques de Dragon Ball comptent comme **une seule œuvre**, pas comme deux goûts corroborés. Huit genres et huit thèmes maximum sont retenus pour limiter les inférences.
+4. **Aucune donnée récurrente** : le conseiller demande des favoris, notes ou une ambiance plutôt que d'inventer un profil.
+
+Le mode `owned_collection_only` affiche explicitement que **la possession n'implique pas l'appréciation**. Une requête « sans mes goûts » ne lit pas le profil personnel. Les exclusions existantes restent appliquées en SQL avant recommandation : bibliothèque enregistrée, volumes physiques vérifiés, exclusions de genre et contraintes explicites. Les correspondances de l'inventaire encore en attente ne sont pas devinées.
+
+L'API du conseiller fournit `personalization_basis` (`reading_preferences`, `feedback_interest`, `owned_collection_only` ou `none`) et un résumé `ownership_evidence` limité à des **comptages** : nombre d'œuvres prises en compte, genres et thèmes récurrents. Le benchmark privé de l'option **20** conserve ces champs dans son rapport JSON, sur le PC exclusivement, afin de comparer les améliorations à partir de la même mangathèque. Aucun pourcentage de compatibilité artificiel n'est produit.
+
+**Limite :** une collection achetée n'est pas un historique de satisfaction. Le mode possession doit servir à découvrir des pistes, pas à prétendre connaître les goûts réels. Une poignée de notes/favoris amélioreront la pertinence au-delà de ce premier niveau.
