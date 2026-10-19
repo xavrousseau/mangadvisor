@@ -99,7 +99,7 @@ jobs:
           $BASE run --rm engine python -c "from pathlib import Path; p=Path('/workspace/data/raw/ci_persistence_probe.txt');p.parent.mkdir(parents=True,exist_ok=True);p.write_text('persisted',encoding='utf-8')"
           $BASE run --rm engine python -c "from pathlib import Path; assert Path('/workspace/data/raw/ci_persistence_probe.txt').read_text(encoding='utf-8')=='persisted'"
           test -f data/raw/ci_persistence_probe.txt
-          rm data/raw/ci_persistence_probe.txt
+          sudo rm -f data/raw/ci_persistence_probe.txt
           echo "Data/raw partage de maniere persistante sans montage du code source complet."
       - name: Diagnostic uniquement si echec
         if: failure()
