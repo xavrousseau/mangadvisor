@@ -106,6 +106,31 @@ def reset_jikan_source_table() -> None:
         conn.close()
 
 
+def refresh_canonical_catalog() -> None:
+    """Synchronize displayed manga/tags after source loading, never reset IDs.
+
+    Uses the same active PostgreSQL connection (Docker service or local .env).
+    Scripts 003 and 005 are additive; the separate 004 script creates missing
+    theme/demographic structures before inserting relations.
+    """
+    paths = [
+        PROJECT_ROOT / "sql/schema/003_build_canonical_from_jikan.sql",
+        PROJECT_ROOT / "sql/schema/004_add_theme_demographic_tables.sql",
+        PROJECT_ROOT / "sql/schema/005_build_theme_demographic_from_jikan.sql",
+    ]
+    conn = get_postgres_connection()
+    try:
+        # 003 and 005 already contain explicit BEGIN/COMMIT pairs.
+        # Autocommit avoids nested transactions; any failing script stops here.
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            for script in paths:
+                print(f"[run_jikan_pipeline] Mise à jour non destructive : {script.name}")
+                cur.execute(script.read_text(encoding="utf-8"))
+    finally:
+        conn.close()
+
+
 def main() -> None:
     """
     Point d'entrée principal.
@@ -148,6 +173,8 @@ def main() -> None:
         reset_jikan_source_table()
         print()
     run_python_script(load_script, [])
+    print()
+    refresh_canonical_catalog()
     print()
 
     print("==================================================")
