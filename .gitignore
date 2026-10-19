@@ -26,6 +26,11 @@ data/logs/*
 Thumbs.db
 .DS_Store
 
+# Old historical directories can remain untracked after git pull.
+# Ignore them to prevent accidental recommit or upload of old secrets.
+_archive/
+legacy/
+
 # Credentials and local CA exported for mobile HTTPS setup
 .env.mobile
 mobile-local/
