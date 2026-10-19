@@ -238,6 +238,16 @@ def pending_key(row: dict[str, Any]) -> str:
     return (row.get("source_reference") or "").strip() or f"csv-line:{row['line']}"
 
 
+def suspicious_title_encoding(value: str) -> bool:
+    """Detect common double-decoded UTF-8 sequences without altering titles.
+
+    Prevent saving corrupted source claims under a stable source key:
+    later fixes should not have to overwrite a falsely preserved title.
+    """
+    sequences = ("Ã©", "Ã´", "Ã¯", "Â°", "â\\x80", "â€")
+    return any(part in value for part in sequences)
+
+
 def pending_hash(row: dict[str, Any]) -> str:
     """Detect changes to owner claims without the catalogue's mutable guesses."""
     fields = ("entry_title", "source_reference", "work_declared",
@@ -322,6 +332,17 @@ def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -
                     row for row in review["items"]
                     if row["status"] in ("REVIEW_MISSING", "REVIEW_AMBIGUOUS")
                 ]
+                garbled = [
+                    row["line"] for row in pending
+                    if suspicious_title_encoding(row["entry_title"])
+                ]
+                if garbled:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Certains titres du CSV semblent mal encodes (lignes {}). "
+                               "Corrige le fichier en UTF-8 avant de conserver "
+                               "ces declarations : aucune ecriture.".format(garbled),
+                    )
                 keys = [pending_key(row) for row in pending]
                 if len(keys) != len(set(keys)):
                     raise HTTPException(
