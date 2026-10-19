@@ -11,6 +11,12 @@
 
 Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
 
+### Auditer les recommandations avec ton vrai inventaire, en privé
+
+Mangadvisor peut maintenant comparer un **inventaire CSV personnel** à son catalogue réel et signaler les séries déjà possédées qui ressortent dans les conseils, **sans modifier la bibliothèque**. Le fichier est placé dans `data/private/inventaire.csv` (ignoré par Git) et le rapport dans `data/private/rapport_audit.json`. Après démarrage Docker, sélectionner **option 20 — Auditer ma mangathèque** dans `mangadvisor.cmd`. Ne pas confondre les quantités physiques avec des notes/lectures confirmées, et ne jamais committer les inventaires personnels.
+
+Documentation : [Validation privée d'une vraie collection](docs/04_product/private_collection_validation_3_6.md).
+
 ### Sauvegarder ta mangathèque (recommandé avant les grosses mises à jour)
 
 Dans `mangadvisor.cmd`, **17 — Sauvegarder et vérifier** produit un dump PostgreSQL complet dans `backups/` et **teste une vraie restauration isolée**. **18** revérifie la dernière archive ; **19** permet une restauration volontaire avec confirmation explicite, copie de sécurité de la base courante et conservation de l'ancienne base. Les archives privées ne sont jamais envoyées sur GitHub.
