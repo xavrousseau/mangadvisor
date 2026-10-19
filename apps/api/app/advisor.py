@@ -720,33 +720,49 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             pool_limited=len(candidates)>=500,
             personalized=personalized, mode=context.recommendation_balance,
         )
+        if chosen and profile_only and personalization_basis=="owned_collection_only":
+            reply_text=(
+                "Je pars des genres et thèmes qui reviennent dans plusieurs œuvres de ta collection. "
+                "Posséder un manga ne signifie pas forcément l'aimer : ces propositions "
+                "sont des pistes à affiner avec tes notes ou favoris."
+                if is_fr else
+                "These suggestions use recurring genres and themes across different works you own. "
+                "Owning a manga does not mean you liked it; ratings and favorites "
+                "will improve these suggestions."
+            )
+        elif chosen and profile_only:
+            reply_text=(
+                "Je me base sur les genres et thèmes de tes lectures appréciées ou des mangas "
+                "qui t'intéressent. Les suggestions restent issues du catalogue ; "
+                "un ISBN n'est pas une preuve de stock."
+                if is_fr else
+                "I used recorded genres and themes from titles you enjoyed or want to read. "
+                "Every pick comes from the catalog; an ISBN doesn't confirm stock."
+            )
+        elif chosen:
+            reply_text=(
+                "J'ai compris : "+interpretation+
+                ". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "
+                "Les ISBN français ne prouvent pas la disponibilité en magasin."
+                if is_fr else
+                "I understood: "+interpretation+
+                ". These picks use actual catalog tags and literal synopsis clues. "
+                "Recorded French ISBNs do not confirm store availability."
+            )
+        else:
+            reply_text=(
+                "J'ai compris : "+interpretation+
+                ". Aucun titre documenté ne réunit ces critères. "
+                "Essaie d'assouplir la longueur, la langue ou l'ambiance."
+                if is_fr else
+                "I understood: "+interpretation+
+                ". No supported catalog titles meet all conditions. "
+                "Try relaxing length, French records or mood."
+            )
         data.update(
             status="results" if chosen else "empty",
             recommendations=chosen,count=len(chosen),
-            personalized=personalized,
-            reply=(
-                (("Je pars des genres et thèmes qui reviennent dans plusieurs œuvres de ta collection. "
-                   "Posséder un manga ne signifie pas forcément l'aimer : ces propositions sont des pistes à affiner avec tes notes ou favoris."
-                   if is_fr else
-                   "These suggestions use recurring genres and themes across different works you own. "
-                   "Owning a manga does not mean you liked it; ratings and favorites will improve these suggestions.")
-                  if personalization_basis=="owned_collection_only" else
-                  ("Je me base sur les genres et thèmes de tes lectures appréciées ou des mangas qui t'intéressent. "
-                   "Les suggestions restent issues du catalogue ; un ISBN n'est pas une preuve de stock."
-                   if is_fr else
-                   "I used recorded genres and themes from titles you enjoyed or want to read. "
-                   "Every pick comes from the catalog; an ISBN doesn't confirm stock."))
-                  if profile_only else
-                 ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "
-                  "Les ISBN français ne prouvent pas la disponibilité en magasin."
-                  if is_fr else
-                  "I understood: "+interpretation+". These picks use actual catalog tags and literal synopsis clues. "
-                  "Recorded French ISBNs do not confirm store availability."))
-                if chosen else
-                ("J'ai compris : "+interpretation+". Aucun titre documenté ne réunit ces critères. Essaie d'assouplir la longueur, la langue ou l'ambiance."
-                 if is_fr else
-                 "I understood: "+interpretation+". No supported catalog titles meet all conditions. Try relaxing length, French records or mood.")
-            ),
+            personalized=personalized,reply=reply_text,
         )
         return data
     return router
