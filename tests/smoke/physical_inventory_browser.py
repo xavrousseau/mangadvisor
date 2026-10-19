@@ -26,6 +26,13 @@ def main():
             expect(matches).to_contain_text("3")
             expect(matches).to_contain_text("4")
             expect(workspace).to_contain_text("ISBN")
+            # An unmatched synthetic title saved in the preceding inventory smoke
+            # remains visible but has no made-up manga detail link.
+            pending=page.locator(".physical-inventory-pending")
+            expect(pending).to_be_visible(timeout=30000)
+            expect(pending).to_contain_text("Inconnu de CI")
+            expect(pending).to_contain_text("2 exemplaires")
+            assert pending.locator('[data-go^="/manga/"]').count()==0
             page.screenshot(path=str(OUT/f"{device}-physical-inventory-3-9.png"),full_page=True)
             matches.locator('[data-go^="/manga/"]').click()
             expect(page).to_have_url(BASE+"/manga/16",timeout=30000)
