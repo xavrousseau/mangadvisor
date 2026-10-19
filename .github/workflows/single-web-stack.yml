@@ -91,6 +91,11 @@ jobs:
             echo "Ancien conteneur Streamlit encore actif"
             exit 1
           fi
+      - name: Tester le chargement complet Tenrai vers SQL et Web (donnees fictives)
+        shell: bash
+        run: |
+          bash tests/integration/guided-ingestion-smoke.sh
+
       - name: Tester la persistance des JSON entre extractions Docker temporaires
         shell: bash
         run: |

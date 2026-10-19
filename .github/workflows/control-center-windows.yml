@@ -75,6 +75,30 @@ jobs:
           $secondHash = (Get-FileHash .env -Algorithm SHA256).Hash
           if ($firstHash -ne $secondHash) { throw "Le .env existant a ete modifie." }
 
+      - name: Verifier la resolution securisee du port API dans .env
+        shell: powershell
+        run: |
+          . .\cmd\local-api.ps1
+          $settings=Join-Path $env:RUNNER_TEMP "mangadvisor_port_test.env"
+          try {
+            "API_PORT=8777" | Set-Content -LiteralPath $settings -Encoding Ascii
+            if ((Get-MangadvisorApiUrl $settings) -cne "http://127.0.0.1:8777") {
+              throw "Le port configure n'est pas respecte."
+            }
+            "API_PORT='8500'" | Set-Content -LiteralPath $settings -Encoding Ascii
+            if ((Get-MangadvisorApiUrl $settings) -cne "http://127.0.0.1:8500") {
+              throw "Le port entre apostrophes n'est pas respecte."
+            }
+            foreach ($bad in @("0","65536","8000/path","https://example.com")) {
+              "API_PORT=$bad" | Set-Content -LiteralPath $settings -Encoding Ascii
+              $rejected=$false
+              try { $null=Get-MangadvisorApiUrl $settings } catch { $rejected=$true }
+              if (-not $rejected) { throw "API_PORT invalide accepte : $bad" }
+            }
+          } finally {
+            Remove-Item -LiteralPath $settings -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Tester la mise a jour Git en clone Windows jetable
         shell: powershell
         run: |

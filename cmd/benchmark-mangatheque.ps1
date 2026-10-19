@@ -45,9 +45,10 @@ foreach($row in $rows) {
     $totals[$spec[1]]+=$num
   }
 }
-$api="http://127.0.0.1:8000"
+. (Join-Path $PSScriptRoot "local-api.ps1")
+$api=Get-MangadvisorApiUrl (Join-Path $root ".env")
 try { $health=Invoke-RestMethod -Uri "$api/health" -TimeoutSec 20 }
-catch { throw "Demarre Mangadvisor avec Docker Desktop puis menu option 3 (API locale 8000)." }
+catch { throw "Demarre Mangadvisor avec Docker Desktop puis menu option 3 (API locale configuree dans .env)." }
 if ($health.status -ne "ok") { throw "Base PostgreSQL non disponible." }
 # The only CSV import call is forced dry-run: NEVER write to the live collection.
 $previewRows=@($rows | ForEach-Object {
