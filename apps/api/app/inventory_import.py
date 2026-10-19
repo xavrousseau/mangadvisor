@@ -452,6 +452,32 @@ def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -
             "message":"Seules les œuvres sûres sont ajoutées ; jamais de remplacement des notes/lectures ou attribution d'ISBN.",
         }
 
+    @router.get("/pending")
+    def pending_declarations() -> dict[str, Any]:
+        """Unresolved source entries: not part of the recommendation library."""
+        with connection_factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT source_key,entry_title,source_reference,work_declared,
+                           edition_declared,format_hint,main_volumes,
+                           duplicate_copies,other_editions_unknown,
+                           review_status,candidate_ids,saved_at::text AS saved_at
+                    FROM user_manga_inventory_pending
+                    WHERE user_id=%(user_id)s
+                    ORDER BY entry_title,source_key LIMIT 1000
+                """, {"user_id": user_id})
+                rows = cur.fetchall()
+        return {
+            "count": len(rows),
+            "items": rows,
+            "declared_physical_volumes": sum(
+                r["main_volumes"] + r["duplicate_copies"]
+                + r["other_editions_unknown"] for r in rows
+            ),
+            "scope": "unmatched_owner_declarations_no_manga_id_no_isbn",
+            "limited": len(rows) == 1000,
+        }
+
     @router.get("/declarations")
     def declarations(manga_id: int | None = None) -> dict[str, Any]:
         if manga_id is not None and manga_id < 1:
