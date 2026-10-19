@@ -25,8 +25,22 @@ services:
     ports:
       - "127.0.0.1:${UI_PORT}:80"
 
-  # Ancienne interface Streamlit disponible comme outil avancé (port 8502).
+  # Streamlit exists exclusively in the development/test overlay.
+  # Never used by mangadvisor.cmd or normal Windows users.
   ui:
+    profiles: ["legacy"]
+    build:
+      context: ../..
+      dockerfile: infra/docker/ui/Dockerfile
+    container_name: mangadvisor_ui
+    environment:
+      API_BASE_URL: http://api:8000
+      UI_PORT: ${UI_PORT}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - mangadvisor_network
     ports:
       - "127.0.0.1:${LEGACY_UI_PORT:-8502}:8501"
     volumes:
