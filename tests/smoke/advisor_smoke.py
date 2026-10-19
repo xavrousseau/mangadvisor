@@ -54,6 +54,20 @@ def main():
     disabled=request("Surprends-moi sans mes goûts")
     assert disabled["status"]=="clarify",disabled
 
+    # Quality diagnostics are calculated from real database-backed returned
+    # suggestions, not an estimated match probability or private data export.
+    diagnostic=request("Un mystère terminé, sans horreur et sans gore")
+    assert diagnostic["status"]=="results",diagnostic
+    quality=diagnostic["quality_diagnostic"]
+    assert quality["scope"]=="displayed_catalogue_results_only",quality
+    assert quality["returned_count"]==diagnostic["count"],quality
+    assert quality["unique_manga_count"]==diagnostic["count"],quality
+    assert quality["tag_evidence_count"]==diagnostic["count"],quality
+    assert 0 <= quality["affinity_evidence_count"] <= diagnostic["count"],quality
+    assert quality["quality_is_not_a_probability"] is True,quality
+    assert all("Horror" not in m["genres"]+m["themes"] and "Gore" not in m["genres"]+m["themes"]
+               for m in diagnostic["recommendations"]),diagnostic
+
     first=request("Un manga d'action ou d'aventure, plutôt long et terminé")
     assert first["status"]=="results",first
     assert first["count"]>0,first
