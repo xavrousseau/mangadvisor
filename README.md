@@ -11,6 +11,12 @@
 
 Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
 
+### Tester ta vraie mangathèque sans importer les données (option 20)
+
+Copier ton CSV de collection dans le dossier local `private-data/mangatheque.csv`, puis lancer Mangadvisor et choisir **option 20** dans `mangadvisor.cmd`. Le test rapproche les titres avec le catalogue réel via `dry_run=true`, signale les homonymes/éditions et mesure des recommandations en lecture seule. Après tes réactions aux suggestions, relancer l'option 20 permet de comparer les recommandations avant/après. **Ne jamais publier la collection sur GitHub** : `private-data/` est exclu de Git.
+
+Voir : [Benchmark privé de la mangathèque 3.6](docs/04_product/private_library_benchmark_3_6.md).
+
 ### Sauvegarder ta mangathèque (recommandé avant les grosses mises à jour)
 
 Dans `mangadvisor.cmd`, **17 — Sauvegarder et vérifier** produit un dump PostgreSQL complet dans `backups/` et **teste une vraie restauration isolée**. **18** revérifie la dernière archive ; **19** permet une restauration volontaire avec confirmation explicite, copie de sécurité de la base courante et conservation de l'ancienne base. Les archives privées ne sont jamais envoyées sur GitHub.
