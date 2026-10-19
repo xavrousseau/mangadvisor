@@ -747,8 +747,12 @@ async function showRecResults(token){
  const target=document.querySelector("#rec-results");if(!target||!state.recResult)return;
  const result=state.recResult;
  const sources=(result.positive_sources||result.sources||[]).map(s=>s.title).filter(Boolean);
+ const evidence=result.profile_summary?.preference_evidence;
+ const evidenceWarning=evidence==="OWNERSHIP_ONLY"?L("recOwnedOnlyWarning"):
+   evidence==="OWNERSHIP_AND_INTEREST_ONLY"?L("recInterestOnlyWarning"):"";
  target.innerHTML='<div class="section-header"><h2 class="section-title">'+L("results")+'</h2></div>'+
-  (sources.length?'<div class="list-head">'+L("sources")+': '+sources.slice(0,5).map(e).join(" · ")+'</div>':'')+
+  (sources.length?'<div class="list-head">'+L("sources")+': '+sources.slice(0,8).map(e).join(" · ")+'</div>':'')+
+  (evidenceWarning?'<p class="info" role="status">'+e(evidenceWarning)+'</p>':'')+
   recommendationProfileContext(result)+
   '<div id="rec-cards">'+loadingCards(3)+'</div>';
  const diagnosis=result.quality_diagnostic;
