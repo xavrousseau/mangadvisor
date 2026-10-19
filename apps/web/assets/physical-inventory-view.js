@@ -50,8 +50,31 @@ export function physicalInventoryMarkup(data, lang, translate, escape, {compact=
           L("physicalOpenWork")+' →</button></div>')+
       '<div class="physical-edition-list">'+entries+'</div></article>';
   }).join("");
+  // Pending rows are genuine owner declarations but not canonical manga links.
+  // They must never display an invented ISBN, status OWNED, or manga detail link.
+  const unresolved=compact?[]:(Array.isArray(data.pending?.items)?data.pending.items:[]);
+  const pendingLabel=lang==="fr"?"En attente de rapprochement":"Waiting for a catalogue match";
+  const pendingHelp=lang==="fr"?
+    "Conservees sans les attribuer a une mauvaise oeuvre ou edition. Aucun ISBN n'a ete deduit.":
+    "Preserved without assigning an uncertain manga or edition. No ISBN was inferred.";
+  const pendingMarkup=unresolved.length?
+    '<section class="physical-inventory-pending"><h2 class="section-title">'+pendingLabel+
+    ' ('+safeCount(data.pending.count)+' · '+safeCount(data.pending.declared_physical_volumes)+
+    (lang==="fr"?" exemplaires":" copies")+')</h2>'+
+    '<p class="collection-caveat">'+pendingHelp+'</p>'+
+    '<div class="physical-work-grid">'+unresolved.map(item=>{
+      const n=safeCount(item.main_volumes)+safeCount(item.duplicate_copies)+
+        safeCount(item.other_editions_unknown);
+      const status=item.review_status==="REVIEW_AMBIGUOUS"?
+        (lang==="fr"?"Plusieurs correspondances possibles":"Multiple possible matches"):
+        (lang==="fr"?"Aucune correspondance exacte":"No exact match");
+      return '<article class="physical-work"><div class="physical-work-header"><h3>'+
+        e(item.entry_title)+'</h3><span class="pill">'+e(status)+'</span></div>'+
+        '<p class="muted tiny">'+n+(lang==="fr"?" exemplaires declares":" declared copies")+
+        '</p></article>';
+    }).join("")+'</div></section>':"";
   return summary+
     '<p class="collection-caveat">'+L("physicalScopeNote")+'</p>'+
-    '<div class="physical-work-grid">'+cards+'</div>'+
+    '<div class="physical-work-grid">'+cards+'</div>'+pendingMarkup+
     (data.limited?'<p class="collection-caveat">'+L("physicalTruncated")+'</p>':"");
 }
