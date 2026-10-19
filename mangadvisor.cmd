@@ -25,8 +25,8 @@ echo   9  - Restart
 echo   10 - Clean
 echo   11 - Nuke
 echo.
-echo   Pipeline
-echo   --------
+echo   Extensions optionnelles
+echo   ----------------------
 echo   13 - Activer le scanner mobile HTTPS
 echo   14 - Arreter le scanner mobile HTTPS
 echo   15 - Installer et activer le conseiller IA local
@@ -41,7 +41,7 @@ echo   20 - Tester ma mangatheque en lecture seule
 echo   21 - Importer ma mangatheque apres verification (3.8)
 echo.
 echo.
-echo   Centre de pilotage 4.0 - Assistant complet
+echo   Centre de pilotage - Installation et donnees
 echo   -----------------------------------------
 echo   22 - Installer de A a Z (base, donnees, appli, bibliotheque, tests)
 echo   23 - Creer / verifier la configuration .env
@@ -91,7 +91,7 @@ if /I "%CHOICE%"=="21" start "Mangadvisor - Import inventaire" cmd /k powershell
 if /I "%CHOICE%"=="22" start "Mangadvisor - Installation complete" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Wizard & goto menu
 if /I "%CHOICE%"=="23" start "Mangadvisor - Configuration" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Environment & goto menu
 if /I "%CHOICE%"=="24" start "Mangadvisor - Initialisation SQL" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Database & goto menu
-if /I "%CHOICE%"=="25" start "Mangadvisor - Catalogue Jikan" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto menu
+if /I "%CHOICE%"=="25" start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto menu
 if /I "%CHOICE%"=="26" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto menu
 if /I "%CHOICE%"=="27" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto menu
 if /I "%CHOICE%"=="28" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto menu
