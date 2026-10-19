@@ -129,7 +129,8 @@ def reconcile_ai_intent(
     Explicit reset is handled server-side even if the model ignores it.
     """
     guided, guided_changes, guided_more, warnings = interpret(message, prior)
-    if RESET.search(normalize(message)):
+    is_reset = bool(RESET.search(normalize(message)))
+    if is_reset:
         # A model that misses "recommençons" must not keep the old filters.
         values = AdvisorContext().model_dump()
         for key in changes:
@@ -148,11 +149,13 @@ def reconcile_ai_intent(
     # If the older request demanded a strict constraint, require an
     # *explicit recognized* relaxation before accepting a relaxed model delta.
     for key in ("avoid_romance", "avoid_horror", "avoid_gore"):
-        if getattr(prior, key) and not getattr(merged, key) and key not in guided_changes:
+        if (not is_reset and getattr(prior, key) and not getattr(merged, key)
+            and key not in guided_changes):
             setattr(merged, key, True)
-    if prior.french == "REQUIRE" and merged.french != "REQUIRE" and "french" not in guided_changes:
+    if (not is_reset and prior.french == "REQUIRE" and merged.french != "REQUIRE"
+        and "french" not in guided_changes):
         merged.french = "REQUIRE"
-    if (prior.require_edition_kind and not merged.require_edition_kind
+    if (not is_reset and prior.require_edition_kind and not merged.require_edition_kind
         and "preferred_edition_kind" not in guided_changes
         and "require_edition_kind" not in guided_changes):
         merged.require_edition_kind = True
