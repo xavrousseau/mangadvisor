@@ -11,6 +11,14 @@
 
 Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
 
+### Sauvegarder ta mangathèque (recommandé avant les grosses mises à jour)
+
+Dans `mangadvisor.cmd`, **17 — Sauvegarder et vérifier** produit un dump PostgreSQL complet dans `backups/` et **teste une vraie restauration isolée**. **18** revérifie la dernière archive ; **19** permet une restauration volontaire avec confirmation explicite, copie de sécurité de la base courante et conservation de l'ancienne base. Les archives privées ne sont jamais envoyées sur GitHub.
+
+**Copie ensuite les fichiers `.dump` et `.dump.json` sur un deuxième support** : une sauvegarde restée sur le PC ne protège pas d'une panne de son disque. Les secrets `.env` et les modèles Ollama sont hors du dump et nécessitent une sauvegarde séparée.
+
+Voir : [Sauvegarde et récupération 3.2](docs/04_product/library_backup_recovery_3_2.md).
+
 ### Activer le vrai modèle IA local (optionnel)
 
 Le conseiller fonctionne **sans IA générative** dès le premier démarrage, grâce à son moteur de recherche guidée. Pour augmenter sa compréhension du langage :

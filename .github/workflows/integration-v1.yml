@@ -191,6 +191,37 @@ jobs:
       - name: Prouver que la reconstruction Jikan préserve la bibliothèque
         run: python tests/smoke/rebuild_safety_smoke.py
 
+      - name: Sauvegarder et valider une restauration complete de la mangatheque
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v pwsh
+          pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup -NonInteractive
+          BACKUP="$(find backups -maxdepth 1 -name 'mangadvisor_*.dump' -type f | head -n1)"
+          test -s "$BACKUP"
+          test -s "$BACKUP.json"
+          pwsh -NoProfile -File cmd/library-backup.ps1 -Action Verify -NonInteractive
+          export BACKUP
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          original=Path(os.environ['BACKUP'])
+          tampered=original.with_name('mangadvisor_20261019_121212_deadbeef.dump')
+          tampered.write_bytes(original.read_bytes()+b'GARBAGE')
+          manifest=json.loads(Path(str(original)+'.json').read_text(encoding='utf-8-sig'))
+          manifest['file']=tampered.name
+          Path(str(tampered)+'.json').write_text(json.dumps(manifest),encoding='utf-8')
+          PY
+          if pwsh -NoProfile -File cmd/library-backup.ps1 -Action Verify -NonInteractive -File backups/mangadvisor_20261019_121212_deadbeef.dump; then
+            echo 'ERREUR : archive corrompue acceptee'
+            exit 1
+          fi
+          rm -f backups/mangadvisor_20261019_121212_deadbeef.dump*
+          MANGADVISOR_BACKUP_TEST_CI=1 pwsh -NoProfile -File cmd/library-backup.ps1 -Action Restore -NonInteractive -CiRestore -File "$BACKUP"
+          docker exec mangadvisor_postgres psql -X -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci -At -c "SELECT count(*) FROM user_manga_library" | grep -Eq '^[1-9][0-9]*$'
+          docker exec mangadvisor_postgres psql -X -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci -At -c "SELECT count(*) FROM manga_fr_edition" | grep -Eq '^[1-9][0-9]*$'
+          echo 'Backup et restauration reelle sur PostgreSQL jetable : OK'
+
       - name: Valider HTTPS prive, certificat IP et authentification mobile
         shell: bash
         run: |
