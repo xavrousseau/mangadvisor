@@ -38,6 +38,7 @@ echo   ---------------------------
 echo   17 - Sauvegarder et verifier
 echo   18 - Verifier la derniere sauvegarde
 echo   19 - Restaurer (confirmation obligatoire)
+echo   20 - Tester ma mangatheque en lecture seule
 echo.
 echo   Q  - Quitter
 echo.
@@ -74,6 +75,7 @@ if /I "%CHOICE%"=="16" start "Mangadvisor - Arreter IA" cmd /k powershell -NoPro
 if /I "%CHOICE%"=="17" start "Mangadvisor - Sauvegarde" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Backup & goto menu
 if /I "%CHOICE%"=="18" start "Mangadvisor - Verification sauvegarde" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Verify & goto menu
 if /I "%CHOICE%"=="19" start "Mangadvisor - Restauration securisee" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Restore & goto menu
+if /I "%CHOICE%"=="20" start "Mangadvisor - Benchmark prive" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\benchmark-mangatheque.ps1" & goto menu
 
 if /I "%CHOICE%"=="12" goto jikan_menu
 

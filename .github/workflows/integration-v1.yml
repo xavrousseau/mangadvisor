@@ -191,6 +191,43 @@ jobs:
       - name: Prouver que la reconstruction Jikan préserve la bibliothèque
         run: python tests/smoke/rebuild_safety_smoke.py
 
+      - name: Tester le benchmark prive en lecture seule sur donnees synthetiques
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p private-data
+          cat > private-data/mangatheque.csv <<'CSV'
+          serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier;statut_releve;ligne_source
+          Naruto;72;72;0;Sans mention en cours;1
+          Monster;18;0;0;Sans mention en cours;2
+          Demo CI 08;10;0;2;Edition en cours;3
+          Oeuvre inexistante Mangadvisor CI;1;0;0;A verifier;4
+          CSV
+          BEFORE="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM user_manga_library')"
+          pwsh -NoProfile -File cmd/benchmark-mangatheque.ps1
+          pwsh -NoProfile -File cmd/benchmark-mangatheque.ps1
+          AFTER="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM user_manga_library')"
+          test "$BEFORE" = "$AFTER"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          results=sorted(Path("private-data").glob("benchmark_mangatheque_*.json"))
+          assert len(results)==2, results
+          snapshots=[json.loads(p.read_text(encoding="utf-8-sig")) for p in results]
+          for snap in snapshots:
+              assert snap["type"]=="private_read_only_library_benchmark",snap
+              assert snap["dry_run_status"]=="dry_run",snap
+              assert snap["entries"]==4,snap
+              assert snap["main_volumes"]==101,snap
+              assert snap["duplicate_volumes"]==72,snap
+              assert snap["other_editions"]==2,snap
+              assert snap["matched_count"]>=3,snap
+              assert len(snap["missing"])>=1,snap
+              assert len(snap["scenarios"])==3,snap
+          assert any(snap["comparison_with_previous"] for snap in snapshots),snapshots
+          print("Private read-only benchmark and repeated snapshot comparison verified")
+          PY
+
       - name: Sauvegarder et valider une restauration complete de la mangatheque
         shell: bash
         run: |
