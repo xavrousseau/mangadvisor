@@ -20,7 +20,7 @@ class StabilisationSafetyTests(unittest.TestCase):
         source=(ROOT/"cmd/library-backup.ps1").read_text("utf-8")
         self.assertIn("user_manga_inventory_pending",source)
         self.assertIn("user_manga_inventory_declaration",source)
-        self.assertIn("--profile legacy stop api web ui engine",source)
+        self.assertIn("stop api web engine",source)
         self.assertIn("up -d api web",source)
         self.assertNotIn("up -d api web ui",source)
 
