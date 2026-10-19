@@ -15,6 +15,9 @@ from pipelines.engine.src.load.postgres_loader import (
     get_postgres_connection,
     local_database_settings,
 )
+from pipelines.engine.scripts.load_jikan_recommendations_to_postgres import (
+    upsert_recommendation_rows,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -78,6 +81,46 @@ class RepositorySafetyTests(unittest.TestCase):
         self.assertEqual(kwargs["password"],"ci_password")
         self.assertEqual(kwargs["host"],"postgres")
         self.assertEqual(kwargs["port"],"5432")
+
+    def test_recommendation_reset_is_atomic_and_rejects_empty_source(self):
+        class FakeCursor:
+            def __init__(self, fail=False):
+                self.commands=[]
+                self.fail=fail
+            def __enter__(self):return self
+            def __exit__(self,*args):return False
+            def execute(self, statement):
+                self.commands.append(statement.strip())
+            def executemany(self, statement, rows):
+                self.commands.append("INSERT_BATCH")
+                if self.fail:
+                    raise RuntimeError("Synthetic SQL failure")
+
+        class FakeConnection:
+            def __init__(self, fail=False):
+                self.cur=FakeCursor(fail)
+                self.commits=0
+            def cursor(self):return self.cur
+            def commit(self):self.commits+=1
+
+        with self.assertRaisesRegex(ValueError,"Import vide"):
+            upsert_recommendation_rows(FakeConnection(),[],reset=True)
+        row={"source_manga_id":1,"recommended_mal_id":2,
+             "recommended_manga_id":2,"recommended_title":"Synthetic",
+             "votes":3,"raw_json":"{}"}
+        success=FakeConnection()
+        self.assertEqual(upsert_recommendation_rows(success,[row],reset=True),1)
+        self.assertEqual(success.cur.commands[0],
+                         "DELETE FROM manga_recommendation_edge;")
+        self.assertEqual(success.cur.commands[1],"INSERT_BATCH")
+        self.assertEqual(success.commits,1)
+
+        failing=FakeConnection(fail=True)
+        with self.assertRaisesRegex(RuntimeError,"Synthetic SQL failure"):
+            upsert_recommendation_rows(failing,[row],reset=True)
+        self.assertEqual(failing.commits,0)
+        self.assertEqual(failing.cur.commands[0],
+                         "DELETE FROM manga_recommendation_edge;")
 
     def test_missing_password_has_clear_failure_not_guess(self):
         env={k:v for k,v in os.environ.items() if not k.startswith("POSTGRES_")}
