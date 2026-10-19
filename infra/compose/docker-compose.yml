@@ -83,23 +83,6 @@ services:
     networks:
       - mangadvisor_network
 
-  # Historical Streamlit UI: optional for tests, not started for users.
-  # Mangadvisor has one normal Web UI on UI_PORT (8501).
-  ui:
-    profiles: ["legacy"]
-    build:
-      context: ../..
-      dockerfile: infra/docker/ui/Dockerfile
-    container_name: mangadvisor_ui
-    environment:
-      API_BASE_URL: http://api:8000
-      UI_PORT: ${UI_PORT}
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - mangadvisor_network
-
   # Nouvelle application Mangadvisor : HTML/CSS/JS + proxy API via Nginx.
   # Elle devient l'interface par défaut sur le port UI_PORT.
   web:
