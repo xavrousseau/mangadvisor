@@ -41,3 +41,8 @@ backups/
 
 # Personal manga lists and local evaluation results (never push to public GitHub)
 private-data/
+
+# Private (real) manga reference exports and local evaluation reports.
+private-evaluations/
+mangatheque_reference_*.csv
+mangatheque_extraite_*.xlsx

@@ -26,7 +26,7 @@ Aucune note, aucun statut lu ou favori ne sont inventés. Le fichier CSV doit av
 ## Ce qui est validé — et ce qui ne l'est pas
 
 - La quantité de séries, tomes principaux, doublons et autres éditions est recalculée dans le fichier local.
-- Chaque série est testée contre le catalogue de ton instance par **la logique de rapprochement actuelle**, sans aucune écriture. Les correspondances indirectes (rang 3+) sont marquées **floues**, pas certifiées. Si plusieurs lignes de collection correspondent au même \`manga_id\`, une **collision** est signalée (par exemple plusieurs éditions d'une même œuvre).
+- Chaque série est testée contre le catalogue de ton instance par **la logique de rapprochement actuelle**, sans aucune écriture. Les correspondances indirectes (rang 3+) sont marquées **floues**, pas certifiées. Si plusieurs lignes correspondent au même identifiant manga, le benchmark distingue les **éditions explicitement déclarées d'une même œuvre** des collisions ambiguës (voir 3.7 ci-dessous).
 - Seules les correspondances directes et non conflictuelles peuvent être utilisées pour repérer une suggestion correspondant à un manga de l'inventaire.
 - Le benchmark vérifie le résultat réel actuel du conseiller pour trois demandes. Une œuvre de la liste qui apparaît dans les suggestions est un signe que **la liste privée et la bibliothèque en base ne sont peut-être pas encore synchronisées**, pas automatiquement une erreur du moteur.
 - Les indicateurs **avant/après** montrent des changements de suggestions, **pas une amélioration prouvée de la qualité**. Pour juger l'amélioration, il faut des retours véritablement donnés par l'utilisateur, une collection reliée au bon identifiant et une période d'observation suffisante.
@@ -41,3 +41,24 @@ La fonctionnalité historique d'import CSV de la bibliothèque peut **remplacer 
 - Script \`cmd/benchmark-mangatheque.ps1\` : lecture locale, contrôle de chiffres positifs, refus des doublons de lignes, \`dry_run=true\` imposé ; aucune option d'activation des écritures.
 - \`private-data/\` dans \`.gitignore\`; ni collection privée ni identifiants/API privés dans le dépôt.
 - CI PostgreSQL jetable : fixture **synthétique**, double exécution du benchmark, comparaisons déterministes, snapshot et compteurs de bibliothèque inchangés, avant de réexécuter la sauvegarde/restauration et la vérification HTTPS.
+
+
+## Extension 3.7 — deux éditions physiques d'une seule œuvre
+
+Le CSV conserve ses six premières colonnes et accepte trois colonnes facultatives :
+
+- **oeuvre_commune** : titre canonique à rechercher, uniquement lorsque le propriétaire confirme explicitement que les variantes représentent la même œuvre.
+- **edition_declaree** : libellé de l'édition possédée, distinct pour chaque version.
+- **format_catalogue_provisoire** : indice informatif, jamais utilisé pour inventer un ISBN.
+
+Les CSV plus anciens continuent à fonctionner. Les deux premières colonnes facultatives doivent être renseignées ensemble, ou rester vides ensemble.
+
+Deux lignes ne forment un **groupe d'éditions distinctes** que si elles ont le même titre canonique déclaré, des éditions déclarées différentes, une correspondance de catalogue directe (rang 1 ou 2), et le même identifiant manga canonique. Sinon, il s'agit toujours d'une collision potentiellement ambiguë. Les groupes validés se trouvent dans le nouveau champ **groupes_editions_distinctes** du rapport, avec les quantités séparées.
+
+### Exemple privé documenté
+
+Les deux versions Dragon Ball sont conservées séparément dans l'inventaire : **Pastel (42 tomes)** et **Deluxe (34 tomes)**, mais pointent vers la même œuvre pour le benchmark. L'éditeur Glénat appelle sa version 34 tomes *Perfect Edition* : l'association aux ISBN de la collection physique reste néanmoins à confirmer. Références :
+- https://www.glenat.com/actualite/arret-de-commercialisation-des-editions-sens-francais-de-dragon-ball/
+- https://www.glenat.com/glenat-manga/series-dragon-ball-perfect-edition/
+
+**Aucune écriture dans la bibliothèque, aucune attribution automatique d'ISBN et aucune fusion de tomes physiques.** Le benchmark ne fait que distinguer les vrais groupes d'éditions déclarés des correspondances ambiguës.

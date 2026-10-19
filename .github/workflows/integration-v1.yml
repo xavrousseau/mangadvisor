@@ -197,11 +197,13 @@ jobs:
           set -euo pipefail
           mkdir -p private-data
           cat > private-data/mangatheque.csv <<'CSV'
-          serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier;statut_releve;ligne_source
-          Naruto;72;72;0;Sans mention en cours;1
-          Monster;18;0;0;Sans mention en cours;2
-          Demo CI 08;10;0;2;Edition en cours;3
-          Oeuvre inexistante Mangadvisor CI;1;0;0;A verifier;4
+          serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier;statut_releve;ligne_source;oeuvre_commune;edition_declaree;format_catalogue_provisoire
+          Naruto;72;72;0;Sans mention en cours;1;;;
+          Monster;18;0;0;Sans mention en cours;2;;;
+          Demo CI 08;10;0;2;Edition en cours;3;;;
+          Oeuvre inexistante Mangadvisor CI;1;0;0;A verifier;4;;;
+          Demo CI 05 version A;3;0;0;Sans mention en cours;5;Demo CI 05;Version A;INCONNU
+          Demo CI 05 version B;4;0;0;Sans mention en cours;6;Demo CI 05;Version B;INCONNU
           CSV
           BEFORE="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM user_manga_library')"
           pwsh -NoProfile -File cmd/benchmark-mangatheque.ps1
@@ -217,13 +219,20 @@ jobs:
           for snap in snapshots:
               assert snap["type"]=="private_read_only_library_benchmark",snap
               assert snap["dry_run_status"]=="dry_run",snap
-              assert snap["entries"]==4,snap
-              assert snap["main_volumes"]==101,snap
+              assert snap["entries"]==6,snap
+              assert snap["main_volumes"]==108,snap
               assert snap["duplicate_volumes"]==72,snap
               assert snap["other_editions"]==2,snap
               assert snap["matched_count"]>=3,snap
               assert len(snap["missing"])>=1,snap
               assert len(snap["scenarios"])==3,snap
+              assert len(snap["groupes_editions_distinctes"])==1,snap
+              group=snap["groupes_editions_distinctes"][0]
+              assert group["oeuvre_commune"]=="Demo CI 05",group
+              assert {r["edition_declaree"] for r in group["editions"]}=={"Version A","Version B"},group
+              assert sorted(r["tomes_declares"] for r in group["editions"])==[3,4],group
+              assert len(snap["collisions"])==0,snap
+              assert snap["trusted_canonical_match_count"]>=4,snap
           assert any(snap["comparison_with_previous"] for snap in snapshots),snapshots
           print("Private read-only benchmark and repeated snapshot comparison verified")
           PY
