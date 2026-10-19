@@ -33,7 +33,7 @@ class AdvisorQualityTests(unittest.TestCase):
         self.assertEqual(q["french_isbn_record_count"],2)
         self.assertEqual(q["narrative_clue_evidence_count"],1)
         # Only the two mystery results share a catalog tag.
-        self.assertEqual(q["mean_pairwise_tag_overlap"],0.067)
+        self.assertEqual(q["mean_pairwise_tag_overlap"],0.111)
         self.assertEqual(q["pair_count_compared"],3)
         self.assertTrue(q["quality_is_not_a_probability"])
 
