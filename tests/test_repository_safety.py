@@ -41,10 +41,11 @@ class RepositorySafetyTests(unittest.TestCase):
         self.assertIn("ON CONFLICT (source_mal_id) DO UPDATE",manga_sql)
         self.assertNotIn("RESTART IDENTITY",manga_sql)
 
-    def test_windows_jikan_menu_never_overrides_db_password(self):
-        script=(ROOT/"cmd/run-jikan-pipeline.cmd").read_text(encoding="utf-8")
-        self.assertNotIn('set "POSTGRES_PASSWORD=',script)
-        self.assertNotIn('set "POSTGRES_USER=',script)
+    def test_windows_catalog_menu_uses_safe_central_orchestrator(self):
+        script=(ROOT/"mangadvisor.cmd").read_text(encoding="utf-8")
+        self.assertIn('-Action Catalogue', script)
+        self.assertNotIn('--reset-db', script)
+        self.assertNotIn('cmd\\run-jikan-pipeline.cmd', script)
 
     def test_parser_handles_quotes_unicode_and_only_known_keys(self):
         with tempfile.TemporaryDirectory() as temp:
