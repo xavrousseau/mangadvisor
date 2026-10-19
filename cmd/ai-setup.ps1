@@ -6,7 +6,7 @@ $ProgressPreference = "SilentlyContinue"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $envFile = Join-Path $root ".env"
 $compose = @("-f",(Join-Path $root "infra\compose\docker-compose.yml"),
-             "-f",(Join-Path $root "infra\compose\docker-compose.dev.yml"))
+             "-f",(Join-Path $root "infra\compose\docker-compose.local.yml"))
 $model = "qwen2.5:3b"
 function Assert-LastExit([string]$message) {
   if ($LASTEXITCODE -ne 0) { throw "$message (code $LASTEXITCODE)." }
