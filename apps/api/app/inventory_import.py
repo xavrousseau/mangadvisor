@@ -40,6 +40,27 @@ CREATE TABLE IF NOT EXISTS user_manga_inventory_declaration (
 );
 CREATE INDEX IF NOT EXISTS user_manga_inventory_declaration_work_idx
   ON user_manga_inventory_declaration(user_id, manga_id);
+
+-- Preserve owner declarations without inventing a canonical manga identifier.
+CREATE TABLE IF NOT EXISTS user_manga_inventory_pending (
+    user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    source_key TEXT NOT NULL,
+    entry_title TEXT NOT NULL,
+    source_reference TEXT,
+    work_declared TEXT,
+    edition_declared TEXT,
+    format_hint TEXT,
+    main_volumes INTEGER NOT NULL CHECK (main_volumes BETWEEN 0 AND 9999),
+    duplicate_copies INTEGER NOT NULL CHECK (duplicate_copies BETWEEN 0 AND 9999),
+    other_editions_unknown INTEGER NOT NULL CHECK (other_editions_unknown BETWEEN 0 AND 9999),
+    review_status TEXT NOT NULL CHECK (review_status IN ('REVIEW_MISSING','REVIEW_AMBIGUOUS')),
+    candidate_ids INTEGER[] NOT NULL DEFAULT '{}',
+    content_sha256 TEXT NOT NULL,
+    saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, source_key)
+);
+CREATE INDEX IF NOT EXISTS user_manga_inventory_pending_user_idx
+  ON user_manga_inventory_pending(user_id);
 """
 
 
@@ -50,6 +71,10 @@ class InventoryCsv(BaseModel):
 class InventoryApply(InventoryCsv):
     confirmation_token: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     accept_partial: bool = False
+
+
+class InventorySavePending(InventoryCsv):
+    confirmation_token: str = Field(..., pattern=r"^[0-9a-f]{64}$")
 
 
 def ensure_inventory_schema(connection_factory: Callable[..., Any]) -> None:
@@ -206,6 +231,21 @@ def preview_hash(review: dict[str, Any], user_id: int) -> str:
     ).encode("utf-8")
     return hashlib.sha256(contents).hexdigest()
 
+
+
+def pending_key(row: dict[str, Any]) -> str:
+    """Stable position in the original collection, never a guessed manga ID."""
+    return (row.get("source_reference") or "").strip() or f"csv-line:{row['line']}"
+
+
+def pending_hash(row: dict[str, Any]) -> str:
+    """Detect changes to owner claims without the catalogue's mutable guesses."""
+    fields = ("entry_title", "source_reference", "work_declared",
+              "edition_declared", "format_hint", "main_volumes",
+              "duplicate_copies", "other_editions_unknown")
+    raw = json.dumps({key: row.get(key) for key in fields},
+                     ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def summarize_declarations(items: list[dict[str, Any]]) -> dict[str, int]:
