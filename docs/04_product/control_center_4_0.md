@@ -15,7 +15,8 @@
 9. **Diagnostic** : vérifier la santé API, PostgreSQL, les compteurs SQL, une recherche, l'ouverture du site Web **et ses appels API réels via Nginx** (santé + bibliothèque).
 10. **Sauvegarde vérifiée** : créer un dump PostgreSQL et valider une restauration de test dans une base isolée.
 11. **Import facultatif de collection** : placer un fichier CSV compatible dans **private-data/mangatheque.csv**. Un aperçu est exécuté sans écriture. L'import réel exige ensuite deux confirmations et exclut les titres ambigus ou non reconnus.
-12. Nouveau diagnostic, puis **sauvegarde finale automatique vérifiée**, y compris si une bibliothèque vient d'être importée. Copier ensuite les archives sur un autre support.
+12. **Sauvegarde finale automatique vérifiée immédiatement après l'import**, avant toute requête d'audit : même si le diagnostic échoue ensuite, les nouvelles déclarations sont déjà protégées.
+13. Nouveau diagnostic, puis **benchmark privé automatique** si le CSV est présent : rapport de couverture du catalogue, distinction des éditions d'une même œuvre et trois scénarios du conseiller. L'audit est en lecture seule et écrit son JSON dans **private-data/** ; s'il échoue, l'installation et la sauvegarde restent intactes et l'option **20** permet de le relancer. Copier ensuite les archives sur un autre support.
 
 Une réinstallation est **non destructive par défaut** : elle ne supprime ni volume Docker, ni configuration .env existante, ni données de la mangathèque. Pour repartir d'une base vierge malgré des données existantes, sauvegarder d'abord avec 17 puis utiliser **11 — Nuke** séparément et volontairement. **11 est irréversible sans sauvegarde**.
 
@@ -52,6 +53,8 @@ Git utilise désormais le fichier `.gitattributes` : LF pour les sources exécut
 L'import CSV conserve les déclarations physiques par édition mais ne prétend pas connaître les ISBN, les volumes lus, les notes ou la complétude. Les ISBN français sont recherchés et vérifiés séparément via la BnF ; **il n'existe pas encore de chargement complet automatique de toutes les éditions françaises**. Les anciennes propositions de pipelines AniList, MangaNews, embeddings et indexation exhaustive Meilisearch ne sont pas toutes implémentées dans ce parcours et ne sont pas annoncées comme exécutées.
 
 Le diagnostic contrôle l'infrastructure réelle, mais pas la qualité artistique des recommandations ni l'identification certaine de tous les titres. Vérifier les fiches, les couvertures, la correspondance des mangas de ta collection, les éditions et les exclusions des recommandations dans l'interface. Une CI GitHub réussie ne remplace pas un test du PC.
+
+Si **toutes** les extractions de recommandations échouent (fournisseur indisponible, timeout, quota), l'option **26** renvoie désormais une erreur claire au lieu d'annoncer une réussite trompeuse. Les relations SQL déjà présentes sont conservées. En cas de succès partiel, les relations exploitables sont chargées, les erreurs sont signalées et une relance de 26 permet de compléter sans effacer le précédent graphe.
 
 En cas d'échec Jikan (réseau ou quotas), relancer l'option 25 sans suppression. En cas d'échec SQL, corriger puis relancer 24. Pour un inventaire non reconnu, enrichir le catalogue avant d'importer plutôt que d'inventer une correspondance. L'option 6 donne accès aux logs et 27 permet de reprendre les contrôles.
 
