@@ -21,7 +21,7 @@ $preview=Invoke-RestMethod -Method Post -Uri "$api/inventory/preview" -TimeoutSe
 $path=Join-Path $private ("inventaire_apercu_{0}_{1}.json" -f (Get-Date -Format "yyyyMMdd_HHmmss"),([guid]::NewGuid().ToString("N")).Substring(0,6))
 $preview | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $path -Encoding UTF8
 Write-Host ""
-Write-Host "========= MANGADVISOR 3.8  -  APERCU SANS ECRITURE ========="
+Write-Host "========= MANGADVISOR 4.3  -  APERCU SANS ECRITURE ========="
 Write-Host "Fichier : $CsvFile"
 Write-Host "Quantites physiques declarees : $($preview.declared_physical_volumes)"
 Write-Host "Nouvelles declarations fiables : $($preview.ready)"
@@ -35,8 +35,36 @@ foreach($entry in @($preview.items | Where-Object {$_.status -eq "READY"} | Sele
   $format=if($entry.edition_declared){$entry.edition_declared}else{"edition non precisee"}
   Write-Host ("[PRET] {0}  -  {1} ({2} tomes principaux)" -f $entry.catalog_title,$format,$entry.main_volumes)
 }
-if ($preview.ready -le 0) { Write-Host "Aucune nouvelle ligne fiable : aucune ecriture."; exit 0 }
-if ($PreviewOnly) { Write-Host "Mode APERCU : aucune modification de la base."; exit 0 }
+if ($PreviewOnly) {
+  Write-Host "Mode APERCU : aucune modification de la base."
+  exit 0
+}
+# Unmatched works are preserved ONLY after a second, separate user decision.
+# They are not associated with a manga_id and never affect recommendations.
+$unresolved=@($preview.items | Where-Object {
+  $_.status -eq "REVIEW_MISSING" -or $_.status -eq "REVIEW_AMBIGUOUS"
+})
+if (-not $CiApply -and $unresolved.Count -gt 0) {
+  Write-Host ""
+  Write-Host "$($unresolved.Count) entrees restent inconnues ou ambigues dans le catalogue."
+  Write-Host "Tu peux les conserver en attente, sans ISBN, sans attribution a une serie et sans modification des suivis."
+  $saveExpected="CONSERVER $($unresolved.Count)"
+  $saveAnswer=Read-Host "Saisis exactement '$saveExpected' pour sauvegarder ces entrees en attente, ou Entree pour ignorer"
+  if ($saveAnswer -ceq $saveExpected) {
+    $pendingBody=@{
+      csv_content=$csv
+      confirmation_token=[string]$preview.confirmation_token
+    } | ConvertTo-Json -Compress
+    $saved=Invoke-RestMethod -Method Post -Uri "$api/inventory/pending/save" -TimeoutSec 120 -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($pendingBody))
+    if ($saved.status -ne "ok" -or $saved.preserved_without_guessing -ne $true) {
+      throw "Sauvegarde des entrees sans correspondance non certifiee."
+    }
+    Write-Host ("PRESERVEES : {0} nouvelles declarations en attente ; {1} deja presentes. Aucun manga ni ISBN ajoute." -f $saved.saved,$saved.unchanged_pending)
+  } else {
+    Write-Host "Conservation des entrees en attente ignoree : aucune ecriture pour ces lignes."
+  }
+}
+if ($preview.ready -le 0) { Write-Host "Aucune nouvelle declaration fiable a importer dans les mangas."; exit 0 }
 if ($CiApply) {
   if ($env:MANGADVISOR_INVENTORY_TEST_CI -ne "1" -or $health.database -ne "mangadvisor_ci") {
     throw "L'import automatise n'est autorise QUE sur la base jetable mangadvisor_ci."

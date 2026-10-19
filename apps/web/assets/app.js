@@ -376,9 +376,12 @@ async function updatePhysicalInventory(token){
  const host=document.querySelector("#physical-inventory-results");
  if(!host)return;
  try{
-  const physical=await request("/inventory/declarations");
+  const [physical,pending]=await Promise.all([
+    request("/inventory/declarations"),
+    request("/inventory/pending"),
+  ]);
   if(token===renderToken && routeInfo().view==="library")
-    host.innerHTML=physicalInventoryMarkup(physical,state.lang,t,escapeHtml);
+    host.innerHTML=physicalInventoryMarkup({...physical,pending},state.lang,t,escapeHtml);
  }catch(err){
   if(token===renderToken && routeInfo().view==="library")
     host.innerHTML='<p class="collection-caveat">'+L("physicalUnavailable")+'</p>';
