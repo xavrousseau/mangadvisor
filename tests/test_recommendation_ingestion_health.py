@@ -52,8 +52,11 @@ class RecommendationIngestionHealthTests(unittest.TestCase):
     def test_guided_wizard_backs_up_before_quality_audit(self):
         script = (ROOT / "cmd/control-center.ps1").read_text(encoding="utf-8")
         wizard = script.split("function Wizard {", 1)[1].split("\ntry {\n  switch ($Action)", 1)[0]
+        # Earlier setup phases have their own diagnostic and backup. Compare
+        # only the post-import tail, which must protect the newly owned items.
+        post_import = wizard[wizard.index("  Inventory\n"):]
         phases = ["  Inventory\n", "  Backup\n", "  Diagnostic\n", "    Benchmark-Inventory\n"]
-        offsets = [wizard.index(phase) for phase in phases]
+        offsets = [post_import.index(phase) for phase in phases]
         self.assertEqual(offsets, sorted(offsets))
         self.assertIn('Join-Path $root "private-data\\mangatheque.csv"', script)
         self.assertIn('cmd\\benchmark-mangatheque.ps1', script)
