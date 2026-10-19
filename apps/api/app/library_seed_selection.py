@@ -15,7 +15,11 @@ def evidence_tier(source: dict[str, Any]) -> int:
     score = source.get("user_score")
     if source.get("is_favorite") is True or (score is not None and float(score) >= 8.5):
         return 3
-    if (score is not None and float(score) >= 7) or source.get("library_status") in ("READ", "READING"):
+    # An explicit lukewarm/negative rating overrides a "read" status:
+    # reading a book is not proof that the reader enjoyed it.
+    if score is not None:
+        return 2 if float(score) >= 7 else 0
+    if source.get("library_status") in ("READ", "READING"):
         return 2
     if source.get("library_status") == "WANT_TO_READ":
         return 1
