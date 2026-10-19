@@ -303,6 +303,36 @@ def select_balanced_candidates(
     return picked
 
 
+def recurring_owned_tags(
+    rows: list[dict[str, Any]], *, max_per_kind: int = 8,
+) -> tuple[dict[str, set[str]], dict[str, int]]:
+    """Use recurring *ownership*, never a claimed positive rating, as weak evidence.
+
+    SQL counts DISTINCT canonical manga IDs: two physical editions of one work
+    do not make its tags appear twice. Require at least two separate owned
+    works for each tag, and cap generic tags to keep the fallback bounded.
+    """
+    selected: dict[str, set[str]] = {"genres": set(), "themes": set()}
+    work_count = 0
+    for row in rows:
+        kind = row.get("kind")
+        tag = row.get("tag")
+        work_count = max(work_count, int(row.get("owned_work_count") or 0))
+        if (
+            kind in selected
+            and isinstance(tag, str)
+            and tag.strip()
+            and int(row.get("source_count") or 0) >= 2
+            and len(selected[kind]) < max_per_kind
+        ):
+            selected[kind].add(tag.casefold().strip())
+    return selected, {
+        "owned_works_considered": work_count,
+        "recurring_genres": len(selected["genres"]),
+        "recurring_themes": len(selected["themes"]),
+    }
+
+
 def score_candidates(
     rows: list[dict[str, Any]], context: AdvisorContext,
     preferences: dict[str, set[str]], limit: int,
@@ -590,8 +620,38 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                 FROM positive p JOIN manga_theme mt ON mt.manga_id=p.manga_id
                 JOIN theme t ON t.id=mt.theme_id
         """
+        # Ownership alone is NOT evidence that someone enjoyed a series.
+        # This fallback is used only for explicitly requested profile discovery
+        # when no rated/favorited/positively read series or interested feedback
+        # gives a more trustworthy signal.
+        ownership_sql="""
+            WITH owned AS (
+                SELECT manga_id FROM user_manga_library
+                WHERE user_id=%(user_id)s AND library_status='OWNED'
+                  AND is_favorite=FALSE AND user_score IS NULL
+            ), repeated AS (
+                SELECT 'genres' AS kind, LOWER(g.name) AS tag,
+                       COUNT(DISTINCT o.manga_id)::int AS source_count
+                FROM owned o JOIN manga_genre mg ON mg.manga_id=o.manga_id
+                JOIN genre g ON g.id=mg.genre_id
+                GROUP BY LOWER(g.name)
+                UNION ALL
+                SELECT 'themes' AS kind, LOWER(t.name) AS tag,
+                       COUNT(DISTINCT o.manga_id)::int AS source_count
+                FROM owned o JOIN manga_theme mt ON mt.manga_id=o.manga_id
+                JOIN theme t ON t.id=mt.theme_id
+                GROUP BY LOWER(t.name)
+            )
+            SELECT kind,tag,source_count,
+                   (SELECT COUNT(*)::int FROM owned) AS owned_work_count
+            FROM repeated
+            WHERE source_count>=2
+            ORDER BY source_count DESC,kind ASC,tag ASC
+        """
         preferences:dict[str,set[str]]={"genres":set(),"themes":set()}
         feedback=empty_feedback()
+        ownership_evidence={"owned_works_considered":0,"recurring_genres":0,"recurring_themes":0}
+        personalization_basis="none"
         with connection_factory() as conn:
             with conn.cursor() as cur:
                 # Read personal evidence before candidate SQL; in profile-only
@@ -603,21 +663,32 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                 if context.use_library:
                     cur.execute(FEEDBACK_SQL,{"user_id":user_id})
                     feedback=build_feedback_profile(cur.fetchall())
+                if any(preferences.values()):
+                    personalization_basis="reading_preferences"
+                elif any(feedback["interested"][kind] for kind in ("genres","themes")):
+                    personalization_basis="feedback_interest"
                 if profile_only:
-                    if not any(preferences.values()) and not any(
-                        feedback["interested"][kind] for kind in ("genres","themes")
-                    ):
+                    if personalization_basis=="none":
+                        # Importing a CSV as OWNED must be useful even when
+                        # the user has not yet rated hundreds of volumes.
+                        cur.execute(ownership_sql,{"user_id":user_id})
+                        owned_tags,ownership_evidence=recurring_owned_tags(cur.fetchall())
+                        if any(owned_tags.values()):
+                            preferences=owned_tags
+                            personalization_basis="owned_collection_only"
+                    if personalization_basis=="none":
                         data.update(status="clarify",reply=(
-                            "Je n'ai pas encore assez de lectures favorites ou bien notées pour te surprendre. "
-                            "Ajoute quelques lectures ou choisis une ambiance."
+                            "Je manque encore de signaux documentés pour te proposer une découverte. "
+                            "Note quelques lectures, ajoute des favoris ou indique une ambiance. "
+                            "Les œuvres simplement possédées ne suffisent pas si aucun thème ne revient."
                             if is_fr else
-                            "I need a few favorite or highly-rated readings first. "
-                            "Add some manga to your library or choose a mood."
-                        ))
+                            "There is not enough catalog evidence for a personalized discovery yet. "
+                            "Rate a few reads, mark favorites or choose a mood. "
+                            "Ownership by itself is not a positive review."
+                        ),personalization_basis="none",ownership_evidence=ownership_evidence)
                         return data
-                    # Interest is weaker than loved/positively read titles.
-                    # Use it as a fallback to populate source tags for a sparse
-                    # library; do not mislabel it as an actual reading.
+                    # Explicit interest is weaker than loved/positively read
+                    # works, but stronger than unscored ownership.
                     params["genres"]=sorted(
                         preferences["genres"] | set(feedback["interested"]["genres"])
                     )
@@ -641,6 +712,8 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         interpretation=describe_context(context,payload.lang)
         data["interpreted_criteria"]=interpretation
         data["feedback_learning"]=feedback_summary(feedback)
+        data["personalization_basis"]=personalization_basis
+        data["ownership_evidence"]=ownership_evidence
         data["discovery_source"]="library_tags" if profile_only else "requested_mood"
         data["quality_diagnostic"] = quality_diagnostic(
             chosen, examined=len(candidates),
@@ -652,11 +725,17 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             recommendations=chosen,count=len(chosen),
             personalized=personalized,
             reply=(
-                (("Je me base sur les genres et thèmes de tes lectures appréciées ou des mangas qui t'intéressent. "
+                (("Je pars des genres et thèmes qui reviennent dans plusieurs œuvres de ta collection. "
+                   "Posséder un manga ne signifie pas forcément l'aimer : ces propositions sont des pistes à affiner avec tes notes ou favoris."
+                   if is_fr else
+                   "These suggestions use recurring genres and themes across different works you own. "
+                   "Owning a manga does not mean you liked it; ratings and favorites will improve these suggestions.")
+                  if personalization_basis=="owned_collection_only" else
+                  ("Je me base sur les genres et thèmes de tes lectures appréciées ou des mangas qui t'intéressent. "
                    "Les suggestions restent issues du catalogue ; un ISBN n'est pas une preuve de stock."
                    if is_fr else
                    "I used recorded genres and themes from titles you enjoyed or want to read. "
-                   "Every pick comes from the catalog; an ISBN doesn't confirm stock.")
+                   "Every pick comes from the catalog; an ISBN doesn't confirm stock."))
                   if profile_only else
                  ("J'ai compris : "+interpretation+". Voici des pistes appuyées sur les genres, thèmes et indices textuels réellement trouvés. "
                   "Les ISBN français ne prouvent pas la disponibilité en magasin."
