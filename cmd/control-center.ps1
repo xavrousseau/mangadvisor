@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Diagnostic","Update","Wizard")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -149,6 +149,12 @@ function Confirm([string]$Question,[bool]$Default=$false) {
 function Engine([string[]]$Arguments) {
   Compose (@("run","--rm","engine","python")+$Arguments)
 }
+function Network {
+  Say "Diagnostic HTTPS Docker : Jikan et acces Internet"
+  Ensure-Environment
+  Check-Docker
+  Engine @("pipelines/engine/scripts/check_network.py")
+}
 function Get-Count([string]$Table) {
   $allowed=@("manga","jikan_manga_source","genre","manga_genre","theme","manga_theme",
              "demographic","manga_demographic","manga_recommendation_edge",
@@ -177,6 +183,7 @@ function Load-Catalogue {
   Compose @("up","-d","postgres","meilisearch")
   Wait-Postgres
   $null=Get-Count "manga"
+  Network
   $pages=Ask-Number "Nombre de pages SEARCH Jikan (25 mangas/page)" 40 400
   $topPages=Ask-Number "Nombre de pages TOP Jikan (25 mangas/page)" 10 100
   $force=Confirm "Actualiser aussi les fichiers JSON deja telecharges ?" $false
@@ -207,6 +214,7 @@ function Load-Recommendations {
   Compose @("up","-d","postgres","meilisearch")
   Wait-Postgres
   if ((Get-Count "manga") -eq 0) { throw "Catalogue vide. Lance d'abord l'option 25." }
+  Network
   $limit=Ask-Number "Nombre de mangas a enrichir" 50 2000
   $force=Confirm "Retelecharger les relations deja extraites ?" $false
   $argsList=@("pipelines/engine/scripts/extract_jikan_recommendations.py",
@@ -337,6 +345,7 @@ try {
     "Database"        { Initialize-Database }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
+    "Network"         { Network }
     "Diagnostic"      { Diagnostic }
     "Update"          { Update }
     "Wizard"          { Wizard }
