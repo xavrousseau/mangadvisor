@@ -59,7 +59,7 @@ $head=(& git -C $working rev-parse HEAD).Trim()
 $expected=(& git -C $remote rev-parse refs/heads/main).Trim()
 if ($head -cne $expected) { throw "Pull did not fast-forward to remote main" }
 $stash=@(& git -C $working stash list --format="%gs")
-if ($stash.Count -ne 1 -or $stash[0] -notlike "mangadvisor-avant-maj-*") {
+if ($stash.Count -ne 1 -or $stash[0] -notlike "*mangadvisor-avant-maj-*") {
   throw "Original changes not saved in named stash"
 }
 $stashDiff=(& git -C $working stash show -p "stash@{0}") -join [Environment]::NewLine
