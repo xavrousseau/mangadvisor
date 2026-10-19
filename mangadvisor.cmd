@@ -111,7 +111,6 @@ goto menu
 if /I "%~1"=="wizard" start "Mangadvisor - Installation complete" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Wizard & goto :eof
 if /I "%~1"=="environment" start "Mangadvisor - Configuration" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Environment & goto :eof
 if /I "%~1"=="database" start "Mangadvisor - Initialisation SQL" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Database & goto :eof
-if /I "%~1"=="catalogue" start "Mangadvisor - Catalogue Jikan" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto :eof
 if /I "%~1"=="recommendations" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto :eof
 if /I "%~1"=="diagnostic" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto :eof
 if /I "%~1"=="update" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto :eof
