@@ -47,11 +47,11 @@ echo   -----------------------------------------
 echo   22 - Installer de A a Z (base, donnees, appli, bibliotheque, tests)
 echo   23 - Creer / verifier la configuration .env
 echo   24 - Initialiser / reparer les tables SQL
-echo   25 - Telecharger et charger le catalogue Jikan
+echo   25 - Telecharger et charger le catalogue manga (Tenrai)
 echo   26 - Telecharger et charger les recommandations
 echo   27 - Diagnostic final complet (lecture seule)
 echo   28 - Mise a jour securisee (sauvegarde + Git + Docker)
-echo   29 - Diagnostic reseau Docker / API Jikan
+echo   29 - Diagnostic reseau Docker / API manga
 echo   Q  - Quitter
 echo.
 echo ============================================================
