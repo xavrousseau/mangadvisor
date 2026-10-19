@@ -86,7 +86,7 @@ class ImportInventoryTests(unittest.TestCase):
             CSV.replace("Dragon Ball;Deluxe;", "Dragon Ball;;"),
             CSV.replace("serie;tomes_principaux", "serie;serie;tomes_principaux"),
             CSV.replace(";34;0;0;", ";0;0;0;"),
-            CSV+"x;1;1;1\n",
+            CSV+"x;1;1;1;F;Dragon Ball;;\n",
         ]
         for sample in bad:
             with self.subTest(sample=sample[:80]):
