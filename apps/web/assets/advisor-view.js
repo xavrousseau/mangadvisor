@@ -18,14 +18,14 @@ export const ADVISOR_PROMPTS={
 /** Buttons send ordinary messages to the audited advisor, not direct SQL queries. */
 export const ADVISOR_BALANCE_PROMPTS={
  fr:{
-  CLOSE:"Montre-moi d'autres mangas très proches de mes goûts",
-  BALANCED:"Montre-moi d'autres mangas variés",
-  EXPLORE:"Surprends-moi avec d'autres mangas"
+  CLOSE:"Je veux une sélection très proche de mes goûts",
+  BALANCED:"Je veux une sélection variée",
+  EXPLORE:"Surprends-moi avec une sélection inattendue"
  },
  en:{
-  CLOSE:"Show me more manga in the same style, close to my tastes",
-  BALANCED:"Show me more manga with a balanced variety",
-  EXPLORE:"Surprise me with more unexpected manga"
+  CLOSE:"I want manga in the same style, close to my tastes",
+  BALANCED:"I want a balanced variety of manga",
+  EXPLORE:"Surprise me with unexpected manga"
  }
 };
 
