@@ -438,11 +438,13 @@ async function renderDetail(token,id){
   state.enrichmentReport=null;state.enrichmentAlias="";state.enrichmentNonce++;
   const synopsis=translation?.text||manga.synopsis||"";
   const reallyTranslated=state.lang==="fr"&&Boolean(translation?.translated);
+  const displayTitle=preferredMangaTitle(manga,state.lang);
+  const alternateTitles=[manga.title,manga.title_japanese]
+    .filter((value,index,list)=>value&&value!==displayTitle&&list.indexOf(value)===index);
   const elements='<section class="detail-hero">'+
    poster(manga,urls,false)+'<div class="detail-info"><div class="eyebrow">MANGADVISOR · '+L("mangaDetails")+'</div>'+
-   '<h1>'+e(manga.title)+'</h1>'+
-   '<p class="detail-sub">'+(manga.title_japanese?e(manga.title_japanese)+' · ':'')+
-    (manga.title_english&&manga.title_english!==manga.title?e(manga.title_english):'')+'</p>'+
+   '<h1>'+e(displayTitle)+'</h1>'+
+   '<p class="detail-sub">'+alternateTitles.map(e).join(' · ')+'</p>'+
    '<div class="tag-row">'+badges(manga.genres,5)+badges(manga.demographics,2)+'</div>'+
    '<p class="muted tiny">'+L("status")+' : '+e(publication(state.lang,manga.status))+' · '+
    (manga.manga_type?tr(manga.manga_type):'Manga')+'</p>'+
