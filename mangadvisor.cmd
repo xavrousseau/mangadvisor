@@ -41,6 +41,16 @@ echo   19 - Restaurer (confirmation obligatoire)
 echo   20 - Tester ma mangatheque en lecture seule
 echo   21 - Importer ma mangatheque apres verification (3.8)
 echo.
+echo.
+echo   Centre de pilotage 4.0 - Assistant complet
+echo   -----------------------------------------
+echo   22 - Installer de A a Z (base, donnees, appli, bibliotheque, tests)
+echo   23 - Creer / verifier la configuration .env
+echo   24 - Initialiser / reparer les tables SQL
+echo   25 - Telecharger et charger le catalogue Jikan
+echo   26 - Telecharger et charger les recommandations
+echo   27 - Diagnostic final complet (lecture seule)
+echo   28 - Mise a jour securisee (sauvegarde + Git + Docker)
 echo   Q  - Quitter
 echo.
 echo ============================================================
@@ -78,6 +88,14 @@ if /I "%CHOICE%"=="18" start "Mangadvisor - Verification sauvegarde" cmd /k powe
 if /I "%CHOICE%"=="19" start "Mangadvisor - Restauration securisee" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Restore & goto menu
 if /I "%CHOICE%"=="20" start "Mangadvisor - Benchmark prive" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\benchmark-mangatheque.ps1" & goto menu
 if /I "%CHOICE%"=="21" start "Mangadvisor - Import inventaire" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\import-private-inventory.ps1" & goto menu
+
+if /I "%CHOICE%"=="22" start "Mangadvisor - Installation complete" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Wizard & goto menu
+if /I "%CHOICE%"=="23" start "Mangadvisor - Configuration" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Environment & goto menu
+if /I "%CHOICE%"=="24" start "Mangadvisor - Initialisation SQL" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Database & goto menu
+if /I "%CHOICE%"=="25" start "Mangadvisor - Catalogue Jikan" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto menu
+if /I "%CHOICE%"=="26" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto menu
+if /I "%CHOICE%"=="27" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto menu
+if /I "%CHOICE%"=="28" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto menu
 
 if /I "%CHOICE%"=="12" goto jikan_menu
 
@@ -163,6 +181,14 @@ if /I "%RESET_DB%"=="oui" (
 goto menu
 
 :run_command
+if /I "%~1"=="wizard" start "Mangadvisor - Installation complete" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Wizard & goto :eof
+if /I "%~1"=="environment" start "Mangadvisor - Configuration" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Environment & goto :eof
+if /I "%~1"=="database" start "Mangadvisor - Initialisation SQL" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Database & goto :eof
+if /I "%~1"=="catalogue" start "Mangadvisor - Catalogue Jikan" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto :eof
+if /I "%~1"=="recommendations" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto :eof
+if /I "%~1"=="diagnostic" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto :eof
+if /I "%~1"=="update" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto :eof
+
 if /I "%~1"=="check"   start "Mangadvisor - Verification" cmd /k call "%ROOT_DIR%cmd\install-check.cmd" & goto :eof
 if /I "%~1"=="build"   start "Mangadvisor - Build"        cmd /k call "%ROOT_DIR%cmd\build.cmd" & goto :eof
 if /I "%~1"=="up"      start "Mangadvisor - Up"           cmd /k call "%ROOT_DIR%cmd\up.cmd" & goto :eof
