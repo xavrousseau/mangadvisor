@@ -67,6 +67,20 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
  };
  const balance=["CLOSE","BALANCED","EXPLORE"].includes(response?.context?.recommendation_balance)
   ?response.context.recommendation_balance:"BALANCED";
+ const diagnostic=response.quality_diagnostic;
+ const safeCount=value=>Number.isInteger(value)&&value>=0?value:0;
+ const quality=diagnostic?.scope==="displayed_catalogue_results_only"
+  ?'<details class="advisor-quality"><summary>'+L("advisorQualityTitle")+'</summary>'+
+    '<div class="advisor-quality-body">'+
+      '<span>'+L("advisorQualityShown")+': <strong>'+safeCount(diagnostic.returned_count)+'</strong></span>'+
+      '<span>'+L("advisorQualityExamined")+': <strong>'+safeCount(diagnostic.examined_count)+'</strong></span>'+
+      '<span>'+L("advisorQualityTags")+': <strong>'+safeCount(diagnostic.unique_recorded_tags)+'</strong></span>'+
+      '<span>'+L("advisorQualityAffinity")+': <strong>'+safeCount(diagnostic.affinity_evidence_count)+'</strong></span>'+
+      (diagnostic.mean_pairwise_tag_overlap!=null && Number.isFinite(diagnostic.mean_pairwise_tag_overlap) ?
+        '<span>'+L("advisorQualityOverlap")+': <strong>'+Math.round(diagnostic.mean_pairwise_tag_overlap*100)+'%</strong></span>':"")+
+      (diagnostic.candidate_pool_capped?'<p>'+L("advisorQualityWindow")+'</p>':"")+
+      '<p>'+L("advisorQualityCaution")+'</p>'+
+    '</div></details>':"";
  const controls='<div class="advisor-balance-controls" role="group" aria-label="'+L("advisorBalanceChoose")+'">'+
   '<span class="advisor-balance-caption">'+L("advisorBalanceChoose")+'</span>'+
   ["CLOSE","BALANCED","EXPLORE"].map(mode=>
@@ -77,7 +91,7 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
   '<div><div class="eyebrow">'+L(response.personalized?"advisorWithTaste":"advisorCatalog")+'</div>'+
   '<h2>'+L("advisorPicks")+'</h2></div>'+
   '<span class="mood-count">'+e(response.count)+' '+L("moodResultsCount")+'</span></div>'+
-  controls+
+  controls+quality+
   '<div class="mood-grid">'+response.recommendations.map((m,i)=>{
    const mood=[...(m.mood_matches?.genres||[]),...(m.mood_matches?.themes||[])];
    const common=[...(m.affinity_matches?.genres||[]),...(m.affinity_matches?.themes||[])];
