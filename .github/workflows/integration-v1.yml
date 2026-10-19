@@ -186,6 +186,11 @@ jobs:
             -f infra/compose/docker-compose.dev.yml exec -T api \
             python - < tests/smoke/resolve_unknown_db.py
 
+      # IMPORTANT: run only AFTER all feature tests; CI Jikan source rows are
+      # intentionally sparse. Assert user IDs, ISBNs and reading states survive.
+      - name: Prouver que la reconstruction Jikan préserve la bibliothèque
+        run: python tests/smoke/rebuild_safety_smoke.py
+
       - name: Valider HTTPS prive, certificat IP et authentification mobile
         shell: bash
         run: |
