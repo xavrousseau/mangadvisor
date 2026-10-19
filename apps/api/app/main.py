@@ -10,6 +10,7 @@ from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
 from apps.api.app.collection import create_collection_router, ensure_collection_schema
 from apps.api.app.collection_bulk import collection_import_router
+from apps.api.app.inventory_import import inventory_router,ensure_inventory_schema
 from apps.api.app.collection_scan import scan_router
 from apps.api.app.edition_discovery import edition_discovery_router
 from apps.api.app.edition_enrichment import create_enrichment_router
@@ -1292,14 +1293,11 @@ def import_library_csv(payload: LibraryImportCsvRequest) -> dict[str, Any]:
             NULL,
             NULL
         )
-        ON CONFLICT (user_id, manga_id)
-        DO UPDATE SET
-            library_status = EXCLUDED.library_status,
-            user_score = EXCLUDED.user_score,
-            is_favorite = EXCLUDED.is_favorite,
-            owned_volumes = EXCLUDED.owned_volumes,
-            read_volumes = EXCLUDED.read_volumes,
-            notes = EXCLUDED.notes;
+        -- The legacy CSV importer is now ADD-ONLY on existing library
+        -- entries. A sparse spreadsheet must not erase scores, favorite
+        -- status, reading progress or notes. Use explicit editing to change
+        -- those fields, and the new /inventory routes for physical editions.
+        ON CONFLICT (user_id, manga_id) DO NOTHING;
     """
 
     with get_connection() as conn:
@@ -3665,10 +3663,12 @@ def get_manga_covers(
 @app.on_event("startup")
 def prepare_fr_collection() -> None:
     ensure_collection_schema(get_connection)
+    ensure_inventory_schema(get_connection)
 
 
 app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
 app.include_router(collection_import_router(get_connection, DEFAULT_USER_ID))
+app.include_router(inventory_router(get_connection, DEFAULT_USER_ID))
 app.include_router(scan_router(get_connection, DEFAULT_USER_ID))
 app.include_router(edition_discovery_router(get_connection))
 app.include_router(create_enrichment_router(get_connection))

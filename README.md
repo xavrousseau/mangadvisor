@@ -11,6 +11,14 @@
 
 Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
 
+### Importer ton inventaire avec confirmation (option 21 — Mangadvisor 3.8)
+
+Après avoir effectué une **sauvegarde validée (option 17)**, place le CSV privé dans `private-data/mangatheque.csv`. Démarre l'application et choisis l'**option 21**. Le script rapproche seulement les œuvres aux titres correspondants de façon exacte et unique, puis affiche un **aperçu sans écriture** : lignes prêtes, éditions distinctes, lignes ambiguës et données préexistantes. Une confirmation textuelle explicite est obligatoire avant l'import, notamment pour accepter un import partiel.
+
+Les quantités par **édition déclarée** sont conservées séparément des ISBN vérifiés. Une œuvre absente de la bibliothèque est ajoutée comme « Possédée » pour éviter qu'elle soit recommandée ; **aucune note, favori, statut existant ou tome lu n'est écrasé**. Un titre manquant ou homonyme reste à vérifier. Les fichiers et rapports restent exclusivement dans `private-data/`, ignoré par Git.
+
+Voir [Import sécurisé 3.8](docs/04_product/safe_inventory_import_3_8.md).
+
 ### Tester ta vraie mangathèque sans importer les données (option 20)
 
 Copier ton CSV de collection dans le dossier local `private-data/mangatheque.csv`, puis lancer Mangadvisor et choisir **option 20** dans `mangadvisor.cmd`. Le test rapproche les titres avec le catalogue réel via `dry_run=true`, signale les homonymes/éditions et mesure des recommandations en lecture seule. Après tes réactions aux suggestions, relancer l'option 20 permet de comparer les recommandations avant/après. **Ne jamais publier la collection sur GitHub** : `private-data/` est exclu de Git.
