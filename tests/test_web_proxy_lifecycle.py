@@ -33,8 +33,8 @@ class WebProxyLifecycleTests(unittest.TestCase):
                 self.assertNotIn("volume rm", code)
         control = (ROOT / "cmd/control-center.ps1").read_text(encoding="utf-8")
         self.assertIn('Compose @("--profile","legacy","stop","ui")', control)
-        self.assertIn('"/api/health"', control)
-        self.assertIn('"/api/library?limit=1"', control)
+        self.assertIn("/api/health", control)
+        self.assertIn("/api/library?limit=1", control)
         self.assertNotIn("down -v", control)
 
 
