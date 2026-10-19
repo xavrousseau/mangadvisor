@@ -10,7 +10,9 @@ SELECT 900000 + n,
        CASE n WHEN 1 THEN 'Naruto' WHEN 2 THEN 'Monster'
               WHEN 3 THEN 'Vinland Saga' WHEN 4 THEN 'Berserk'
               ELSE 'Demo CI ' || LPAD(n::text, 2, '0') END,
-       'Test title ' || n,
+       CASE n WHEN 1 THEN 'Naruto' WHEN 2 THEN 'Monster'
+              WHEN 3 THEN 'Vinland Saga' WHEN 4 THEN 'Berserk'
+              ELSE 'Test title ' || n END,
        'Synopsis fictif pour tests automatises.',
        CASE WHEN n % 3 = 0 THEN 'Publishing' ELSE 'Finished' END,
        12 + n, 100 + n, 7.2 + (n % 10)::numeric/10, n, 10000 + n * 100, n * 10, 'Manga'
