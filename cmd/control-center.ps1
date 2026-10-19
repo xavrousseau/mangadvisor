@@ -1,4 +1,4 @@
-# Mangadvisor 4.0 - Windows control center.
+# Mangadvisor - single WEB deployment, stable default Compose stack.
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
@@ -11,7 +11,7 @@ $root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $envFile=Join-Path $root ".env"
 $example=Join-Path $root ".env.example"
 $composeFiles=@("-f",(Join-Path $root "infra\compose\docker-compose.yml"),
-                "-f",(Join-Path $root "infra\compose\docker-compose.dev.yml"))
+                "-f",(Join-Path $root "infra\compose\docker-compose.local.yml"))
 
 function Say([string]$Message) { Write-Host ""; Write-Host ("=== " + $Message + " ===") -ForegroundColor Cyan }
 function Assert-Exit([string]$Message) {
@@ -128,6 +128,7 @@ function Start-Application {
   Say "Construction et demarrage des services"
   Check-Docker
   # Turn off the old 8502 Streamlit UI, keeping data volumes untouched.
+  # Existing 8502 containers from older installations must be stopped, not deleted.
   Compose @("--profile","legacy","stop","ui")
   Compose @("up","-d","--build")
   Write-Host ("Interface unique : http://localhost:" + (Config "UI_PORT"))
