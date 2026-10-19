@@ -1,4 +1,4 @@
-name: Validation intégrée Mangadvisor 1.0
+name: Validation intégrée Mangadvisor
 
 on:
   pull_request:
