@@ -51,6 +51,7 @@ echo   25 - Telecharger et charger le catalogue Jikan
 echo   26 - Telecharger et charger les recommandations
 echo   27 - Diagnostic final complet (lecture seule)
 echo   28 - Mise a jour securisee (sauvegarde + Git + Docker)
+echo   29 - Diagnostic reseau Docker / API Jikan
 echo   Q  - Quitter
 echo.
 echo ============================================================
@@ -96,6 +97,7 @@ if /I "%CHOICE%"=="25" start "Mangadvisor - Catalogue Jikan" cmd /k powershell -
 if /I "%CHOICE%"=="26" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto menu
 if /I "%CHOICE%"=="27" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto menu
 if /I "%CHOICE%"=="28" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto menu
+if /I "%CHOICE%"=="29" start "Mangadvisor - Diagnostic reseau" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Network & goto menu
 
 if /I "%CHOICE%"=="12" goto jikan_menu
 
@@ -188,6 +190,7 @@ if /I "%~1"=="catalogue" start "Mangadvisor - Catalogue Jikan" cmd /k powershell
 if /I "%~1"=="recommendations" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto :eof
 if /I "%~1"=="diagnostic" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto :eof
 if /I "%~1"=="update" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto :eof
+if /I "%~1"=="network" start "Mangadvisor - Diagnostic reseau" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Network & goto :eof
 
 if /I "%~1"=="check"   start "Mangadvisor - Verification" cmd /k call "%ROOT_DIR%cmd\install-check.cmd" & goto :eof
 if /I "%~1"=="build"   start "Mangadvisor - Build"        cmd /k call "%ROOT_DIR%cmd\build.cmd" & goto :eof
