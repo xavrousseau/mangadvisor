@@ -27,7 +27,6 @@ echo   11 - Nuke
 echo.
 echo   Pipeline
 echo   --------
-echo   12 - Run Jikan Pipeline
 echo   13 - Activer le scanner mobile HTTPS
 echo   14 - Arreter le scanner mobile HTTPS
 echo   15 - Installer et activer le conseiller IA local
@@ -60,8 +59,7 @@ echo   mangadvisor.cmd check
 echo   mangadvisor.cmd build
 echo   mangadvisor.cmd start
 echo   mangadvisor.cmd logs
-echo   mangadvisor.cmd jikan
-echo   mangadvisor.cmd jikan-reset
+echo   mangadvisor.cmd catalogue
 echo ============================================================
 echo.
 
@@ -99,87 +97,14 @@ if /I "%CHOICE%"=="27" start "Mangadvisor - Diagnostic" cmd /k powershell -NoPro
 if /I "%CHOICE%"=="28" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto menu
 if /I "%CHOICE%"=="29" start "Mangadvisor - Diagnostic reseau" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Network & goto menu
 
-if /I "%CHOICE%"=="12" goto jikan_menu
+REM Ancien choix 12 : raccourci de compatibilite vers l'option 25.
+if /I "%CHOICE%"=="12" start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto menu
 
 if /I "%CHOICE%"=="Q" goto :eof
 
 echo.
 echo Choix invalide.
 pause
-goto menu
-
-:jikan_menu
-cls
-echo ============================================================
-echo                    MANGADVISOR - JIKAN PIPELINE
-echo ============================================================
-echo.
-echo   1 - Run Jikan Pipeline (1 page, limit 25)
-echo   2 - Run Jikan Pipeline (pages 1 a 3, limit 10)
-echo   3 - Run Jikan Pipeline + reset DB (pages 1 a 3, limit 10)
-echo   4 - Run Jikan Pipeline personnalise
-echo.
-echo   B - Retour menu principal
-echo.
-echo ============================================================
-echo Exemples directs :
-echo   mangadvisor.cmd jikan
-echo   mangadvisor.cmd jikan-reset
-echo   mangadvisor.cmd jikan-pages 1 3 10
-echo ============================================================
-echo.
-
-set /p JIKAN_CHOICE=Votre choix : 
-
-if /I "%JIKAN_CHOICE%"=="1" start "Mangadvisor - Jikan Pipeline" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" & goto menu
-if /I "%JIKAN_CHOICE%"=="2" start "Mangadvisor - Jikan Pipeline 1-3" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" --start-page 1 --end-page 3 --limit 10 & goto menu
-if /I "%JIKAN_CHOICE%"=="3" start "Mangadvisor - Jikan Pipeline Reset" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" --reset-db --start-page 1 --end-page 3 --limit 10 & goto menu
-if /I "%JIKAN_CHOICE%"=="4" goto jikan_custom
-if /I "%JIKAN_CHOICE%"=="B" goto menu
-
-echo.
-echo Choix invalide.
-pause
-goto jikan_menu
-
-:jikan_custom
-cls
-echo ============================================================
-echo              MANGADVISOR - JIKAN PIPELINE PERSONNALISE
-echo ============================================================
-echo.
-
-set "START_PAGE=1"
-set "END_PAGE=1"
-set "LIMIT=25"
-set "RESET_DB=non"
-
-set /p START_PAGE=Premiere page [1] : 
-if "%START_PAGE%"=="" set "START_PAGE=1"
-
-set /p END_PAGE=Derniere page [1] : 
-if "%END_PAGE%"=="" set "END_PAGE=1"
-
-set /p LIMIT=Limite par page [25] : 
-if "%LIMIT%"=="" set "LIMIT=25"
-
-set /p RESET_DB=Reset DB avant chargement ? (oui/non) [non] : 
-if "%RESET_DB%"=="" set "RESET_DB=non"
-
-echo.
-echo Recapitulatif :
-echo   Start page : %START_PAGE%
-echo   End page   : %END_PAGE%
-echo   Limit      : %LIMIT%
-echo   Reset DB   : %RESET_DB%
-echo.
-
-if /I "%RESET_DB%"=="oui" (
-    start "Mangadvisor - Jikan Pipeline Custom Reset" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" --reset-db --start-page %START_PAGE% --end-page %END_PAGE% --limit %LIMIT%
-) else (
-    start "Mangadvisor - Jikan Pipeline Custom" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" --start-page %START_PAGE% --end-page %END_PAGE% --limit %LIMIT%
-)
-
 goto menu
 
 :run_command
@@ -209,31 +134,16 @@ if /I "%~1"=="ai" start "Mangadvisor - IA locale" cmd /k powershell -NoProfile -
 if /I "%~1"=="ai-stop" start "Mangadvisor - Arreter IA" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" -Stop & goto :eof
 if /I "%~1"=="mobile-stop" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto :eof
 
-if /I "%~1"=="jikan"       start "Mangadvisor - Jikan Pipeline" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" & goto :eof
-if /I "%~1"=="jikan-reset" start "Mangadvisor - Jikan Reset"    cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" --reset-db --start-page 1 --end-page 3 --limit 10 & goto :eof
-
-if /I "%~1"=="jikan-pages" (
-    if "%~2"=="" (
-        echo ERREUR : start-page manquant.
-        exit /b 1
-    )
-    if "%~3"=="" (
-        echo ERREUR : end-page manquant.
-        exit /b 1
-    )
-    if "%~4"=="" (
-        echo ERREUR : limit manquante.
-        exit /b 1
-    )
-    start "Mangadvisor - Jikan Pages" cmd /k call "%ROOT_DIR%cmd\run-jikan-pipeline.cmd" --start-page %~2 --end-page %~3 --limit %~4
-    goto :eof
-)
+REM Alias historiques : redirection vers le catalogue centralise.
+if /I "%~1"=="jikan" start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto :eof
+if /I "%~1"=="jikan-reset" echo Option retiree pour proteger les donnees. Utilise le choix 25 sans reset. & exit /b 1
+if /I "%~1"=="jikan-pages" echo Ancienne commande retiree. Choisis 25 pour les pages personnalisees. & exit /b 1
 
 echo Commande inconnue : %~1
 echo.
 echo Commandes disponibles :
 echo   check ^| build ^| up ^| start ^| status ^| logs ^| stop ^| down ^| restart ^| clean ^| nuke
-echo   jikan ^| jikan-reset ^| jikan-pages START END LIMIT
+echo   catalogue ^| jikan (alias historique) ^| network ^| diagnostic
 echo   mobile ^| mobile-stop
 exit /b 1
 
