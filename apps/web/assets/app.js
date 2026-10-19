@@ -2,7 +2,7 @@ import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
 import { createIsbnScanner } from "./isbn-scanner.js";
 import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js";
-import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS} from "./advisor-view.js";
+import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS,ADVISOR_BALANCE_PROMPTS} from "./advisor-view.js";
 import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
 import { enrichmentPanel, enrichmentResults, reconcileEnrichment, mergeEnrichmentPages } from "./enrichment-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
@@ -1213,6 +1213,12 @@ root.addEventListener("click",async event=>{
  }
  if(action==="advisor-prompt"){
   const prompt=ADVISOR_PROMPTS[state.lang]?.[Number(button.dataset.index)];
+  if(prompt)await sendAdvisorMessage(prompt);
+  return;
+ }
+ if(action==="advisor-balance"){
+  if(state.advisorBusy)return;
+  const prompt=ADVISOR_BALANCE_PROMPTS[state.lang]?.[button.dataset.value];
   if(prompt)await sendAdvisorMessage(prompt);
   return;
  }

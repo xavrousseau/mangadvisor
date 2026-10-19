@@ -15,6 +15,20 @@ export const ADVISOR_PROMPTS={
  ]
 };
 
+/** Buttons send ordinary messages to the audited advisor, not direct SQL queries. */
+export const ADVISOR_BALANCE_PROMPTS={
+ fr:{
+  CLOSE:"Je veux une sélection très proche de mes goûts",
+  BALANCED:"Je veux une sélection variée",
+  EXPLORE:"Surprends-moi avec une sélection inattendue"
+ },
+ en:{
+  CLOSE:"I want manga in the same style, close to my tastes",
+  BALANCED:"I want a balanced variety of manga",
+  EXPLORE:"Surprise me with unexpected manga"
+ }
+};
+
 export function advisorChatMarkup({history=[],busy=false,lang="fr",aiMode="guided"},L,e){
  const modeKey=aiMode==="local_ai"?"advisorAIActive":
    aiMode==="guided_fallback"?"advisorAIFallback":"advisorAIGuided";
@@ -51,10 +65,19 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
   const rows=Array.isArray(item)?item:[];
   return rows.slice(0,5).map(x=>'<span class="pill">'+tr(x)+'</span>').join("");
  };
+ const balance=["CLOSE","BALANCED","EXPLORE"].includes(response?.context?.recommendation_balance)
+  ?response.context.recommendation_balance:"BALANCED";
+ const controls='<div class="advisor-balance-controls" role="group" aria-label="'+L("advisorBalanceChoose")+'">'+
+  '<span class="advisor-balance-caption">'+L("advisorBalanceChoose")+'</span>'+
+  ["CLOSE","BALANCED","EXPLORE"].map(mode=>
+    '<button type="button" class="btn btn-small '+(balance===mode?"btn-primary":"btn-soft")+
+    '" data-action="advisor-balance" data-value="'+mode+'" aria-pressed="'+(balance===mode)+'">'+
+    L("advisorBalance"+mode)+'</button>').join("")+'</div>';
  return '<section class="advisor-recommendations"><div class="advisor-results-heading">'+
   '<div><div class="eyebrow">'+L(response.personalized?"advisorWithTaste":"advisorCatalog")+'</div>'+
   '<h2>'+L("advisorPicks")+'</h2></div>'+
   '<span class="mood-count">'+e(response.count)+' '+L("moodResultsCount")+'</span></div>'+
+  controls+
   '<div class="mood-grid">'+response.recommendations.map((m,i)=>{
    const mood=[...(m.mood_matches?.genres||[]),...(m.mood_matches?.themes||[])];
    const common=[...(m.affinity_matches?.genres||[]),...(m.affinity_matches?.themes||[])];
@@ -75,6 +98,9 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
     '<div class="tag-row">'+chips(mood)+'</div></div>'+
     (common.length?'<div class="mood-evidence"><strong>'+L("moodAffinity")+'</strong>'+
      '<div class="tag-row">'+chips(common)+'</div></div>':"")+
+    (Array.isArray(m.variety_evidence)&&m.variety_evidence.length?
+      '<div class="mood-evidence advisor-variety"><strong>'+L("advisorVarietyEvidence")+'</strong>'+
+      '<div class="tag-row">'+chips(m.variety_evidence)+'</div></div>':"")+
     (storyBadges?'<div class="mood-evidence"><strong>'+L("advisorNarrativeEvidence")+'</strong>'+
      '<div class="advisor-story-grid">'+storyBadges+'</div></div>':"")+
     (missingBadges?'<p class="advisor-unverified">'+L("advisorNarrativeMissing")+': '+missingBadges+'</p>':"")+

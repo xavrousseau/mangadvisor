@@ -21,6 +21,7 @@ Mood = Literal["DARK", "COMFORT", "ACTION", "MYSTERY", "ROMANCE", "FANTASY"]
 Length = Literal["ANY", "SHORT", "LONG"]
 FrenchEvidence = Literal["ANY", "PREFER", "REQUIRE"]
 EditionKind = Literal["CLASSIC","DELUXE","PERFECT","COLLECTOR","INTEGRAL","OTHER"]
+DiscoveryBalance = Literal["CLOSE", "BALANCED", "EXPLORE"]
 
 class AdvisorContext(BaseModel):
     mood: Mood | None = None
@@ -31,6 +32,7 @@ class AdvisorContext(BaseModel):
     preferred_edition_kind: EditionKind | None = None
     require_edition_kind: bool = False
     use_library: bool = True
+    recommendation_balance: DiscoveryBalance = "BALANCED"
     avoid_romance: bool = False
     avoid_horror: bool = False
     avoid_gore: bool = False
@@ -88,6 +90,17 @@ EDITION_KIND_WORDS = (
 EDITION_CLEAR = re.compile(r"\b(?:peu importe (?:l[' ]|le |la )?(?:edition|format)|tout format|any edition|any format)\b")
 EDITION_REQUIRED = re.compile(r"\b(?:obligatoire|uniquement|seulement|absolument|only|must|required)\b")
 EDITION_PREFERRED = re.compile(r"\b(?:idealement|si possible|de preference|prefer|ideally|preferably)\b")
+BALANCE_EXPLORE = re.compile(
+    r"\b(surprend\w*|surprise me|surprising|decouvertes?\b|inattendu\w*|"
+    r"hors des sentiers battus|unexpected|something different)\b"
+)
+BALANCE_CLOSE = re.compile(
+    r"\b(tres proche\w* de mes gouts|proche\w* de mes gouts|"
+    r"meme style|dans le meme style|similar to my tastes|close to my tastes)\b"
+)
+BALANCE_BALANCED = re.compile(
+    r"\b(varie\w*|equilibre\w*|balanced|variety|diversifi\w*)\b"
+)
 RATING = re.compile(r"\b(?:note|score|rating)\s*(?:minimum|min|de|d.au moins|>=|superieure a)?\s*(\d{1,2}(?:[.,]\d)?)\s*(?:/10)?\b")
 
 def normalize(text: str) -> str:
@@ -181,6 +194,16 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
                 )
                 changes.append("preferred_edition_kind")
                 break
+    # A discovery balance changes selection variety only, never user filters.
+    if BALANCE_EXPLORE.search(normalized):
+        current.recommendation_balance = "EXPLORE"
+        changes.append("recommendation_balance")
+    elif BALANCE_CLOSE.search(normalized):
+        current.recommendation_balance = "CLOSE"
+        changes.append("recommendation_balance")
+    elif BALANCE_BALANCED.search(normalized):
+        current.recommendation_balance = "BALANCED"
+        changes.append("recommendation_balance")
     if LIBRARY_OFF.search(normalized):
         current.use_library = False;changes.append("use_library")
     elif LIBRARY_ON.search(normalized):
@@ -194,6 +217,76 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
         warnings.append("maturity_not_verified")
     # Dedicated clarification rather than pretending arbitrary unknown text was parsed.
     return current, list(dict.fromkeys(changes)), bool(MORE.search(normalized)), warnings
+
+def _tag_keys(item: dict[str, Any]) -> set[str]:
+    """Namespaced *recorded* catalog tags for comparing different suggestions."""
+    return {
+        kind + ":" + str(tag).casefold()
+        for kind in ("genres", "themes")
+        for tag in (item.get(kind) or [])
+        if isinstance(tag, str) and tag
+    }
+
+
+def select_balanced_candidates(
+    ranked: list[tuple[float, float, int, int, dict[str, Any]]],
+    balance: DiscoveryBalance,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Re-rank verified eligible candidates, never generate new recommendations.
+
+    CLOSE preserves the original relevance order; BALANCED and EXPLORE
+    increasingly penalize repeated catalog tags. A relevance floor prevents
+    surprise mode promoting very weak matches over substantially better ones.
+    All SQL conditions, exclusions and explicit mood matches are upstream.
+    """
+    if not ranked or limit <= 0:
+        return []
+    ranked.sort(key=lambda record: record[:4], reverse=True)
+    if balance == "CLOSE":
+        return [{**row[4], "variety_evidence": []} for row in ranked[:limit]]
+
+    relevance_floor = max(0.0, ranked[0][0] * (0.75 if balance == "EXPLORE" else 0.85))
+    near = [r for r in ranked if r[0] >= relevance_floor]
+    remainder = [r for r in ranked if r[0] < relevance_floor]
+    penalty = 30 if balance == "EXPLORE" else 12
+    picked: list[dict[str, Any]] = []
+    already: set[str] = set()
+    previous_tags: list[set[str]] = []
+    # Work from a bounded SQL candidate pool (500), with a deterministic tie break.
+    for pool in (near, remainder):
+        remaining = list(pool)
+        while remaining and len(picked) < limit:
+            selected_index = 0
+            selected_key: tuple[float, float, int, int, int] | None = None
+            for i, row in enumerate(remaining):
+                tags = _tag_keys(row[4])
+                overlap = max(
+                    (len(tags & earlier) / len(tags | earlier)
+                     for earlier in previous_tags if tags | earlier),
+                    default=0.0,
+                )
+                adjusted = row[0] - penalty * overlap
+                # Original order is the deterministic tie-breaker.
+                key = (adjusted, row[1], row[2], row[3], -i)
+                if selected_key is None or key > selected_key:
+                    selected_index, selected_key = i, key
+            row = remaining.pop(selected_index)
+            item = row[4]
+            tags = _tag_keys(item)
+            # These labels come only from existing source tags absent in earlier picks.
+            novel = [
+                label for kind in ("genres", "themes")
+                for label in (item.get(kind) or [])
+                if isinstance(label, str) and kind + ":" + label.casefold() not in already
+            ] if picked else []
+            picked.append({**item, "variety_evidence": list(dict.fromkeys(novel))[:3]})
+            previous_tags.append(tags)
+            already.update(tags)
+        if len(picked) >= limit:
+            break
+    return picked
+
 
 def score_candidates(
     rows: list[dict[str, Any]], context: AdvisorContext,
@@ -246,8 +339,7 @@ def score_candidates(
             "preferred_format_recorded":preferred_format,
             "ranking_score":None,
         }))
-    selected.sort(key=lambda row:row[:4],reverse=True)
-    return [row[4] for row in selected[:limit]]
+    return select_balanced_candidates(selected, context.recommendation_balance, limit)
 
 def describe_context(context:AdvisorContext,lang:str)->str:
     """Reveal interpreted constraints, not invisible assumptions."""
@@ -278,6 +370,12 @@ def describe_context(context:AdvisorContext,lang:str)->str:
             if fr else
             ("French "+kind+" edition "+("required" if context.require_edition_kind else "preferred"))
         )
+    balance_labels = {
+        "CLOSE": ("proche de tes goûts", "close to your tastes"),
+        "BALANCED": ("sélection équilibrée", "balanced picks"),
+        "EXPLORE": ("découvertes variées", "exploratory picks"),
+    }
+    parts.append(balance_labels[context.recommendation_balance][0 if fr else 1])
     if context.avoid_romance:
         parts.append("sans romance documentée" if fr else "without tagged romance")
     if context.avoid_horror:
