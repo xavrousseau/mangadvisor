@@ -8,11 +8,11 @@
 2. Double-cliquer sur **mangadvisor.cmd**, sélectionner **22 — Installation complète**.
 3. La configuration privée **.env** est générée uniquement si absente, à partir de **.env.example**, avec deux clés aléatoires distinctes pour PostgreSQL et Meilisearch. Les répertoires privés **backups/** et **private-data/** sont créés.
 4. Démarrer PostgreSQL et Meilisearch, attendre la disponibilité de la base et appliquer les scripts SQL **001 → 002 → 004 → 006 → 007** (tables sources, catalogue, tags, recommandations, bibliothèque). Ces créations sont additives.
-5. Construire les images Docker et démarrer l'API et les interfaces, qui initialisent de manière additive les tables des éditions françaises et de l'inventaire.
+5. Construire les images Docker et démarrer l'API **et l'interface unique Web (8501)**, qui initialisent de manière additive les tables des éditions françaises et de l'inventaire. Arrêter sans supprimer l'ancienne UI Streamlit 8502 si elle existait.
 6. **Extraction manga via Tenrai (scripts historiques Jikan)** : choisir les pages SEARCH et TOP (40 et 10 par défaut, 25 notices maximum par page). Les scripts extraient les JSON dans **data/raw/jikan/search/** et **data/raw/jikan/top/**.
 7. **Chargement SQL Jikan** : exécuter le chargeur des sources search et top, puis les reconstructions SQL **003 → 004 → 005** pour remplir **jikan_manga_source**, **manga**, **genre**, **manga_genre**, **theme**, **manga_theme**, **demographic** et **manga_demographic**. Ces mises à jour ne vident pas le catalogue.
 8. **Recommandations communautaires** : extraire les relations Jikan entre œuvres puis les charger dans **manga_recommendation_edge** ; 50 mangas à enrichir par défaut. Les données déjà téléchargées peuvent être réutilisées.
-9. **Diagnostic** : vérifier la santé API, PostgreSQL, les compteurs SQL, une requête de recherche et l'ouverture de la page Web.
+9. **Diagnostic** : vérifier la santé API, PostgreSQL, les compteurs SQL, une recherche, l'ouverture du site Web **et ses appels API réels via Nginx** (santé + bibliothèque).
 10. **Sauvegarde vérifiée** : créer un dump PostgreSQL et valider une restauration de test dans une base isolée.
 11. **Import facultatif de collection** : placer un fichier CSV compatible dans **private-data/mangatheque.csv**. Un aperçu est exécuté sans écriture. L'import réel exige ensuite deux confirmations et exclut les titres ambigus ou non reconnus.
 12. Nouveau diagnostic, puis **sauvegarde finale automatique vérifiée**, y compris si une bibliothèque vient d'être importée. Copier ensuite les archives sur un autre support.
@@ -71,3 +71,9 @@ L'option **29** vérifie dorénavant la connexion HTTPS au fournisseur configur�
 ## Dédoublonnage de Mangadvisor 4.1
 
 L'ancien sous-menu Jikan (option 12) a été fusionné fonctionnellement avec l'option 25, sans changer les numéros des autres options. Taper 12 ou utiliser l'alias historique `jikan` renvoie à l'ingestion centrale Tenrai ; la commande `jikan-reset`, dangereuse pour les données, est désormais refusée. Les anciens lanceurs autonomes Windows nécessitant Python sur le PC ont été retirés. Les commandes du centre de pilotage restent la référence ; voir le [rapport de nettoyage](../03_technical/cleanup_4_1.md).
+
+## Interface unique et réparation HTTP 502 (4.2)
+
+Le site utilisateur est exclusivement **http://localhost:8501**. L'ancien Streamlit **8502** reste présent en code uniquement pour les tests ; `docker compose --profile legacy up ui` est réservé au développement et non requis par le menu Windows. Les options de démarrage standard et le centre de pilotage arrêtent proprement toute ancienne instance 8502 sans effacer ses données.
+
+Si l'API est recréée après Nginx, son adresse IP peut changer sur le réseau Docker. Le proxy Web utilise désormais `resolver 127.0.0.11` pour rafraîchir automatiquement cette adresse tout en retirant le préfixe `/api` et en préservant les paramètres d'URL. L'option **27** distingue maintenant trois cas : API directe indisponible, site HTML indisponible, ou proxy / bibliothèque indisponible (dont `HTTP 502`). Aucune purge Docker n'est nécessaire.

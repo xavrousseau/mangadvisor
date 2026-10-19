@@ -76,9 +76,10 @@ services:
     networks:
       - mangadvisor_network
 
-  # Interface utilisateur Streamlit.
-  # Elle consomme uniquement l'API et ne parle pas directement aux autres services.
+  # Historical Streamlit UI: optional for tests, not started for users.
+  # Mangadvisor has one normal Web UI on UI_PORT (8501).
   ui:
+    profiles: ["legacy"]
     build:
       context: ../..
       dockerfile: infra/docker/ui/Dockerfile

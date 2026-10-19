@@ -127,7 +127,7 @@ function shell(){
   '<div class="sidebar-caption">Mangadvisor 1.0</div><nav class="nav">'+navItems.map(([view,url,icon,key])=>
     '<button class="nav-link '+(active===view?'active':'')+'" data-go="'+url+'"'+(active===view?' aria-current="page"':'')+
     '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+L(key)+'</span></button>').join("")+
-  '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p><a class="legacy-link" href="http://localhost:8502" target="_blank" rel="noopener">↗ '+L("openLegacy")+'</a></div></aside>'+
+  '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p></div></aside>'+
   '<div class="main"><header class="topbar"><div class="crumb">'+L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active)+'</div>'+
   '<div class="topbar-right"><label class="field-label" for="app-language">'+L("language")+'</label><select id="app-language" class="locale-select" aria-label="'+L("language")+'"><option value="fr"'+(state.lang==="fr"?" selected":"")+'>🇫🇷 FR</option><option value="en"'+(state.lang==="en"?" selected":"")+'>🇬🇧 EN</option></select>'+
   '<button type="button" class="appearance-trigger '+(active==="appearance"?'active':'')+'" data-go="/appearance" aria-label="'+L("appearance")+'" title="'+L("appearance")+'"><span aria-hidden="true">⚙</span><span class="appearance-label">'+L("appearance")+'</span></button>'+
@@ -366,8 +366,7 @@ async function renderLibrary(token){
  '<p class="collection-caveat">'+L("bulkSafety")+'</p>'+
  '<div class="bulk-actions"><button type="button" class="btn btn-soft" data-action="bulk-compare">'+L("bulkCompareAction")+'</button></div>'+
  '<div id="bulk-compare-result"></div></details></section>'+
- '<div class="section-header"><span class="muted tiny">'+L("importLegacy")+'</span>'+
- '<a href="http://localhost:8502" class="btn-link" target="_blank" rel="noopener">'+L("openLegacy")+' ↗</a></div>';
+ '';
  if(!mount(html,token))return;
  if(state.bulkResolver)drawBulkResolver();
  void updatePhysicalInventory(token);

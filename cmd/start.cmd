@@ -10,6 +10,12 @@ echo ==================================================
 echo.
 
 pushd "%ROOT_DIR%"
+rem L'ancienne interface Streamlit 8502 est desormais facultative.
+%COMPOSE_CMD% --profile legacy stop ui
+if errorlevel 1 (
+  popd
+  exit /b 1
+)
 %COMPOSE_CMD% up
 set "RC=%ERRORLEVEL%"
 popd

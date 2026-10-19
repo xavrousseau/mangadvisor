@@ -127,8 +127,10 @@ function Initialize-Database {
 function Start-Application {
   Say "Construction et demarrage des services"
   Check-Docker
+  # Turn off the old 8502 Streamlit UI, keeping data volumes untouched.
+  Compose @("--profile","legacy","stop","ui")
   Compose @("up","-d","--build")
-  Write-Host ("Interface : http://localhost:" + (Config "UI_PORT"))
+  Write-Host ("Interface unique : http://localhost:" + (Config "UI_PORT"))
   Write-Host ("API       : http://localhost:" + (Config "API_PORT") + "/health")
 }
 function Ask-Number([string]$Question,[int]$Default,[int]$Max) {
@@ -265,7 +267,22 @@ function Diagnostic {
   $webUrl="http://127.0.0.1:$(Config 'UI_PORT')/"
   $web=Invoke-WebRequest -Uri $webUrl -UseBasicParsing -TimeoutSec 15
   if ([int]$web.StatusCode -ne 200) { throw "Interface web inaccessible : $webUrl" }
-  Write-Host "Recherche API : OK ; interface web : OK ($webUrl)"
+  # Validate the real browser network path, not merely static index.html.
+  $proxyUrl="http://127.0.0.1:$(Config 'UI_PORT')/api/health"
+  try {
+    $proxy=Invoke-RestMethod -Uri $proxyUrl -TimeoutSec 15
+    if ($proxy.status -ne "ok") { throw "Reponse inattendue du proxy." }
+  } catch {
+    throw "Le site est disponible, mais le proxy API ne fonctionne pas : $proxyUrl. Verifie les logs Docker web/api. Detail: $($_.Exception.Message)"
+  }
+  $libraryUrl="http://127.0.0.1:$(Config 'UI_PORT')/api/library?limit=1"
+  try {
+    $library=Invoke-RestMethod -Uri $libraryUrl -TimeoutSec 15
+    if ($null -eq $library.items) { throw "JSON bibliotheque incomplet." }
+  } catch {
+    throw "La bibliotheque du site ne repond pas : $libraryUrl. Detail: $($_.Exception.Message)"
+  }
+  Write-Host "API directe, proxy Web et bibliotheque : OK ($webUrl)"
   Write-Host "Controle manuel restant : fiches, editions, recommandations et conseiller."
   Write-Host "Un diagnostic reussi ne garantit pas la pertinence des correspondances de la mangatheque."
 }

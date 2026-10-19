@@ -4,6 +4,14 @@
 
 [Structure actuelle du dépôt](docs/03_technical/project_structure.md) · [Compte rendu du nettoyage 4.1](docs/03_technical/cleanup_4_1.md)
 
+## Une interface unique depuis Mangadvisor 4.2
+
+Le **site principal** est sur `http://127.0.0.1:8501`, servi par Nginx et `apps/web/`. Le vieux prototype Streamlit `apps/ui/` (anciennement exposé sur 8502) reste disponible uniquement pour les développeurs/tests sous le profil Docker `legacy` et ne figure plus dans les liens du site.
+
+Le proxy Nginx résout dynamiquement l'adresse du conteneur FastAPI. Un redémarrage ou une recréation d'API ne doit plus produire une erreur `HTTP 502` durable sur 8501. **L'option 27** vérifie désormais les URL `/api/health` et `/api/library?limit=1` empruntées par le navigateur : le simple affichage HTML ne suffit plus à déclarer le site opérationnel. Les options 3, 4 et le centre de pilotage arrêtent sans détruire l'éventuel ancien conteneur UI 8502.
+
+En cas de 502, consulter le diagnostic 27 et les logs de `mangadvisor_web` / `mangadvisor_api`. Éviter `Nuke` : le proxy n'exige aucune réinitialisation de données.
+
 ## Source du catalogue manga depuis le 1er octobre 2026
 
 **Attention :** le fournisseur public Jikan `api.jikan.moe` a officiellement été arrêté le 1er octobre 2026 ([annonce des mainteneurs](https://github.com/jikan-me/jikan-rest/issues/613)). Mangadvisor utilise désormais **[Tenrai v1](https://api.tenrai.org/documentation)**, qui documente un format compatible avec Jikan pour les recherches et les recommandations mangas.
@@ -28,7 +36,7 @@ Voir [le guide complet du centre de pilotage 4.0](docs/04_product/control_center
 
 1. Installer et démarrer **Docker Desktop**. Placer le dépôt GitHub sur le PC.
 2. À la racine, exécuter **mangadvisor.cmd**, puis choisir **3 — Build + démarrage**.
-3. Ouvrir **http://localhost:8501**. Les outils historiques Streamlit sont accessibles à **http://localhost:8502**.
+3. Ouvrir **http://localhost:8501** : c'est l'unique interface de Mangadvisor lancée par défaut. Le prototype Streamlit 8502 ne démarre plus automatiquement ; il reste réservé aux tests via le profil Docker `legacy`.
 4. Naviguer dans **Découvrir**, **Ma bibliothèque** et **Pour moi → Mon conseiller**.
 
 Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
@@ -92,7 +100,7 @@ Sources publiques et notices autorisées → pipelines Python → PostgreSQL + p
 Répertoires :
 - apps/api : API et moteur de recommandation.
 - apps/web : interface PC/mobile.
-- apps/ui : interface historique Streamlit.
+- apps/ui : ancien prototype Streamlit conservé pour les tests, non lancé par défaut.
 - pipelines : ingestion et normalisation des sources.
 - infra : Docker, réseau, HTTPS local.
 - tests : tests unitaires, API PostgreSQL jetable, Chromium PC/mobile.
