@@ -89,3 +89,12 @@ Si l'API est recréée après Nginx, son adresse IP peut changer sur le réseau 
 Le site Web attend dorénavant le **healthcheck réel** de FastAPI (connexion PostgreSQL), et le diagnostic 27 conserve son contrôle du proxy Nginx. L'option 17 de sauvegarde vérifie aussi, dans la base temporaire restaurée, les tables `user_manga_inventory_declaration` et `user_manga_inventory_pending` si elles figurent dans l'archive. Un ancien outil indépendant utilisant `--reset-db` est explicitement bloqué. La page « Ma bibliothèque » sépare statut, éventuelle note et nombre d'exemplaires physiques **déclarés** ; aucun ISBN n'est inféré.
 
 Le nom affiché suit la priorité **titre français explicitement vérifié (si disponible) → titre anglais fourni par la source → titre principal → titre japonais**. À ce jour, il n'existe pas de registre général de titres français officiellement vérifiés ; les couvertures peuvent être celles des éditions japonaises. Voir le [rapport d'audit et la suite](../03_technical/audit_transversal_4_4.md).
+
+
+## Verification de bout en bout (stabilisation 4.5)
+
+Les outils Windows **20 (benchmark)** et **21 (import prive)** utilisent maintenant le port **API_PORT** renseigne dans `.env`, au lieu de supposer le port 8000. L'adresse reste volontairement `127.0.0.1` : ces outils ne transmettent jamais la collection a un serveur distant. Les ports absents, invalides ou hors de la plage 1-65535 sont refuses.
+
+Le workflow Linux `single-web-stack.yml` lance maintenant un **test d'integration reel dans Docker et PostgreSQL, avec des donnees fictives et une base jetable** : JSON Tenrai compatibles (SEARCH et TOP) -> chargeur SQL -> tables canoniques -> genres/themes/publics -> recommandations communautaires -> API Web. Une seconde execution controle l'absence de doublons, la stabilite des identifiants et la conservation d'un suivi utilisateur cree pour le test. Le workflow Windows valide le port personnalise et le rejet des adresses ou ports dangereux.
+
+**Portee exacte :** ce test valide l'assemblage et la persistance, sans solliciter le fournisseur externe (qui peut etre temporairement indisponible) et sans acceder a la mangatheque privee du PC. L'extraction HTTPS reelle et la pertinence des correspondances doivent toujours etre verifiees lors de l'utilisation sur Windows.
