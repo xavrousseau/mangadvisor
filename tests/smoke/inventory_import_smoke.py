@@ -79,6 +79,24 @@ def main() -> None:
     assert first["items"][1]["edition_key"] != first["items"][2]["edition_key"]
     assert first["items"][3]["status"]=="REVIEW_MISSING"
     assert req("/inventory/declarations")["count"]==0
+
+    # User opt-in preserves the unknown entry independently from known mangas.
+    # This does not invent an FK, ISBN, read status or library ownership.
+    assert req("/inventory/pending")["count"]==0
+    pending_payload={"csv_content":fixture(),"confirmation_token":first["confirmation_token"]}
+    assert req("/inventory/pending/save",{**pending_payload,"confirmation_token":"0"*64},409)["detail"]
+    saved_pending=req("/inventory/pending/save",pending_payload)
+    assert saved_pending["saved"]==1 and saved_pending["linked_mangas"]==0,saved_pending
+    assert saved_pending["pending_physical_volumes"]==2,saved_pending
+    waiting=req("/inventory/pending")
+    assert waiting["count"]==1 and waiting["declared_physical_volumes"]==2,waiting
+    assert waiting["items"][0]["entry_title"]=="Inconnu de CI",waiting
+    assert "manga_id" not in waiting["items"][0],waiting
+    assert req("/inventory/declarations")["count"]==0
+    assert library_row("Inconnu de CI") is None
+    second_save=req("/inventory/pending/save",pending_payload)
+    assert second_save["saved"]==0 and second_save["unchanged_pending"]==1,second_save
+    assert req("/inventory/pending")["count"]==1
     payload={"csv_content":fixture(),"confirmation_token":first["confirmation_token"]}
     assert req("/inventory/apply",payload,409)["detail"].startswith("Des lignes")
     assert req("/inventory/declarations")["count"]==0
