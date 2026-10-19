@@ -183,3 +183,29 @@ test("advisor evidence audit discloses real metrics without inventing a success 
  assert.match(limited,/38%/);
  assert.match(limited,/advisorQualityWindow/);
 });
+
+
+test("advisor exposes sourced interested and repeated-refusal tags without unescaped HTML",()=>{
+ const record={id:55,title:"Actual catalog record",genres:["Mystery"],themes:["Detective"],
+  mood_matches:{genres:["Mystery"],themes:["Detective"]},affinity_matches:{genres:[],themes:[]},
+  feedback_evidence:{
+    interested_tags:["Detective","<img src=x onerror=alert(1)>"],
+    repeated_rejection_tags:["Psychological"]},
+  narrative_matches:[],variety_evidence:[]};
+ const html=advisorResultsMarkup({
+  count:1,personalized:true,context:{recommendation_balance:"BALANCED"},
+  feedback_learning:{scope:"existing_library_statuses",
+    interested_tag_count:2,repeated_rejection_tag_count:1},
+  quality_diagnostic:{scope:"displayed_catalogue_results_only",
+    examined_count:15,returned_count:1,unique_recorded_tags:3,
+    affinity_evidence_count:0,mean_pairwise_tag_overlap:null},
+  recommendations:[record]
+ },{L,e,tr:e,poster:()=>"",rating:()=>"",published:()=>""});
+ assert.match(html,/advisorInterestedEvidence/);
+ assert.match(html,/advisorRefusalEvidence/);
+ assert.match(html,/advisorLearningInterest/);
+ assert.match(html,/advisorLearningRefusals/);
+ assert.match(html,/advisorLearningCaution/);
+ assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
+ assert.doesNotMatch(html,/<img src=x/);
+});
