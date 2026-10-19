@@ -18,10 +18,7 @@ REPORT_DIR = ROOT_DIR / "docs" / "reports"
 
 ENGINE_VERSION = "V0.7.4"
 
-REPORT_PATH = REPORT_DIR / "recommendation_profile_tests_v0_7_4.md"
-
-# Copie legacy pour ne pas casser les anciens chemins / habitudes
-LEGACY_REPORT_PATH = REPORT_DIR / "recommendation_profile_tests_latest.md"
+REPORT_PATH = REPORT_DIR / "recommendation_profile_tests_latest.md"
 
 # --------------------------------------------------
 # Alias de titres
@@ -671,12 +668,10 @@ def main() -> int:
     report_content = "\n".join(lines)
 
     REPORT_PATH.write_text(report_content, encoding="utf-8")
-    LEGACY_REPORT_PATH.write_text(report_content, encoding="utf-8")
 
     print("==================================================")
     print("Tests terminés")
     print(f"Rapport généré : {REPORT_PATH}")
-    print(f"Copie legacy   : {LEGACY_REPORT_PATH}")
     print("==================================================")
 
     return 0

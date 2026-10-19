@@ -26,11 +26,11 @@ Une réinstallation est **non destructive par défaut** : elle ne supprime ni vo
 | **22** | Assistant d'installation complet : environnement, SQL, données, app, import, diagnostic | Oui, sauf lecture seule/confirmation |
 | **23** | Configurer les secrets et les répertoires privés | .env seulement si absent |
 | **24** | Initialiser/réparer les tables SQL | Création additive |
-| **25** | Extraire et charger le catalogue Jikan | Upserts catalogue, sans reset |
+| **25** | Extraire et charger le catalogue Tenrai | Upserts catalogue, sans reset |
 | **26** | Extraire et charger les recommandations communautaires | Upserts relations, sans reset |
 | **27** | Diagnostiquer bases et application | Lecture seule |
 | **28** | Sauvegarde vérifiée, mise à jour Git, rebuild Docker, diagnostic | Préserve les volumes |
-| **29** | Vérification DNS et accès HTTPS depuis le conteneur Docker vers Jikan et un site témoin | Lecture seule |
+| **29** | Vérification DNS et accès HTTPS depuis le conteneur Docker vers Tenrai et un site témoin | Lecture seule |
 | **17 à 19** | Sauvegarder, revérifier, restaurer après confirmation | Restauration seulement sur demande |
 | **20 et 21** | Simuler la collection, importer après aperçu et confirmation | Option 21 uniquement |
 | **13 à 16** | Scanner mobile HTTPS et IA Ollama locale optionnelle | Aucun effacement de bibliothèque |
@@ -67,3 +67,7 @@ Les scripts historiques dont le nom contient « Jikan » et les dossiers `data/r
 
 L'option **29** vérifie dorénavant la connexion HTTPS au fournisseur configuré **et une vraie réponse manga JSON**. Après mise à jour, relancer 29 puis 25 pour charger le catalogue, 26 pour les recommandations. Aucune réinstallation ni suppression de volume n'est requise.
 
+
+## Dédoublonnage de Mangadvisor 4.1
+
+L'ancien sous-menu Jikan (option 12) a été fusionné fonctionnellement avec l'option 25, sans changer les numéros des autres options. Taper 12 ou utiliser l'alias historique `jikan` renvoie à l'ingestion centrale Tenrai ; la commande `jikan-reset`, dangereuse pour les données, est désormais refusée. Les anciens lanceurs autonomes Windows nécessitant Python sur le PC ont été retirés. Les commandes du centre de pilotage restent la référence ; voir le [rapport de nettoyage](../03_technical/cleanup_4_1.md).

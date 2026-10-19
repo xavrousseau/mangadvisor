@@ -1,5 +1,8 @@
 # Mangadvisor — Architecture v1
 
+> **Archive conceptuelle V1, pas une description du fonctionnement actuel.** Ce document conserve les objectifs du projet tels qu'ils avaient été envisagés. Le catalogue opérationnel utilise aujourd'hui Tenrai (format compatible MAL/Jikan), PostgreSQL et le site Web principal ; AniList, MangaNews, embeddings et indexation Meilisearch exhaustive ne sont pas des étapes automatiquement exécutées. Voir [la structure actuelle](../03_technical/project_structure.md) et [le guide du centre de pilotage](../04_product/control_center_4_0.md).
+
+
 ## 1. Présentation du projet
 
 **Mangadvisor** est un moteur de recommandation de mangas basé sur l’analyse de catalogues publics et enrichi par des techniques de recherche sémantique.

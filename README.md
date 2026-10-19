@@ -1,6 +1,8 @@
 # Mangadvisor
 
-**Ta mangathèque, tes découvertes et ton conseiller manga personnel.** Application locale PC + mobile, avec catalogue multi-sources, bibliothèque, éditions françaises ISBN et recommandations explicables. Interface sombre/orange, français/anglais, sans abonnement.
+**Ta mangathèque, tes découvertes et ton conseiller manga personnel.** Application locale PC + mobile, avec catalogue Tenrai, enrichissement BnF des éditions françaises, bibliothèque et recommandations explicables. Interface sombre/orange, français/anglais, sans abonnement.
+
+[Structure actuelle du dépôt](docs/03_technical/project_structure.md) · [Compte rendu du nettoyage 4.1](docs/03_technical/cleanup_4_1.md)
 
 ## Source du catalogue manga depuis le 1er octobre 2026
 
@@ -12,13 +14,13 @@ Les scripts historiques dont le nom contient « Jikan » et les dossiers `data/r
 
 L'option **29** vérifie dorénavant la connexion HTTPS au fournisseur configuré **et une vraie réponse manga JSON**. Après mise à jour, relancer 29 puis 25 pour charger le catalogue, 26 pour les recommandations. Aucune réinstallation ni suppression de volume n'est requise.
 
-## Tout piloter depuis mangadvisor.cmd (nouveau : centre de pilotage 4.0)
+## Tout piloter depuis mangadvisor.cmd (centre de pilotage 4.x)
 
 Pour une première installation sur Windows : **télécharge le dépôt GitHub (ZIP ou Git), démarre Docker Desktop, double-clique sur mangadvisor.cmd et choisis l'option 22 — Installer de A à Z**. Aucun Python, psql ou terminal technique à installer sur Windows : les opérations data fonctionnent dans Docker.
 
 L'assistant prépare le fichier .env avec des secrets aléatoires, crée les tables PostgreSQL, démarre l'application, **extrait les JSON Jikan SEARCH + TOP, les charge dans PostgreSQL, construit le catalogue et récupère les recommandations communautaires**, vérifie API/SQL/UI, effectue une sauvegarde testée et propose l'aperçu puis l'import confirmé de ta bibliothèque personnelle (CSV à placer dans private-data/mangatheque.csv). Les éditions françaises ISBN sont à compléter séparément après vérification BnF.
 
-Les options **23 à 29** permettent ensuite de refaire chaque opération sans réinstallation : configuration, tables, catalogue, recommandations, diagnostic, **mise à jour Git + sauvegarde + Docker** et diagnostic réseau Docker/Jikan (29). Les étapes 25 et 26 vérifient maintenant l'accès externe avant de lancer leurs extractions. Les options historiques 1 à 21 restent disponibles. **L'option 22 n'efface jamais tes volumes**, et l'option destructive 11 doit rester exceptionnelle et volontaire.
+Les options **23 à 29** permettent ensuite de refaire chaque opération sans réinstallation : configuration, tables, catalogue, recommandations, diagnostic, **mise à jour Git + sauvegarde + Docker** et diagnostic réseau Docker/Tenrai (29). Les étapes 25 et 26 vérifient maintenant l'accès externe avant de lancer leurs extractions. Les options historiques de maintenance, sauvegarde et import sont conservées ; l'ancien sous-menu 12 a été remplacé par un alias de compatibilité vers l'option 25. **L'option 22 n'efface jamais tes volumes**, et l'option destructive 11 doit rester exceptionnelle et volontaire.
 
 Voir [le guide complet du centre de pilotage 4.0](docs/04_product/control_center_4_0.md).
 

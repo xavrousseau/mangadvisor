@@ -221,7 +221,7 @@ def main() -> int:
 
     if not files:
         print("Aucun fichier de recommandations trouvé.")
-        print("Lance d'abord : cmd\\extract-jikan-recommendations.cmd")
+        print("Lance d'abord l'option 26 du menu Mangadvisor (recommandations Tenrai).")
         return 0
 
     print(f"Fichiers détectés : {len(files)}")
