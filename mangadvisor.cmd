@@ -38,7 +38,7 @@ echo   17 - Sauvegarder et verifier
 echo   18 - Verifier la derniere sauvegarde
 echo   19 - Restaurer (confirmation obligatoire)
 echo   20 - Tester ma mangatheque en lecture seule
-echo   21 - Importer ma mangatheque apres verification (3.8)
+echo   21 - Importer ma mangatheque apres verification
 echo.
 echo.
 echo   Centre de pilotage - Installation et donnees

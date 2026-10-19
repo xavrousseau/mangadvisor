@@ -186,8 +186,8 @@ function Load-Catalogue {
   Wait-Postgres
   $null=Get-Count "manga"
   Network
-  $pages=Ask-Number "Nombre de pages SEARCH Jikan (25 mangas/page)" 40 400
-  $topPages=Ask-Number "Nombre de pages TOP Jikan (25 mangas/page)" 10 100
+  $pages=Ask-Number "Nombre de pages SEARCH Tenrai (25 mangas/page)" 40 400
+  $topPages=Ask-Number "Nombre de pages TOP Tenrai (25 mangas/page)" 10 100
   $force=Confirm "Actualiser aussi les fichiers JSON deja telecharges ?" $false
   $base=@("--start-page","1","--limit","25","--sleep-seconds","1")
   $search=@("pipelines/engine/scripts/extract_jikan.py","--mode","search")+
@@ -206,8 +206,8 @@ function Load-Catalogue {
   }
   $sourceCount=Get-Count "jikan_manga_source"
   $catalogCount=Get-Count "manga"
-  Write-Host "Notices Jikan : $sourceCount ; mangas dans le catalogue : $catalogCount"
-  if ($catalogCount -eq 0) { throw "Catalogue vide : import Jikan non valide." }
+  Write-Host "Notices fournisseur : $sourceCount ; mangas dans le catalogue : $catalogCount"
+  if ($catalogCount -eq 0) { throw "Catalogue vide : chargement Tenrai invalide." }
 }
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
@@ -227,7 +227,7 @@ function Load-Recommendations {
   $count=Get-Count "manga_recommendation_edge"
   Write-Host "Relations enregistrees : $count"
   if ($count -eq 0) {
-    Write-Warning "Aucune relation en base : voir les logs d'extraction (Jikan peut renvoyer 0 resultat)."
+    Write-Warning "Aucune relation en base : voir les logs d'extraction (le fournisseur peut renvoyer 0 resultat)."
   }
 }
 function Wait-Health {
@@ -333,7 +333,7 @@ function Wizard {
   Say "ASSISTANT COMPLET - Premiere installation ou reprise"
   Write-Host "Pre-requis : Docker Desktop installe, code telecharge (Git ou ZIP)."
   Write-Host "L'assistant ne lance JAMAIS Nuke, ne supprime PAS de volume."
-  Write-Host "Le catalogue exige Internet pour joindre Jikan. Les traitements sont relancables."
+  Write-Host "Le catalogue exige Internet pour joindre Tenrai. Les traitements sont relancables."
   if (!(Confirm "Demarrer l'installation guidee ?" $true)) { return }
   Ensure-Environment
   Initialize-Database

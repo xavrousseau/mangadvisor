@@ -81,6 +81,19 @@ function Restore-Test([string]$archive,[switch]$KeepDatabase) {
     $counts=& docker exec $containerName psql -X -v ON_ERROR_STOP=1 -U $script:pgUser -d $testDb -At -c "SELECT (SELECT count(*) FROM manga)||' mangas; '||(SELECT count(*) FROM user_manga_library)||' suivis; '||(SELECT count(*) FROM manga_fr_edition)||' ISBN; '||(SELECT count(*) FROM user_manga_volume)||' tomes suivis';"
     Assert-Ok "Lecture des donnees restaurees impossible"
     Write-Host "Restauration de test validee : $counts"
+    # Work-level reading statuses and owner-declared physical inventory are
+    # different tables. Checking only user_manga_library can hide possessions.
+    foreach ($table in @("user_manga_inventory_declaration","user_manga_inventory_pending")) {
+      $exists=& docker exec $containerName psql -X -v ON_ERROR_STOP=1 -U $script:pgUser -d $testDb -At -c "SELECT CASE WHEN to_regclass('public.$table') IS NOT NULL THEN 1 ELSE 0 END;"
+      Assert-Ok "Impossible de verifier la presence de la table $table"
+      if (([string]$exists).Trim() -eq "1") {
+        $count=& docker exec $containerName psql -X -v ON_ERROR_STOP=1 -U $script:pgUser -d $testDb -At -c "SELECT count(*) FROM $table;"
+        Assert-Ok "Impossible de verifier les declarations dans $table"
+        Write-Host ("  {0}: {1} lignes restaurees" -f $table,([string]$count).Trim())
+      } else {
+        Write-Host ("  {0}: table absente de cette archive ancienne" -f $table)
+      }
+    }
     if ($KeepDatabase) { $created=$false; return $testDb }
   }
   finally {
@@ -149,7 +162,7 @@ try {
   # Verify an independent safety copy of the CURRENT database before switching.
   $null=Create-Backup
   $restoredDb=Restore-Test $archive -KeepDatabase
-  & docker compose @compose stop api web ui engine
+  & docker compose @compose --profile legacy stop api web ui engine
   Assert-Ok "Impossible d'arreter les services applicatifs"
   $null=Admin-Sql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$pgDb' AND pid<>pg_backend_pid();"
   $q=[char]34
@@ -169,7 +182,8 @@ catch {
 }
 finally {
   if ($restoredDb) { Drop-Verification $restoredDb }
-  & docker compose @compose up -d api web ui
+  # Restart only the supported site 8501; legacy 8502 stays opt-in.
+  & docker compose @compose up -d api web
   if ($LASTEXITCODE -ne 0) { Write-Warning "Relancer mangadvisor.cmd option 3 pour les services Web." }
 }
 Write-Host "Restauration reussie. Ancienne base toujours disponible sous le nom: $oldDb"
