@@ -301,6 +301,98 @@ def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -
             with conn.cursor() as cur:
                 return evaluate(cur,entries)
 
+    @router.post("/pending/save")
+    def save_pending(payload: InventorySavePending) -> dict[str, Any]:
+        """Explicit owner-confirmed, additive preservation of unresolved CSV rows.
+
+        No manga IDs, ISBNs or read status are created here. Existing
+        pending claims with different counts/titles are never overwritten.
+        """
+        entries = parse_inventory(payload.csv_content)
+        with connection_factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_xact_lock(%(key)s);", {"key": 1202038})
+                review = evaluate(cur, entries)
+                if preview_hash(review, user_id) != payload.confirmation_token:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="L'inventaire ou le catalogue a change : refais l'apercu.",
+                    )
+                pending = [
+                    row for row in review["items"]
+                    if row["status"] in ("REVIEW_MISSING", "REVIEW_AMBIGUOUS")
+                ]
+                keys = [pending_key(row) for row in pending]
+                if len(keys) != len(set(keys)):
+                    raise HTTPException(
+                        status_code=422,
+                        detail="References de lignes dupliquees : aucune sauvegarde.",
+                    )
+                cur.execute("""
+                    SELECT source_key,content_sha256 FROM user_manga_inventory_pending
+                    WHERE user_id=%(user_id)s
+                """, {"user_id": user_id})
+                already = {r["source_key"]: r["content_sha256"] for r in cur.fetchall()}
+                conflicts = [row["line"] for row in pending
+                             if pending_key(row) in already
+                             and pending_hash(row) != already[pending_key(row)]]
+                if conflicts:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Une declaration en attente a change aux lignes {}. "
+                               "Aucune modification : correction manuelle requise.".format(conflicts),
+                    )
+                new = [row for row in pending if pending_key(row) not in already]
+                for row in new:
+                    cur.execute("""
+                        INSERT INTO user_manga_inventory_pending (
+                            user_id,source_key,entry_title,source_reference,
+                            work_declared,edition_declared,format_hint,
+                            main_volumes,duplicate_copies,other_editions_unknown,
+                            review_status,candidate_ids,content_sha256
+                        ) VALUES (
+                            %(user_id)s,%(source_key)s,%(entry_title)s,%(source_reference)s,
+                            %(work_declared)s,%(edition_declared)s,%(format_hint)s,
+                            %(main_volumes)s,%(duplicate_copies)s,%(other_editions_unknown)s,
+                            %(review_status)s,%(candidate_ids)s,%(content_sha256)s
+                        )
+                        ON CONFLICT (user_id,source_key) DO NOTHING
+                        RETURNING source_key
+                    """, {
+                        "user_id": user_id,
+                        "source_key": pending_key(row),
+                        "entry_title": row["entry_title"],
+                        "source_reference": row.get("source_reference"),
+                        "work_declared": row.get("work_declared"),
+                        "edition_declared": row.get("edition_declared"),
+                        "format_hint": row.get("format_hint"),
+                        "main_volumes": row["main_volumes"],
+                        "duplicate_copies": row["duplicate_copies"],
+                        "other_editions_unknown": row["other_editions_unknown"],
+                        "review_status": row["status"],
+                        "candidate_ids": row["candidate_ids"],
+                        "content_sha256": pending_hash(row),
+                    })
+                    if cur.fetchone() is None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="Une declaration a ete creee simultanement : recommence.",
+                        )
+            conn.commit()
+        return {
+            "status": "ok",
+            "saved": len(new),
+            "unchanged_pending": len(pending)-len(new),
+            "still_to_review": len(pending),
+            "pending_physical_volumes": sum(
+                row["main_volumes"] + row["duplicate_copies"]
+                + row["other_editions_unknown"] for row in pending
+            ),
+            "preserved_without_guessing": True,
+            "linked_mangas": 0,
+            "message": "Declarations conservees sans inventer de manga ou d'ISBN.",
+        }
+
     @router.post("/apply")
     def apply(payload: InventoryApply) -> dict[str, Any]:
         entries=parse_inventory(payload.csv_content)
