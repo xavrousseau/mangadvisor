@@ -19,8 +19,8 @@ $compose=@("--env-file",$envFile,
 function Assert-Ok([string]$message) {
   if ($LASTEXITCODE -ne 0) { throw "$message (code $LASTEXITCODE)" }
 }
-function Docker([string[]]$Args, [string]$Message) {
-  & docker @Args
+function Docker([string[]]$CommandArgs, [string]$Message) {
+  & docker @CommandArgs
   Assert-Ok $Message
 }
 function Db-Setting([string]$key) {
