@@ -134,10 +134,23 @@ if /I "%~1"=="ai" start "Mangadvisor - IA locale" cmd /k powershell -NoProfile -
 if /I "%~1"=="ai-stop" start "Mangadvisor - Arreter IA" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" -Stop & goto :eof
 if /I "%~1"=="mobile-stop" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto :eof
 
-REM Alias historiques : redirection vers le catalogue centralise.
-if /I "%~1"=="jikan" start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto :eof
-if /I "%~1"=="jikan-reset" echo Option retiree pour proteger les donnees. Utilise le choix 25 sans reset. & exit /b 1
-if /I "%~1"=="jikan-pages" echo Ancienne commande retiree. Choisis 25 pour les pages personnalisees. & exit /b 1
+REM Entree catalogue unique + aliases historiques non destructifs.
+if /I "%~1"=="catalogue" (
+    start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue
+    goto :eof
+)
+if /I "%~1"=="jikan" (
+    start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue
+    goto :eof
+)
+if /I "%~1"=="jikan-reset" (
+    echo Ancienne option destructive desactivee. Utilise l'option 25.
+    exit /b 1
+)
+if /I "%~1"=="jikan-pages" (
+    echo Ancienne commande remplacee. Utilise l'option 25 pour les pages.
+    exit /b 1
+)
 
 echo Commande inconnue : %~1
 echo.
