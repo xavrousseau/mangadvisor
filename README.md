@@ -4,6 +4,15 @@
 
 [Structure actuelle du dépôt](docs/03_technical/project_structure.md) · [Compte rendu du nettoyage 4.1](docs/03_technical/cleanup_4_1.md)
 
+### Stabilisation et audit 4.4
+
+[Audit transversal de tous les fichiers suivis](docs/03_technical/audit_transversal_4_4.md) · [Structure technique](docs/03_technical/project_structure.md)
+
+Le site unique est servi sur **http://127.0.0.1:8501**. Le catalogue privilégie un titre international lisible quand la source en fournit un, **sans prétendre traduire automatiquement en français**. Les couvertures issues de MyAnimeList peuvent rester japonaises. Dans « Ma bibliothèque », une note vide n'est plus affichée comme « Possédé — » : les **exemplaires déclarés** figurent séparément lorsque ces données existent. Les séries sans rapprochement sont conservées dans une section distincte et ne sont jamais intégrées de force aux recommandations.
+
+`mangadvisor.cmd` reste l'entrée Windows. Les dossiers privés et les volumes Docker ne doivent jamais être supprimés pour une mise à jour. L'option **17** effectue une sauvegarde et une restauration de vérification ; le diagnostic **27** vérifie la communication du site avec l'API. Les difficultés de réconciliation d'alias français, le gel des dépendances et la séparation Docker dev/stable sont documentées comme travaux futurs.
+
+
 ## Une interface unique depuis Mangadvisor 4.2
 
 Le **site principal** est sur `http://127.0.0.1:8501`, servi par Nginx et `apps/web/`. Le vieux prototype Streamlit `apps/ui/` (anciennement exposé sur 8502) reste disponible uniquement pour les développeurs/tests sous le profil Docker `legacy` et ne figure plus dans les liens du site.
