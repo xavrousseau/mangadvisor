@@ -35,3 +35,6 @@ legacy/**/infra/pgadmin/azurecredentialcache/
 # Credentials and local CA exported for mobile HTTPS setup
 .env.mobile
 mobile-local/
+
+# Archives de mangatheque privees : ne jamais les envoyer sur GitHub.
+backups/
