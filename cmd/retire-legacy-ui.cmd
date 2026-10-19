@@ -2,7 +2,7 @@
 setlocal
 rem Migration non destructive depuis l'ancien conteneur Streamlit port 8502.
 rem Le service ui existe uniquement dans l'overlay de developpement.
-rem Aucune option --volumes / -v et aucun acces aux donnees PostgreSQL.
+rem Seul le conteneur historique est retire, jamais les donnees PostgreSQL.
 call "%~dp0common.cmd"
 set "DEV_COMPOSE=%ROOT_DIR%\infra\compose\docker-compose.dev.yml"
 pushd "%ROOT_DIR%"
