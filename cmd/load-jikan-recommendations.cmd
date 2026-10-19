@@ -33,7 +33,7 @@ echo --------------------------------------------------
 echo 1/2 - Creation table manga_recommendation_edge
 echo --------------------------------------------------
 
-docker exec -i mangadvisor_postgres psql -U manga -d mangadvisor < sql\schema\006_add_jikan_recommendation_tables.sql
+docker exec -i mangadvisor_postgres sh -c "psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d $POSTGRES_DB" < sql\schema\006_add_jikan_recommendation_tables.sql
 
 if errorlevel 1 (
     echo.
@@ -61,9 +61,9 @@ echo --------------------------------------------------
 echo Controle final
 echo --------------------------------------------------
 
-docker exec -it mangadvisor_postgres psql -U manga -d mangadvisor -c "SELECT COUNT(*) AS nb_edges FROM manga_recommendation_edge;"
+docker exec -it mangadvisor_postgres sh -c "psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d $POSTGRES_DB" -c "SELECT COUNT(*) AS nb_edges FROM manga_recommendation_edge;"
 
-docker exec -it mangadvisor_postgres psql -U manga -d mangadvisor -c "SELECT m.title AS source, e.recommended_title, e.votes, rm.title AS linked_catalog_title FROM manga_recommendation_edge e JOIN manga m ON m.id = e.source_manga_id LEFT JOIN manga rm ON rm.id = e.recommended_manga_id ORDER BY e.votes DESC NULLS LAST, m.title ASC LIMIT 20;"
+docker exec -it mangadvisor_postgres sh -c "psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d $POSTGRES_DB" -c "SELECT m.title AS source, e.recommended_title, e.votes, rm.title AS linked_catalog_title FROM manga_recommendation_edge e JOIN manga m ON m.id = e.source_manga_id LEFT JOIN manga rm ON rm.id = e.recommended_manga_id ORDER BY e.votes DESC NULLS LAST, m.title ASC LIMIT 20;"
 
 echo.
 echo Chargement recommandations termine.
