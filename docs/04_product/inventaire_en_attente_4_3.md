@@ -15,10 +15,9 @@ La version 4.3 distingue désormais trois états :
   `user_manga_inventory_pending`, sans `manga_id`, sans ISBN, sans lecture
   ni note inventée.
 
-Pour la collection de référence testée localement : 103 entrées, 1 672
-exemplaires déclarés, 54 entrées reconnues (709 exemplaires) et 49 lignes
-encore à rapprocher (963 exemplaires). Ces données ne sont **jamais**
-publiées dans les tests du dépôt ; seuls des mangas fictifs de CI y figurent.
+Les quantités, intitulés, références et éditions d'un inventaire personnel
+restent exclusivement dans les fichiers privés et la base locale. Les tests du
+dépôt utilisent uniquement des données synthétiques fictives.
 
 ## Comment utiliser l'option 21
 
