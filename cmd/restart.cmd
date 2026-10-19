@@ -10,6 +10,13 @@ echo ==================================================
 echo.
 
 pushd "%ROOT_DIR%"
+rem Ne pas laisser tourner l'ancien site Streamlit apres un restart.
+%COMPOSE_CMD% --profile legacy stop ui
+if errorlevel 1 (
+    popd
+    endlocal
+    exit /b 1
+)
 %COMPOSE_CMD% down
 if errorlevel 1 (
     popd
