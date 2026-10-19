@@ -119,3 +119,25 @@ test("candidate-specific evidence cannot fabricate matches or missing scores",()
     references:["Nana"], matches:[],score:{base:null,bonus:null,final:25},
   });
 });
+
+test("up to eight diversified library sources remain visible without fabrication", () => {
+  const sources = Array.from({ length: 11 }, (_, i) => ({
+    title: `Source ${i + 1}`, is_favorite: false,
+    user_score: null, library_status: "OWNED",
+  }));
+  const result = explainProfile({ positive_sources: sources });
+  assert.equal(result.sources.length, 8);
+  assert.equal(result.sources[7].title, "Source 8");
+  assert.ok(result.sources.every(x => x.favorite === false && x.score === null));
+});
+
+test("ownership-only recommendations show an explicit visible warning", () => {
+  const app = readFileSync("apps/web/assets/app.js", "utf8");
+  const translations = readFileSync("apps/web/assets/i18n.js", "utf8");
+  assert.ok(app.includes('result.profile_summary?.preference_evidence'));
+  assert.ok(app.includes('role="status"'));
+  for (const label of ["recOwnedOnlyWarning", "recInterestOnlyWarning"]) {
+    assert.ok(app.includes(label));
+    assert.equal(translations.split(label + ":").length, 3);
+  }
+});
