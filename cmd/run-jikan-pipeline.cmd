@@ -11,12 +11,9 @@ echo.
 call "%~dp0install-check.cmd"
 if errorlevel 1 exit /b 1
 
-REM Variables PostgreSQL pour le script Python
-set "POSTGRES_DB=mangadvisor"
-set "POSTGRES_USER=manga"
-set "POSTGRES_PASSWORD=manga"
-set "POSTGRES_HOST=localhost"
-set "POSTGRES_PORT=5432"
+REM Le chargeur Python lit les parametres PostgreSQL du .env racine.
+REM Ne jamais imposer d'identifiants en dur ni afficher les secrets.
+REM Pour un lancement depuis Windows, l'hote reste localhost par defaut.
 
 REM Paramètres par défaut
 set "START_PAGE=1"
@@ -69,7 +66,8 @@ if defined RESET_FLAG (
 echo.
 
 pushd "%ROOT_DIR%"
-python pipelines\engine\scripts\run_jikan_pipeline.py %RESET_FLAG% --start-page %START_PAGE% --end-page %END_PAGE% --limit %LIMIT%
+REM Executer dans le conteneur engine : aucun Python ou psycopg local requis.
+%COMPOSE_CMD% run --rm engine python pipelines/engine/scripts/run_jikan_pipeline.py %RESET_FLAG% --start-page %START_PAGE% --end-page %END_PAGE% --limit %LIMIT%
 set "RC=%ERRORLEVEL%"
 popd
 

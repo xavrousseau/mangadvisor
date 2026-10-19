@@ -153,15 +153,17 @@ def iter_recommendation_files() -> list[Path]:
     return sorted(RAW_RECOMMENDATIONS_DIR.glob("manga_*_recommendations.json"))
 
 
-def reset_table(conn) -> None:
-    with conn.cursor() as cursor:
-        cursor.execute("TRUNCATE TABLE manga_recommendation_edge;")
+def upsert_recommendation_rows(
+    conn, rows: list[dict[str, Any]], *, reset: bool = False,
+) -> int:
+    """Only replace the old recommendation graph in the SAME DB transaction.
 
-    conn.commit()
-
-
-def upsert_recommendation_rows(conn, rows: list[dict[str, Any]]) -> int:
+    An empty/corrupt incoming dataset cannot erase existing recommendations.
+    A failure during insertion rolls back the DELETE on connection close.
+    """
     if not rows:
+        if reset:
+            raise ValueError("Import vide : les recommandations précédentes sont conservées.")
         return 0
 
     sql = """
@@ -193,6 +195,10 @@ def upsert_recommendation_rows(conn, rows: list[dict[str, Any]]) -> int:
     """
 
     with conn.cursor() as cursor:
+        if reset:
+            # DELETE is transactional. Never commit before successfully
+            # inserting the full validated replacement dataset.
+            cursor.execute("DELETE FROM manga_recommendation_edge;")
         cursor.executemany(sql, rows)
 
     conn.commit()
@@ -224,12 +230,6 @@ def main() -> int:
     conn = get_postgres_connection()
 
     try:
-        if args.reset:
-            print("[load_recommendations] nettoyage table manga_recommendation_edge...")
-            reset_table(conn)
-            print("[load_recommendations] table vidée.")
-            print()
-
         mal_id_to_manga_id, mal_id_to_title = get_manga_mapping(conn)
 
         print(f"Mangas référencés dans le catalogue : {len(mal_id_to_manga_id)}")
@@ -323,7 +323,12 @@ def main() -> int:
             print(f"[load_recommendations] hors catalogue     : {not_linked_in_file}")
             print()
 
-        loaded = upsert_recommendation_rows(conn, all_rows)
+        # A partial or corrupt source must not replace a known-good graph.
+        if args.reset and (total_files_in_error > 0 or not all_rows):
+            print("[load_recommendations] REFUS : fichiers invalides ou zéro recommandation exploitable.")
+            print("[load_recommendations] Relations existantes conservées.")
+            return 1
+        loaded = upsert_recommendation_rows(conn, all_rows, reset=args.reset)
 
     finally:
         conn.close()

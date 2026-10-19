@@ -10,11 +10,39 @@ Rôle :
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import psycopg
 from psycopg import Connection
 from psycopg.rows import dict_row
+
+
+def local_database_settings(env_file: Path | None = None) -> dict[str, str]:
+    """Read only database settings from the local .env for Windows CLI pipelines.
+
+    Docker sets process environment variables and always takes precedence.
+    The file is never modified and its secrets are not logged. Values with
+    ordinary single/double-quote wrappers are accepted.
+    """
+    path = env_file or Path(__file__).resolve().parents[4] / ".env"
+    if not path.is_file():
+        return {}
+    fields = {"POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_PORT"}
+    found: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        if key not in fields:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        found[key] = value
+    return found
 
 
 def get_postgres_connection() -> Connection:
@@ -28,11 +56,15 @@ def get_postgres_connection() -> Connection:
     - POSTGRES_HOST
     - POSTGRES_PORT
     """
-    dbname = os.getenv("POSTGRES_DB", "mangadvisor")
-    user = os.getenv("POSTGRES_USER", "manga")
-    password = os.getenv("POSTGRES_PASSWORD", "manga")
+    local = local_database_settings()
+    # Respect Docker/CI env first; host is always explicit or localhost on Windows.
+    dbname = os.getenv("POSTGRES_DB") or local.get("POSTGRES_DB", "mangadvisor")
+    user = os.getenv("POSTGRES_USER") or local.get("POSTGRES_USER", "manga")
+    password = os.getenv("POSTGRES_PASSWORD") or local.get("POSTGRES_PASSWORD")
+    if not password:
+        raise RuntimeError("POSTGRES_PASSWORD absent : renseigne le fichier .env.")
     host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
+    port = os.getenv("POSTGRES_PORT") or local.get("POSTGRES_PORT", "5432")
 
     conn = psycopg.connect(
         dbname=dbname,
