@@ -6,7 +6,7 @@ const editionSource=readFileSync("apps/web/assets/advisor-editions.js","utf8");
 const editionUrl="data:text/javascript;charset=utf-8,"+encodeURIComponent(editionSource);
 const file=readFileSync("apps/web/assets/advisor-view.js","utf8")
  .replace('from "./advisor-editions.js"', 'from "'+editionUrl+'"');
-const {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS}=
+const {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS,ADVISOR_BALANCE_PROMPTS}=
  await import("data:text/javascript;charset=utf-8,"+encodeURIComponent(file));
 const e=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const L=e;
@@ -101,4 +101,32 @@ test("the UI discloses whether the local AI is really available",()=>{
  const fallback=advisorChatMarkup({history:[],aiMode:"guided_fallback",lang:"fr"},L,e);
  assert.match(fallback,/advisorAIFallback/);
  assert.doesNotMatch(fallback,/advisor-ai-dot active/);
+});
+
+
+test("three discovery modes are real conversational actions, translated and selected",()=>{
+ assert.equal(Object.keys(ADVISOR_BALANCE_PROMPTS.fr).length,3);
+ assert.match(ADVISOR_BALANCE_PROMPTS.fr.EXPLORE,/Surprends-moi/);
+ const item={id:1,title:"Detective Story",genres:["Mystery"],themes:["Detective"],
+  mood_matches:{genres:["Mystery"],themes:["Detective"]},
+  variety_evidence:["Detective"],narrative_matches:[]};
+ const html=advisorResultsMarkup({count:1,context:{recommendation_balance:"EXPLORE"},
+  recommendations:[item]},{L,e,tr:e,poster:()=>"",rating:()=>"",published:()=>""});
+ assert.equal((html.match(/data-action="advisor-balance"/g)||[]).length,3);
+ assert.match(html,/data-value="EXPLORE" aria-pressed="true"/);
+ assert.match(html,/data-value="CLOSE" aria-pressed="false"/);
+ assert.match(html,/advisorVarietyEvidence/);
+ assert.match(html,/Detective/);
+ assert.doesNotMatch(html,/selection_probability/);
+});
+
+test("variety evidence escapes catalog strings and refuses unknown HTML",()=>{
+ const item={id:2,title:"A",mood_matches:{genres:["Mystery"]},
+  variety_evidence:['<img src=x onerror=alert(1)>'],
+  narrative_matches:[]};
+ const html=advisorResultsMarkup({count:1,context:{recommendation_balance:"BALANCED"},
+  recommendations:[item]},{L,e,tr:e,poster:()=>"",rating:()=>"",published:()=>""});
+ assert.doesNotMatch(html,/<img src=x/);
+ assert.match(html,/&lt;img src=x/);
+ assert.match(html,/data-value="BALANCED" aria-pressed="true"/);
 });
