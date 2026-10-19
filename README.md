@@ -2,6 +2,16 @@
 
 **Ta mangathèque, tes découvertes et ton conseiller manga personnel.** Application locale PC + mobile, avec catalogue multi-sources, bibliothèque, éditions françaises ISBN et recommandations explicables. Interface sombre/orange, français/anglais, sans abonnement.
 
+## Source du catalogue manga depuis le 1er octobre 2026
+
+**Attention :** le fournisseur public Jikan `api.jikan.moe` a officiellement été arrêté le 1er octobre 2026 ([annonce des mainteneurs](https://github.com/jikan-me/jikan-rest/issues/613)). Mangadvisor utilise désormais **[Tenrai v1](https://api.tenrai.org/documentation)**, qui documente un format compatible avec Jikan pour les recherches et les recommandations mangas.
+
+L'URL `https://api.tenrai.org/v1` est utilisée automatiquement, **même si ton ancien fichier .env ne comporte pas encore la nouvelle variable**. Si besoin, elle peut être définie dans `.env` via `MANGA_API_BASE_URL=https://api.tenrai.org/v1`. Aucune clé payante n'est nécessaire, les limitations publiques restent applicables (120 appels/minute, 4 appels/seconde). Le fournisseur est encore en bêta : une coupure est possible.
+
+Les scripts historiques dont le nom contient « Jikan » et les dossiers `data/raw/jikan/` sont conservés pour compatibilité avec les bases et tests déjà existants, **mais les nouveaux JSON enregistrent le fournisseur réel** ; les écritures SQL conservent également `source_name=tenrai`. Le chargement est additif et les associations aux mangas existants restent basées sur les identifiants MyAnimeList (`mal_id`).
+
+L'option **29** vérifie dorénavant la connexion HTTPS au fournisseur configuré **et une vraie réponse manga JSON**. Après mise à jour, relancer 29 puis 25 pour charger le catalogue, 26 pour les recommandations. Aucune réinstallation ni suppression de volume n'est requise.
+
 ## Tout piloter depuis mangadvisor.cmd (nouveau : centre de pilotage 4.0)
 
 Pour une première installation sur Windows : **télécharge le dépôt GitHub (ZIP ou Git), démarre Docker Desktop, double-clique sur mangadvisor.cmd et choisis l'option 22 — Installer de A à Z**. Aucun Python, psql ou terminal technique à installer sur Windows : les opérations data fonctionnent dans Docker.
