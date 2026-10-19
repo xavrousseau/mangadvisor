@@ -250,6 +250,9 @@ jobs:
       - name: Tester import physique 3.8 sans ecrasement des lectures ni ISBN inventes
         run: python tests/smoke/inventory_import_smoke.py
 
+      - name: Vérifier le tableau des éditions physiques sur PC et mobile
+        run: python tests/smoke/physical_inventory_browser.py
+
       - name: Sauvegarder et valider une restauration complete de la mangatheque
         shell: bash
         run: |
