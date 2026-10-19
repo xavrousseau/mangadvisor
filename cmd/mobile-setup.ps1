@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $compose = @("-f", (Join-Path $root "infra\compose\docker-compose.yml"),
-             "-f", (Join-Path $root "infra\compose\docker-compose.dev.yml"),
+             "-f", (Join-Path $root "infra\compose\docker-compose.local.yml"),
              "-f", (Join-Path $root "infra\compose\docker-compose.mobile.yml"))
 $envFile = Join-Path $root ".env"
 $mobileEnv = Join-Path $root ".env.mobile"
