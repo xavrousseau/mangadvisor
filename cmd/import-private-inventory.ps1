@@ -12,7 +12,8 @@ if (-not (Test-Path -LiteralPath $CsvFile -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $private)) {
   New-Item -ItemType Directory -Path $private -Force | Out-Null
 }
-$api="http://127.0.0.1:8000"
+. (Join-Path $PSScriptRoot "local-api.ps1")
+$api=Get-MangadvisorApiUrl (Join-Path $root ".env")
 $health=Invoke-RestMethod -Uri "$api/health" -TimeoutSec 20
 if ($health.status -ne "ok") { throw "Base Mangadvisor indisponible." }
 $csv=[IO.File]::ReadAllText([IO.Path]::GetFullPath($CsvFile),[Text.Encoding]::UTF8)
