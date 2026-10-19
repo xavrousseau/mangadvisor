@@ -911,3 +911,16 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
  font-weight:600;overflow-wrap:anywhere}
 .advisor-ai-dot{font-size:17px;color:var(--muted)}
 .advisor-ai-dot.active{color:var(--accent)}
+
+
+/* Mangadvisor 3.1: catalog-grounded discovery balance, mobile-friendly controls. */
+.advisor-balance-controls{display:flex;align-items:center;flex-wrap:wrap;gap:9px;
+ margin:4px 0 20px;padding:12px;border:1px solid var(--border);
+ border-radius:12px;background:var(--surface2)}
+.advisor-balance-caption{color:var(--muted);font-size:11px;font-weight:700;
+ margin-right:auto}
+.advisor-balance-controls .btn{white-space:normal;text-align:center;min-height:34px}
+.advisor-variety{border-left:2px solid var(--accent);padding-left:9px}
+@media(max-width:650px){.advisor-balance-controls{gap:7px;padding:11px}
+ .advisor-balance-caption{width:100%}
+ .advisor-balance-controls .btn{flex:1;min-width:85px;font-size:11px}}
