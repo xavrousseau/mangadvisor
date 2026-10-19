@@ -93,7 +93,11 @@ def check():
         "Web depends on healthy API": re.search(
             r"(?ms)^  web:.*?^    depends_on:\s*\n      api:\s*\n        condition: service_healthy",
             compose) is not None,
-        "Legacy Streamlit opt in": 'profiles: ["legacy"]' in compose,
+        "No Streamlit service in user Compose": "\\n  ui:\\n" not in compose,
+        "Stable local overlay has no Streamlit port": "8502" not in
+            (ROOT / "infra/compose/docker-compose.local.yml").read_text(encoding="utf-8"),
+        "Development-only Streamlit profile": 'profiles: ["legacy"]' in
+            (ROOT / "infra/compose/docker-compose.dev.yml").read_text(encoding="utf-8"),
         "API has a healthcheck": "healthcheck:" in compose[compose.index("  api:"):compose.index("  ollama:")],
         "Pending entries never use manga FK": "CREATE TABLE IF NOT EXISTS user_manga_inventory_pending" in
             (ROOT / "apps/api/app/inventory_import.py").read_text(encoding="utf-8"),
