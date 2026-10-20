@@ -376,7 +376,9 @@ def pending_mangadex_aliases(
             "aliases":0,"french":0}
     for index,work in enumerate(works):
         title=(work.get("work_declared") or work.get("entry_title") or "").strip()[:180]
-        digest=hashlib.md5(title.encode("utf-8")).hexdigest()
+        # The digest must use the same untruncated text as the SQL cache key.
+        full_title=(work.get("work_declared") or work.get("entry_title") or "").strip()
+        digest=hashlib.md5(full_title.encode("utf-8")).hexdigest()
         findings={}
         status="NOT_FOUND"
         try:
@@ -500,8 +502,7 @@ def cli_main(argv:list[str]|None=None)->int:
     scope=linked_library_scope(connect_database,max_works=250)
     ids=scope["ids"]
     if not ids:
-        print("Aucune oeuvre personnelle liee : pas d'appels MangaDex.",flush=True)
-        return 0
+        print("Aucune oeuvre personnelle liee : recherche uniquement dans les lignes en attente.",flush=True)
     aggregate={"selected":0,"matched":0,"not_found":0,
                "ambiguous":0,"error":0,"aliases":0,"french":0}
     while aggregate["selected"]<args.mangadex_limit:
