@@ -531,7 +531,12 @@ def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -
         with connection_factory() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT d.manga_id,m.title AS work_title,d.entry_title,
+                    SELECT d.manga_id,m.title AS work_title,
+                           (SELECT a.alias FROM manga_title_alias a
+                            WHERE a.manga_id=m.id AND a.language='fr'
+                            ORDER BY CASE WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0 ELSE 1 END,
+                                     a.alias LIMIT 1) AS work_title_fr,
+                           d.entry_title,
                            d.edition_declared,d.format_hint,d.main_volumes,
                            d.duplicate_copies,d.other_editions_unknown,
                            d.source_reference,d.imported_at::text AS imported_at
