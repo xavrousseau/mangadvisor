@@ -21,7 +21,7 @@ def data_field(*subfields):
 
 
 def make_record(*, notice="FRBNF99900001", title="Dragon Ball, tome 1",
-                subject="Mangas", isbn="9782344059006",
+                subject="Mangas", isbn="9780306406157",
                 series="Dragon Ball", volume="1"):
     fields = [
         ("001", notice.encode() + b"\x1e"),
@@ -81,7 +81,7 @@ class BnfBulkTests(unittest.TestCase):
     def test_iso2709_decodes_bnf_fields_and_preserves_two_editions(self):
         payload = (make_record(notice="FRBNF001", volume="1") +
                    make_record(notice="FRBNF002", title="Dragon Ball, édition Deluxe",
-                               volume="2", isbn="978-2-344-05900-6"))
+                               volume="2", isbn="978-0-306-40615-7"))
         rows = list(importer.iter_iso2709(io.BytesIO(payload)))
         self.assertEqual(len(rows), 2)
         result = [importer.parse_candidate(item, "x" * 64, importer.datetime.now(importer.timezone.utc))
