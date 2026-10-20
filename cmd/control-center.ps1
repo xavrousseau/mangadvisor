@@ -294,7 +294,7 @@ function Benchmark-Catalogue-Sources {
   Say "Comparatif de 50 mangas : Scrinis et MangaUpdates (lecture seule)"
   Ensure-Environment
   Check-Docker
-  Compose @("up","-d","postgres","meilisearch")
+  Compose @("up","-d","postgres","meilisearch","api")
   Wait-Postgres
   $null=Get-Count "manga"
   $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
