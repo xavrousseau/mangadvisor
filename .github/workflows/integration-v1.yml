@@ -139,13 +139,25 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, urllib.request
-          for path in ("/api/health", "/api/library?limit=1"):
-              with urllib.request.urlopen("http://127.0.0.1:8501"+path, timeout=15) as result:
-                  assert result.status == 200, (path, result.status)
-                  body=json.load(result)
-                  assert body.get("status") == "ok" if path == "/api/health" else isinstance(body.get("items"), list), body
-          print("OK: proxy 8501 avant recreation")
+          import json, time, urllib.request
+          # Container health and Nginx readiness are not instantaneous after
+          # Compose startup. Allow the same bounded retry used after recreation.
+          for attempt in range(30):
+              try:
+                  for path in ("/api/health", "/api/library?limit=1"):
+                      with urllib.request.urlopen("http://127.0.0.1:8501"+path, timeout=5) as result:
+                          assert result.status == 200, (path, result.status)
+                          body=json.load(result)
+                          if path == "/api/health":
+                              assert body.get("status") == "ok", body
+                          else:
+                              assert isinstance(body.get("items"), list), body
+                  print("OK: proxy 8501 avant recreation")
+                  break
+              except Exception as exc:
+                  if attempt == 29:
+                      raise RuntimeError("Proxy 8501 indisponible apres demarrage") from exc
+                  time.sleep(2)
           PY
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
             -f infra/compose/docker-compose.dev.yml up -d --no-deps --force-recreate api
