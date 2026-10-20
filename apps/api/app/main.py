@@ -296,6 +296,19 @@ def list_mangas(
             m.title,
             m.title_english,
             m.title_japanese,
+            (SELECT a.alias FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.language='fr'
+             ORDER BY CASE WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0
+                           WHEN a.source_name LIKE 'WIKIDATA_P4087%' THEN 1
+                           ELSE 2 END,a.alias LIMIT 1) AS title_fr,
+            (SELECT a.source_name FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.language='fr'
+             ORDER BY CASE WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0
+                           WHEN a.source_name LIKE 'WIKIDATA_P4087%' THEN 1
+                           ELSE 2 END,a.alias LIMIT 1) AS title_fr_source,
+            EXISTS (SELECT 1 FROM manga_title_alias a
+                    WHERE a.manga_id=m.id AND a.language='fr'
+                      AND a.source_name='BNF_AUTHORITY_WORK') AS title_fr_verified,
             m.status,
             m.chapters,
             m.volumes,
@@ -401,6 +414,19 @@ def get_manga(manga_id: int) -> dict[str, Any]:
             m.title,
             m.title_english,
             m.title_japanese,
+            (SELECT a.alias FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.language='fr'
+             ORDER BY CASE WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0
+                           WHEN a.source_name LIKE 'WIKIDATA_P4087%' THEN 1
+                           ELSE 2 END,a.alias LIMIT 1) AS title_fr,
+            (SELECT a.source_name FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.language='fr'
+             ORDER BY CASE WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0
+                           WHEN a.source_name LIKE 'WIKIDATA_P4087%' THEN 1
+                           ELSE 2 END,a.alias LIMIT 1) AS title_fr_source,
+            EXISTS (SELECT 1 FROM manga_title_alias a
+                    WHERE a.manga_id=m.id AND a.language='fr'
+                      AND a.source_name='BNF_AUTHORITY_WORK') AS title_fr_verified,
             m.synopsis,
             m.status,
             m.chapters,
