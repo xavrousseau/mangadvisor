@@ -324,7 +324,7 @@ def main() -> int:
             print()
 
         # A partial or corrupt source must not replace a known-good graph.
-        if not all_rows or (args.reset and total_files_in_error > 0):
+        if not all_rows or total_files_in_error > 0:
             print("[load_recommendations] REFUS : fichiers invalides ou zéro recommandation exploitable.")
             print("[load_recommendations] Relations existantes conservées.")
             return 1
