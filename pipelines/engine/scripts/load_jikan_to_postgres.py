@@ -294,8 +294,8 @@ def main() -> int:
 
     if not files:
         print("Aucun fichier JSON trouvé pour les sources demandées.")
-        print("Lance d'abord l'extraction Jikan.")
-        return 0
+        print("Lance d'abord l'extraction Tenrai (option 25).")
+        return 1
 
     print(f"Fichiers détectés : {len(files)}")
     print()
@@ -317,8 +317,8 @@ def main() -> int:
     print()
 
     if not rows:
-        print("Aucune ligne valide à charger.")
-        return 0
+        print("ERREUR : aucune ligne valide à charger (les données précédentes sont conservées).")
+        return 1
 
     conn = get_postgres_connection()
 
