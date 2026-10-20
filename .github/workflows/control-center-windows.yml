@@ -58,6 +58,8 @@ jobs:
           if ($LASTEXITCODE -ne 1 -or $output -notmatch 'Commande inconnue') {
             throw "La distribution des commandes directes ne fonctionne pas : $output"
           }
+          # The expected invalid-command exit must not fail the GitHub step itself.
+          $global:LASTEXITCODE = 0
           # Q must exit without looping indefinitely on the first menu IF.
           $inputFile = Join-Path $env:RUNNER_TEMP "mangadvisor_menu_input.txt"
           $outputFile = Join-Path $env:RUNNER_TEMP "mangadvisor_menu_output.txt"
