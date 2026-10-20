@@ -135,6 +135,82 @@ def create_pending_resolution_router(
 ) -> APIRouter:
     router = APIRouter(prefix="/inventory",tags=["Inventaire : rapprochement manuel"])
 
+    @router.get("/pending/multilingual-suggestions")
+    def multilingual_suggestions() -> dict[str, Any]:
+        """Read-only, exact alias-based review hints for the full pending list.
+
+        This is never an automatic importer. If multiple different manga IDs
+        share the same multilingual name, ALL stay ambiguous. Existing owned
+        manga are especially prominent to prevent duplicated physical counts.
+        """
+        with connection_factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT source_key,entry_title,work_declared
+                    FROM user_manga_inventory_pending
+                    WHERE user_id=%(user_id)s
+                    ORDER BY entry_title,source_key LIMIT 1000
+                """,{"user_id":user_id})
+                pending=list(cur.fetchall())
+                keys=list(dict.fromkeys(
+                    title_key(default_search_term(row)) for row in pending
+                ))
+                keys=[key for key in keys if key]
+                aliases=[]
+                if keys:
+                    cur.execute("""
+                        SELECT a.alias_key,a.alias,a.source_name,a.language,
+                               m.id,m.title,m.title_english,
+                               EXISTS (
+                                 SELECT 1 FROM user_manga_inventory_declaration d
+                                 WHERE d.user_id=%(user_id)s AND d.manga_id=m.id
+                               ) AS already_in_inventory
+                        FROM manga_title_alias a
+                        JOIN manga m ON m.id=a.manga_id
+                        WHERE a.alias_key=ANY(%(keys)s)
+                        ORDER BY a.alias_key,
+                                 CASE WHEN a.source_name='BNF_AUTHORITY_WORK'
+                                      THEN 0 ELSE 1 END,
+                                 m.popularity ASC NULLS LAST,m.id
+                        LIMIT 4001
+                    """,{"keys":keys,"user_id":user_id})
+                    aliases=list(cur.fetchall())
+        truncated=len(aliases)>4000
+        if truncated:
+            return {"count":len(pending),"items":[],
+                    "automatic_association":False,
+                    "status":"TOO_MANY_ALIASES_REVIEW_MANUALLY"}
+        by_key: dict[str, dict[int, dict[str,Any]]] = {}
+        for item in aliases:
+            group=by_key.setdefault(item["alias_key"],{})
+            group.setdefault(int(item["id"]),dict(item))
+        output=[]
+        for row in pending:
+            key=title_key(default_search_term(row))
+            unique=by_key.get(key,{})
+            suggestion=next(iter(unique.values())) if len(unique)==1 else None
+            state=("NO_EXACT_ALIAS" if not unique else
+                   "AMBIGUOUS" if len(unique)>1 else
+                   "ALREADY_IN_COLLECTION" if suggestion["already_in_inventory"]
+                   else "MATCH_POSSIBLE")
+            output.append({
+                "source_key":row["source_key"],
+                "state":state,
+                "candidate_count":len(unique),
+                "manga_id":suggestion["id"] if suggestion else None,
+                "catalog_title":suggestion["title"] if suggestion else None,
+                "title_english":suggestion["title_english"] if suggestion else None,
+                "matched_alias":suggestion["alias"] if suggestion else None,
+                "source_name":suggestion["source_name"] if suggestion else None,
+                "already_in_inventory":bool(
+                    suggestion and suggestion["already_in_inventory"]
+                ),
+            })
+        return {"count":len(output),"items":output,
+                "automatic_association":False,"status":"READY",
+                "notice":"Pistes vérifiées uniquement par alias de titre ; "
+                         "la correspondance œuvre et édition reste à confirmer."}
+
     @router.get("/pending/candidates")
     def find_candidates(
         source_key: str = Query(..., min_length=1, max_length=120),
