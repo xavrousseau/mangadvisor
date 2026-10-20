@@ -221,13 +221,18 @@ def parse_candidate(record: bytes, sha: str, now: datetime) -> dict | None:
     if not notice_id or not title or len(notice_id) > 120:
         return None
 
-    subjects = [*values(fields, "606", "a"), *values(fields, "606", "x"),
-                *values(fields, "608", "a")]
+    # In UNIMARC a subject can be split over $a / $x / $y / $z.
+    # "Bandes dessinées" + "Japon" must stay searchable together.
+    subjects = [" -- ".join(part for code in ("a", "x", "y", "z")
+                           for part in entry.get(code, []) if part)
+                for entry in fields.get("606", [])]
+    subjects.extend(values(fields, "608", "a"))
+    subjects = [x for x in subjects if x]
     collection = first(fields, "225", "a")
     publisher = first(fields, "214", "c") or first(fields, "210", "c")
     # Publisher alone is never evidence: major publishers also publish non-manga.
     signals = ["sujet:" + item for item in subjects
-               if re.search(r"\bmangas?\b|bandes? dessinees? japonaises?", normalize_text(item))]
+               if re.search(r"\bmangas?\b|\bbandes? dessinees?.{0,40}japon", normalize_text(item))]
     if collection and re.search(r"\bmangas?\b", normalize_text(collection)):
         signals.append("collection:" + collection)
     if not signals:
