@@ -50,6 +50,25 @@ jobs:
             throw "L'orchestrateur n'est pas branche au menu."
           }
 
+      - name: Verifier execution reelle du lanceur batch
+        shell: powershell
+        run: |
+          # A naked '& goto' after an IF used to bypass every menu choice.
+          $output = (& cmd.exe /d /c 'mangadvisor.cmd commande-inconnue' 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 1 -or $output -notmatch 'Commande inconnue') {
+            throw "La distribution des commandes directes ne fonctionne pas : $output"
+          }
+          # Q must exit without looping indefinitely on the first menu IF.
+          $inputFile = Join-Path $env:RUNNER_TEMP "mangadvisor_menu_input.txt"
+          $outputFile = Join-Path $env:RUNNER_TEMP "mangadvisor_menu_output.txt"
+          [IO.File]::WriteAllText($inputFile, "Q`r`n")
+          $process = Start-Process -FilePath "cmd.exe" -ArgumentList @("/d","/c","mangadvisor.cmd") -WorkingDirectory $PWD -RedirectStandardInput $inputFile -RedirectStandardOutput $outputFile -PassThru
+          if (-not $process.WaitForExit(10000)) {
+            Stop-Process -Id $process.Id -Force
+            throw "L'option Q ne quitte pas le menu Windows."
+          }
+          if ($process.ExitCode -ne 0) { throw "Sortie du menu echouee : $($process.ExitCode)" }
+
       - name: Verifier la configuration initiale sans Docker
         shell: powershell
         run: |
