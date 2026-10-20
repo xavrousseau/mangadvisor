@@ -4,10 +4,7 @@ set "ROOT_DIR=%~dp0"
 
 rem A single synchronous entry point: never spawn detached terminal windows.
 rem Everything destructive is deliberately absent from the everyday menu.
-if not "%~1"=="" (
-    call :dispatch "%~1"
-    exit /b %ERRORLEVEL%
-)
+if not "%~1"=="" goto :direct
 
 :menu
 cls
@@ -45,7 +42,11 @@ if not defined KEY (
     goto menu
 )
 call :dispatch "%KEY%"
-call :result
+call :direct
+call :dispatch "%~1"
+exit /b %ERRORLEVEL%
+
+:result
 goto menu
 
 :advanced
