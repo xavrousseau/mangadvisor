@@ -15,6 +15,7 @@ from apps.api.app.collection import create_collection_router, ensure_collection_
 from apps.api.app.collection_bulk import collection_import_router
 from apps.api.app.inventory_import import inventory_router,ensure_inventory_schema
 from apps.api.app.inventory_resolution import create_pending_resolution_router
+from apps.api.app.title_aliases import ensure_alias_schema
 from apps.api.app.collection_scan import scan_router
 from apps.api.app.edition_discovery import edition_discovery_router
 from apps.api.app.edition_enrichment import create_enrichment_router
@@ -263,7 +264,9 @@ def list_mangas(
     if q:
         conditions.append(
             "(m.title ILIKE %(q)s OR m.title_english ILIKE %(q)s "
-            "OR m.title_japanese ILIKE %(q)s)"
+            "OR m.title_japanese ILIKE %(q)s OR EXISTS (SELECT 1 FROM manga_title_alias a "
+            "WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id "
+            "AND a.alias ILIKE %(q)s))"
         )
         params["q"] = f"%{q}%"
 
@@ -287,6 +290,18 @@ def list_mangas(
         SELECT
             m.id,
             m.source_mal_id,
+            (SELECT a.alias FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+               AND a.language_code='fr' AND a.validated_identity
+             ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                 WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END,a.alias
+             LIMIT 1) AS title_fr_community,
+            (SELECT a.source_name FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+               AND a.language_code='fr' AND a.validated_identity
+             ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                 WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END,a.alias
+             LIMIT 1) AS title_fr_source,
             m.title,
             m.title_english,
             m.title_japanese,
@@ -392,6 +407,18 @@ def get_manga(manga_id: int) -> dict[str, Any]:
         SELECT
             m.id,
             m.source_mal_id,
+            (SELECT a.alias FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+               AND a.language_code='fr' AND a.validated_identity
+             ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                 WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END,a.alias
+             LIMIT 1) AS title_fr_community,
+            (SELECT a.source_name FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+               AND a.language_code='fr' AND a.validated_identity
+             ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                 WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END,a.alias
+             LIMIT 1) AS title_fr_source,
             m.title,
             m.title_english,
             m.title_japanese,
@@ -669,6 +696,9 @@ def get_library(
                 m.title ILIKE %(q)s
                 OR m.title_english ILIKE %(q)s
                 OR m.title_japanese ILIKE %(q)s
+                OR EXISTS (SELECT 1 FROM manga_title_alias a
+                    WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+                      AND a.alias ILIKE %(q)s)
             )
             """
         )
@@ -693,6 +723,18 @@ def get_library(
             l.updated_at::text AS updated_at,
 
             m.source_mal_id,
+            (SELECT a.alias FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+               AND a.language_code='fr' AND a.validated_identity
+             ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                 WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END,a.alias
+             LIMIT 1) AS title_fr_community,
+            (SELECT a.source_name FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+               AND a.language_code='fr' AND a.validated_identity
+             ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                 WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END,a.alias
+             LIMIT 1) AS title_fr_source,
             m.title,
             m.title_english,
             m.status,
@@ -3681,6 +3723,7 @@ def prepare_fr_collection() -> None:
     ensure_inventory_schema(get_connection)
     ensure_bnf_schema(get_connection)
     ensure_wikidata_schema(get_connection)
+    ensure_alias_schema(get_connection)
 
 
 app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
