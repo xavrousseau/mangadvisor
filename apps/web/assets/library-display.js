@@ -1,12 +1,14 @@
 /** Manga titles, ownership declarations and ratings must never be mixed.
- * French localized labels are shown only when explicitly marked verified.
- * Otherwise use an available English title, then the source's original title.
+ * Verified French publisher titles and clearly sourced community titles
+ * are separate. Community labels do not imply a retail edition or ISBN.
  */
 export function preferredMangaTitle(manga,lang="fr"){
   const read=x=>typeof x==="string"?x.trim():"";
   const verified=lang==="fr" && manga?.title_fr_verified===true
     ? read(manga.title_fr):"";
-  return verified || read(manga?.title_english) || read(manga?.title) ||
+  const community=lang==="fr" && typeof manga?.title_fr_source==="string"
+    ?read(manga?.title_fr_community):"";
+  return verified || community || read(manga?.title_english) || read(manga?.title) ||
     read(manga?.title_japanese) || (lang==="fr"?"Titre inconnu":"Unknown title");
 }
 
