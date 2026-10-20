@@ -402,7 +402,7 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 .collection-stats strong{font:800 25px 'Outfit',sans-serif;color:var(--accent)}
 .collection-legacy,.collection-caveat{font-size:11px;color:var(--muted);line-height:1.7;margin:13px 0}
 .edition-list{display:grid;gap:12px}
-.edition-item{border:1px solid var(--border);background:var(--surface);border-radius:13px;
+.edition-item,.bnf-candidate-item{border:1px solid var(--border);background:var(--surface);border-radius:13px;
  padding:16px 18px;display:flex;justify-content:space-between;gap:15px;align-items:center}
 .edition-main{min-width:0;flex:1}
 .edition-main h3{font-size:16px;margin:7px 0;overflow-wrap:anywhere}
@@ -424,7 +424,7 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 .edition-preview .form-grid{margin:20px 0}
 .edition-verified{color:var(--accent);font-weight:800;font-size:12px}
 @media(max-width:740px){
- .edition-item{align-items:stretch;flex-direction:column;padding:13px}
+ .edition-item,.bnf-candidate-item{align-items:stretch;flex-direction:column;padding:13px}
  .edition-actions .btn{flex:1}
  .collection-stats{gap:8px}
  .collection-stats span{padding:11px}
