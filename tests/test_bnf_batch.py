@@ -181,6 +181,13 @@ class BnfBatchTests(unittest.TestCase):
         self.assertEqual(stats["skipped"], 1)
         self.assertEqual(stats["candidates"], 0)
 
+    def test_cli_reports_total_bnf_outage_as_error(self):
+        with patch("apps.api.app.bnf_batch.run_batch", return_value={
+            "selected": 2, "searched": 0, "candidates": 0, "checked": 0,
+            "empty": 0, "partial": 0, "error": 2, "skipped": 0,
+        }):
+            self.assertEqual(cli_main(["--limit", "2"]), 1)
+
     def test_limit_rejected_before_database_or_network(self):
         db = FakeDb()
         for value in (0, MAX_BATCH + 1, -1):
