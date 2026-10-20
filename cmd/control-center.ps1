@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -29,7 +29,7 @@ function Secret {
 }
 function Config([string]$Key) {
   if (!(Test-Path -LiteralPath $envFile -PathType Leaf)) {
-    throw "Fichier .env absent. Lance l'option 23 pour le creer."
+    throw "Fichier .env absent. Utilise mangadvisor.cmd, puis option 1 (premiere installation), pour le creer."
   }
   $found=@(Get-Content -LiteralPath $envFile | Where-Object {
     $_ -match ("^\s*" + [regex]::Escape($Key) + "\s*=")
@@ -92,7 +92,7 @@ function Wait-Postgres {
     if ($LASTEXITCODE -eq 0) { Write-Host "PostgreSQL pret."; return }
     Start-Sleep -Seconds 2
   }
-  throw "PostgreSQL ne repond pas. Consulte l'option 6 (logs)."
+  throw "PostgreSQL ne repond pas. Depuis les options avancees, choisis les journaux Docker."
 }
 function Sql-File([string]$RelativePath) {
   $source=Join-Path $root $RelativePath
@@ -124,8 +124,9 @@ function Initialize-Database {
   }
   Write-Host "Tables initialisees. Operation additive : aucun volume efface."
 }
-function Start-Application {
-  Say "Construction et demarrage des services"
+function Start-Application([bool]$Build=$true) {
+  Say "Demarrage des services Mangadvisor"
+  Ensure-Environment
   Check-Docker
   # Turn off the old 8502 Streamlit UI, keeping data volumes untouched.
   # The user-friendly stack has no Streamlit service at all.
@@ -137,9 +138,39 @@ function Start-Application {
       "-f",$devCompose,"--profile","legacy")
   Run "docker" ($legacyArgs+@("stop","ui")) "Impossible d'arreter l'ancienne interface"
   Run "docker" ($legacyArgs+@("rm","-f","ui")) "Impossible de retirer l'ancien conteneur UI"
-  Compose @("up","-d","--build")
+  $args=@("up","-d")
+  if ($Build) { $args+=@("--build") }
+  Compose $args
   Write-Host ("Interface unique : http://localhost:" + (Config "UI_PORT"))
   Write-Host ("API       : http://localhost:" + (Config "API_PORT") + "/health")
+}
+function Open-Application {
+  Say "Ouverture de Mangadvisor"
+  Ensure-Environment
+  Check-Docker
+  # A simple everyday launch reuses existing images; do not download data again.
+  # On first installation the guided wizard constructs everything with --build.
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  if ((Get-Count "manga") -eq 0) {
+    throw "Catalogue absent ou vide. Lance d'abord l'option 1 (installation)."
+  }
+  Start-Application $false
+  $null=Wait-Health
+  $site="http://localhost:$(Config 'UI_PORT')"
+  $resp=Invoke-RestMethod -Uri "$site/api/health" -TimeoutSec 15
+  if ($resp.status -ne "ok") { throw "Le site ne parvient pas a joindre l'API." }
+  Write-Host "Mangadvisor est pret : $site"
+  try { Start-Process $site } catch {
+    Write-Warning "Le navigateur ne s'est pas ouvert automatiquement. Adresse : $site"
+  }
+}
+function Stop-Application {
+  Say "Arret de Mangadvisor (donnees conservees)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("stop")
+  Write-Host "Services arretes. Volumes PostgreSQL et fichiers prives conserves."
 }
 function Ask-Number([string]$Question,[int]$Default,[int]$Max) {
   $value=Read-Host "$Question [$Default]"
@@ -223,7 +254,7 @@ function Load-Recommendations {
   Check-Docker
   Compose @("up","-d","postgres","meilisearch")
   Wait-Postgres
-  if ((Get-Count "manga") -eq 0) { throw "Catalogue vide. Lance d'abord l'option 25." }
+  if ((Get-Count "manga") -eq 0) { throw "Catalogue vide. Lance d'abord l'installation (1) ou actualise le catalogue (options avancees)." }
   Network
   $limit=Ask-Number "Nombre de mangas a enrichir" 50 2000
   $force=Confirm "Retelecharger les relations deja extraites ?" $false
@@ -265,7 +296,7 @@ function Diagnostic {
     $counts[$table]=Get-Count $table
     Write-Host ("  {0,-36} {1,8}" -f $table,$counts[$table])
   }
-  if ($counts["manga"] -eq 0) { throw "Catalogue vide : lance l'option 25." }
+  if ($counts["manga"] -eq 0) { throw "Catalogue vide : lance l'installation (1) ou actualise le catalogue (options avancees)." }
   if ($counts["manga_recommendation_edge"] -eq 0) {
     Write-Warning "Aucune recommandation communautaire : lance l'option 26."
   }
@@ -304,7 +335,7 @@ function Inventory {
   $path=Join-Path $root "private-data\mangatheque.csv"
   if (!(Test-Path -LiteralPath $path)) {
     Write-Host "CSV non trouve : $path"
-    Write-Host "Copie ton fichier ici, puis menu 20 (benchmark) et 21 (import securise)."
+    Write-Host "Copie ton fichier ici, puis menu A : tester (4) et importer (3)."
     return
   }
   Say "Inventaire personnel (apercu obligatoire)"
@@ -420,16 +451,18 @@ function Wizard {
     Benchmark-Inventory
   } catch {
     Write-Warning ("Benchmark facultatif non abouti : " + $_.Exception.Message)
-    Write-Host "Relance l'option 20 une fois le conseiller operationnel."
+    Write-Host "Relance le benchmark via le menu A, option 4."
   }
   Say "Fin de l'assistant"
   Write-Host ("Ouvre http://localhost:" + (Config "UI_PORT"))
-  Write-Host "Menu 13 : mobile HTTPS ; menu 15 : IA locale facultative."
+  Write-Host "Mobile HTTPS et IA locale : menu A (options avancees)."
   Write-Host "Sauvegarde finale terminee et verifiee. Copie les fichiers du dossier backups sur un deuxieme support."
 }
 try {
   switch ($Action) {
     "Environment"     { Ensure-Environment }
+    "Start"           { Open-Application }
+    "Stop"            { Stop-Application }
     "Database"        { Initialize-Database }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
