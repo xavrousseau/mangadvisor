@@ -65,7 +65,7 @@ test("French/English/Japanese alias and prior quantities are visible before revi
  assert.match(result,/Déjà présent dans ta collection/);
  assert.match(result,/34 tomes principaux/);
  assert.match(result,/35 tomes principaux/);
- assert.match(result,/ne double pas les quantités/);
+ assert.match(result,/Ne double pas les quantités/);
  assert.match(result,/value="MARK_DUPLICATE"/);
  assert.doesNotMatch(result,/value="CREATE_DECLARATION"/);
  assert.match(result,/data-action="pending-match-confirm" disabled/);
