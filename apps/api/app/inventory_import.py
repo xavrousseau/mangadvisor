@@ -61,6 +61,21 @@ CREATE TABLE IF NOT EXISTS user_manga_inventory_pending (
 );
 CREATE INDEX IF NOT EXISTS user_manga_inventory_pending_user_idx
   ON user_manga_inventory_pending(user_id);
+
+-- Audit of owner-confirmed reconciliations, preserving the original source.
+-- Linking a work must never imply ISBNs, exact volumes, or reading progress.
+CREATE TABLE IF NOT EXISTS user_manga_inventory_resolution (
+    user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    source_key TEXT NOT NULL,
+    manga_id INTEGER NOT NULL REFERENCES manga(id) ON DELETE RESTRICT,
+    edition_key TEXT NOT NULL,
+    original_declaration JSONB NOT NULL,
+    original_sha256 TEXT NOT NULL,
+    confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, source_key)
+);
+CREATE INDEX IF NOT EXISTS user_manga_inventory_resolution_work_idx
+  ON user_manga_inventory_resolution(user_id, manga_id);
 """
 
 
@@ -75,6 +90,16 @@ class InventoryApply(InventoryCsv):
 
 class InventorySavePending(InventoryCsv):
     confirmation_token: str = Field(..., pattern=r"^[0-9a-f]{64}$")
+
+
+class PendingResolvePreview(BaseModel):
+    source_key: str = Field(..., min_length=1, max_length=120)
+    manga_id: int = Field(..., ge=1)
+
+
+class PendingResolveConfirm(PendingResolvePreview):
+    confirmation_token: str = Field(..., pattern=r"^[0-9a-f]{64}$")
+    acknowledge_work_and_edition: bool = False
 
 
 def ensure_inventory_schema(connection_factory: Callable[..., Any]) -> None:

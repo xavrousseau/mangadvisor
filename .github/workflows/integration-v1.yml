@@ -527,6 +527,141 @@ jobs:
             -f infra/compose/docker-compose.dev.yml exec -T api \
             python - < tests/smoke/ownership_exclusion_smoke.py
 
+      - name: Rapprocher manuellement deux editions et preserver les lectures dans PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+          import urllib.error
+          from apps.api.app.main import get_connection
+
+          base="http://127.0.0.1:8000"
+          def api(path,data=None):
+              request=urllib.request.Request(
+                  base+path,
+                  data=json.dumps(data).encode("utf-8") if data else None,
+                  headers={"Content-Type":"application/json"} if data else {},
+                  method="POST" if data else "GET",
+              )
+              with urllib.request.urlopen(request,timeout=15) as resp:
+                  return json.load(resp)
+          def snapshot():
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      counts=[]
+                      for table in ("user_manga_library","user_manga_volume",
+                          "manga_fr_edition","user_manga_inventory_declaration",
+                          "user_manga_inventory_pending","user_manga_inventory_resolution"):
+                          cur.execute("SELECT COUNT(*) AS n FROM "+table)
+                          counts.append(cur.fetchone()["n"])
+                      return counts
+
+          before=snapshot()
+          prefix="ci:manual-edition-resolution:"
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""SELECT m.id,m.title
+                      FROM manga m WHERE NOT EXISTS (
+                        SELECT 1 FROM user_manga_library l
+                        WHERE l.manga_id=m.id AND l.user_id=1
+                          AND l.library_status='NOT_INTERESTED'
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1 FROM user_manga_inventory_declaration d
+                        WHERE d.manga_id=m.id AND d.user_id=1
+                          AND d.edition_key='deluxe ci'
+                      )
+                      ORDER BY m.id LIMIT 1""")
+                  manga=cur.fetchone()
+                  assert manga
+                  manga_id=manga["id"]
+                  manga_title=manga["title"]
+                  for edition,num in (("Deluxe CI",34),("Pastel CI",42)):
+                      key=prefix+edition
+                      cur.execute("""
+                        INSERT INTO user_manga_inventory_pending
+                        (user_id,source_key,entry_title,source_reference,
+                         work_declared,edition_declared,format_hint,
+                         main_volumes,duplicate_copies,other_editions_unknown,
+                         review_status,candidate_ids,content_sha256)
+                        VALUES (1,%s,%s,%s,%s,%s,%s,%s,0,0,
+                                'REVIEW_MISSING',ARRAY[]::integer[],%s)
+                      """,(
+                          key,manga_title+" ("+edition+")",key,manga_title,
+                          edition,"FORMAT_TO_VERIFY",num,"d"*64,
+                      ))
+              conn.commit()
+          staged=snapshot()
+          assert staged[4]==before[4]+2, (before,staged)
+
+          for edition,num in (("Deluxe CI",34),("Pastel CI",42)):
+              key=prefix+edition
+              matches=api("/inventory/pending/candidates?"+
+                  urllib.parse.urlencode({"source_key":key}))
+              assert not matches["automatic_association"],matches
+              assert matches["items"],matches
+              query={"source_key":key,"manga_id":manga_id}
+              reviewed=api("/inventory/pending/resolve/preview",query)
+              assert reviewed["source"]["main_volumes"]==num,reviewed
+              assert reviewed["source"]["edition_declared"]==edition,reviewed
+              wrong={**query,"confirmation_token":"0"*64,
+                     "acknowledge_work_and_edition":True}
+              try:
+                  api("/inventory/pending/resolve",wrong)
+                  raise AssertionError("Stale approval unexpectedly accepted")
+              except urllib.error.HTTPError as exc:
+                  assert exc.code==409,exc
+              confirmed=api("/inventory/pending/resolve",{
+                  **query,"confirmation_token":reviewed["confirmation_token"],
+                  "acknowledge_work_and_edition":True,
+              })
+              assert confirmed["status"]=="confirmed",confirmed
+              assert confirmed["edition_declared"]==edition,confirmed
+              assert confirmed["physical_volumes_declared"]==num,confirmed
+              assert not confirmed["isbn_verified"],confirmed
+              assert not confirmed["reading_status_modified"],confirmed
+              assert not confirmed["progress_modified"],confirmed
+
+          after=snapshot()
+          assert after[:3]==before[:3],(before,after)
+          assert after[3]==before[3]+2,(before,after)
+          assert after[4]==before[4],(before,after)
+          assert after[5]==before[5]+2,(before,after)
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                    SELECT edition_key,main_volumes
+                    FROM user_manga_inventory_declaration
+                    WHERE user_id=1 AND manga_id=%s AND edition_key IN
+                      ('deluxe ci','pastel ci') ORDER BY edition_key
+                  """,(manga_id,))
+                  saved=cur.fetchall()
+                  assert [(r["edition_key"],r["main_volumes"]) for r in saved]==[
+                     ("deluxe ci",34),("pastel ci",42)
+                  ],saved
+                  cur.execute("""
+                    SELECT COUNT(*)::int AS n FROM user_manga_inventory_resolution
+                    WHERE user_id=1 AND source_key LIKE %s
+                  """,(prefix+"%",))
+                  assert cur.fetchone()["n"]==2
+                  cur.execute("""
+                    DELETE FROM user_manga_inventory_resolution
+                    WHERE user_id=1 AND source_key LIKE %s
+                  """,(prefix+"%",))
+                  cur.execute("""
+                    DELETE FROM user_manga_inventory_declaration
+                    WHERE user_id=1 AND manga_id=%s
+                      AND edition_key IN ('deluxe ci','pastel ci')
+                  """,(manga_id,))
+              conn.commit()
+          assert snapshot()==before,(snapshot(),before)
+          print("2 editions distinctes, validation manuelle, audit, droits et nettoyage : OK")
+          PY
+
       - name: Sauvegarder et valider une restauration complete de la mangatheque
         shell: bash
         run: |

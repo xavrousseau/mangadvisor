@@ -88,7 +88,8 @@ class ImportInventoryTests(unittest.TestCase):
         self.assertIsNone(missing["manga_id"])
         self.assertEqual(pending_key(missing),"Inventaire!A31")
         self.assertEqual(len(pending_hash(missing)),64)
-        self.assertNotIn("manga_id INTEGER NOT NULL",SCHEMA.split("CREATE TABLE IF NOT EXISTS user_manga_inventory_pending")[1])
+        pending_table=SCHEMA.split("CREATE TABLE IF NOT EXISTS user_manga_inventory_pending")[1].split("CREATE TABLE IF NOT EXISTS user_manga_inventory_resolution")[0]
+        self.assertNotIn("manga_id INTEGER NOT NULL",pending_table)
         self.assertIn("PRIMARY KEY (user_id, source_key)",SCHEMA)
         self.assertIn("user_manga_inventory_pending",SCHEMA)
 
