@@ -25,6 +25,23 @@ class StabilisationSafetyTests(unittest.TestCase):
         self.assertIn('"--order-by","popularity","--sort","asc"', source)
         self.assertIn('"--sources","search","top"', source)
 
+    def test_github_sync_preserves_private_files_and_forbids_destructive_git(self):
+        menu=(ROOT/"mangadvisor.cmd").read_text("utf-8")
+        sync=(ROOT/"cmd/github-sync.ps1").read_text("utf-8")
+        control=(ROOT/"cmd/control-center.ps1").read_text("utf-8")
+        self.assertIn('if "%CHOICE%"=="7" set "KEY=github-sync"',menu)
+        self.assertIn('if /I "%~1"=="github-sync" set "PS_SCRIPT=github-sync.ps1"',menu)
+        self.assertIn("cmd\\github-sync.ps1",control)
+        self.assertIn("-NonInteractive",control)
+        self.assertIn("ls-files",sync)
+        self.assertIn("ls-tree",sync)
+        self.assertIn("Move-Item",sync)
+        self.assertIn('mangadvisor-archives-git',sync)
+        self.assertIn("git stash list",sync)
+        self.assertNotIn('Git-Run @("reset"',sync)
+        self.assertNotIn('Git-Run @("clean"',sync)
+        self.assertNotIn('down -v',sync)
+
     def test_backup_restore_does_not_revive_legacy_streamlit(self):
         source=(ROOT/"cmd/library-backup.ps1").read_text("utf-8")
         self.assertIn("user_manga_inventory_pending",source)
