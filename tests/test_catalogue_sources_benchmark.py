@@ -117,6 +117,8 @@ class SearchTests(unittest.TestCase):
         self.assertEqual(sess.post.call_count, 2)
         self.assertEqual(result["providers"]["scrinis"]["UNAVAILABLE"], 1)
         self.assertEqual(result["providers"]["scrinis"]["SKIPPED_PROVIDER_UNAVAILABLE"], 1)
+        self.assertIsNone(result["rates"]["scrinis"]["exact_title_or_id_rate_percent"])
+        self.assertEqual(result["rates"]["mangaupdates"]["evaluated"], 2)
 
     def test_reports_only_local_disk_and_no_database_writes(self):
         report = {"entries": [{"title": "Naruto", "origin": "catalog", "sources": {
