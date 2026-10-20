@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS manga_title_alias (
     manga_id INTEGER NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
     source_name TEXT NOT NULL,
     source_id TEXT NOT NULL,
-    language_code TEXT NOT NULL CHECK (language_code IN ('fr','en','ja','ja-ro')),
+    language_code TEXT NOT NULL CHECK (language_code IN ('fr','en','ja','ja-ro','und')),
     alias TEXT NOT NULL CHECK (length(alias) BETWEEN 2 AND 200),
     alias_key TEXT NOT NULL CHECK (length(alias_key) BETWEEN 2 AND 200),
     source_url TEXT NOT NULL,
