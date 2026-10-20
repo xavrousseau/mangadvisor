@@ -1,6 +1,7 @@
 import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
 import { physicalInventoryMarkup } from "./physical-inventory-view.js";
+import { inventoryResolverMarkup } from "./inventory-resolution-view.js";
 import { createIsbnScanner } from "./isbn-scanner.js";
 import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js";
 import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS,ADVISOR_BALANCE_PROMPTS} from "./advisor-view.js";
@@ -34,6 +35,7 @@ const state = {
   enrichmentReport:null,enrichmentNonce:0,enrichmentAlias:"",enrichmentBusy:false,
   bnfCache:null,wikidataCache:null,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
+  pendingRows:[],pendingMatch:null,
 };
 let renderToken = 0, searchTimer = null;
 const root=document.querySelector("#app");
@@ -384,11 +386,97 @@ async function updatePhysicalInventory(token){
     request("/inventory/declarations"),
     request("/inventory/pending"),
   ]);
-  if(token===renderToken && routeInfo().view==="library")
+  if(token===renderToken && routeInfo().view==="library"){
+    state.pendingRows=Array.isArray(pending.items)?pending.items:[];
     host.innerHTML=physicalInventoryMarkup({...physical,pending},state.lang,t,escapeHtml);
+    renderPendingMatcher();
+  }
  }catch(err){
   if(token===renderToken && routeInfo().view==="library")
     host.innerHTML='<p class="collection-caveat">'+L("physicalUnavailable")+'</p>';
+ }
+}
+function renderPendingMatcher(){
+ const target=document.querySelector("#inventory-match-slot");
+ if(target)target.innerHTML=inventoryResolverMarkup(state.pendingMatch,{
+  escape:escapeHtml,lang:state.lang
+ });
+}
+async function startPendingMatcher(button){
+ const sourceKey=String(button.dataset.key||"");
+ const pending=state.pendingRows.find(item=>item.source_key===sourceKey);
+ if(!pending)return;
+ const draft={sourceKey,pending,query:pending.work_declared||pending.entry_title,
+   items:[],searched:false,review:null,loading:true,message:""};
+ state.pendingMatch=draft;
+ renderPendingMatcher();
+ document.querySelector("#inventory-match-panel")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+ await searchPendingMatches(null,draft);
+}
+async function searchPendingMatches(form,draft=state.pendingMatch){
+ if(!draft)return;
+ const query=form?String(new FormData(form).get("query")||"").trim().slice(0,100):"";
+ draft.loading=true;draft.message="";draft.review=null;draft.items=[];
+ draft.searched=false;
+ if(form)draft.query=query;
+ renderPendingMatcher();
+ try{
+  const params=new URLSearchParams({source_key:draft.sourceKey});
+  if(query)params.set("q",query);
+  const result=await request("/inventory/pending/candidates?"+params.toString());
+  if(draft!==state.pendingMatch||routeInfo().view!=="library")return;
+  draft.items=result.items||[];
+  draft.query=result.query;
+  draft.searched=true;draft.loading=false;
+  renderPendingMatcher();
+ }catch(err){
+  if(draft!==state.pendingMatch)return;
+  draft.loading=false;draft.message=err.message||"Recherche impossible";
+  renderPendingMatcher();
+ }
+}
+async function selectPendingManga(button){
+ const draft=state.pendingMatch;if(!draft)return;
+ const id=idNumber(button.dataset.id);
+ if(!id||!draft.items.some(row=>Number(row.id)===id))return;
+ draft.loading=true;draft.message="";draft.review=null;renderPendingMatcher();
+ try{
+  const review=await request("/inventory/pending/resolve/preview",{
+    method:"POST",data:{source_key:draft.sourceKey,manga_id:id}
+  });
+  if(draft!==state.pendingMatch)return;
+  draft.review=review;
+  draft.loading=false;renderPendingMatcher();
+  document.querySelector(".inventory-match-review")?.scrollIntoView({behavior:"smooth",block:"nearest"});
+ }catch(err){
+  if(draft!==state.pendingMatch)return;
+  draft.loading=false;draft.message=err.message||"Association impossible";
+  renderPendingMatcher();
+ }
+}
+async function confirmPendingManga(button){
+ const draft=state.pendingMatch;
+ const review=draft?.review;
+ const acknowledged=document.querySelector("#pending-match-ack")?.checked;
+ if(!draft||!review||!acknowledged)return;
+ button.disabled=true;
+ try{
+  const outcome=await request("/inventory/pending/resolve",{
+    method:"POST",data:{
+      source_key:draft.sourceKey,manga_id:review.manga.id,
+      confirmation_token:review.confirmation_token,
+      acknowledge_work_and_edition:true
+    }
+  });
+  if(draft!==state.pendingMatch)return;
+  state.pendingMatch=null;state.recResult=null;
+  toast("✓ "+outcome.catalog_title+" — "+(outcome.edition_declared||"édition non précisée"));
+  await updatePhysicalInventory(renderToken);
+  await updateLibrary(renderToken);
+ }catch(err){
+  if(draft!==state.pendingMatch)return;
+  draft.message=err.message||"Association impossible";
+  renderPendingMatcher();
  }
 }
 async function updateLibrary(token){
@@ -1221,6 +1309,10 @@ root.addEventListener("click",async event=>{
   return;
  }
  if(action==="feedback")return sendRecommendationFeedback(button);
+ if(action==="pending-match-start")return startPendingMatcher(button);
+ if(action==="pending-match-close"){state.pendingMatch=null;renderPendingMatcher();return;}
+ if(action==="pending-match-select")return selectPendingManga(button);
+ if(action==="pending-match-confirm")return confirmPendingManga(button);
  if(action==="bulk-preview")return previewBulkCsv();
  if(action==="bulk-resolve")return startBulkResolution(button);
  if(action==="bulk-resolve-close"){state.bulkResolver=null;drawBulkResolver();return;}
@@ -1303,6 +1395,9 @@ root.addEventListener("submit",event=>{
  if(event.target.id==="edition-isbn-form"){event.preventDefault();searchFrenchIsbn(event.target);}
  if(event.target.id==="fr-bibliography-form"){event.preventDefault();searchFrenchBibliography(event.target);}
  if(event.target.id==="bulk-resolve-search-form"){event.preventDefault();searchBulkManga(event.target);}
+ if(event.target.id==="pending-match-search-form"){
+   event.preventDefault();searchPendingMatches(event.target);
+ }
 });
 root.addEventListener("change",async event=>{
  const input=event.target;
@@ -1314,6 +1409,10 @@ root.addEventListener("change",async event=>{
  if(input.id==="catalog-finished"){state.catalogFinished=input.checked;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="lib-status"){state.libraryStatus=input.value;state.libraryPage=1;await updateLibrary(renderToken);}
  if(input.id==="bulk-resolve-ack")syncBulkConfirmation();
+ if(input.id==="pending-match-ack"){
+   const save=document.querySelector('[data-action="pending-match-confirm"]');
+   if(save)save.disabled=!input.checked;
+ }
  if(input.id==="bulk-csv-file"&&input.files?.[0]){
   const file=input.files[0];
   if(file.size>80000){toast(t(state.lang,"bulkFormat"));input.value="";return;}
