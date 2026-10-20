@@ -48,6 +48,29 @@ test("results show only server-provided evidence and verified ISBN distinction",
  assert.doesNotMatch(second,/advisor-french is-verified/);
 });
 
+test("Wikidata genre hints are displayed with source and never as matching proof",()=>{
+ const base={id:18,title:"Mystery title",status:"Finished",score:8.7,volumes:4,
+  mood_matches:{genres:["Mystery"],themes:[]},
+  affinity_matches:{genres:[],themes:[]},
+  wikidata_id:"Q1234",
+  wikidata_genres_fr:["Enquête","Thriller"],
+  french_recorded:false};
+ const html=advisorResultsMarkup({personalized:false,count:1,recommendations:[base]},{
+  L,e,tr:e,poster:()=>"",rating:()=>"8.7",published:()=>"Finished"
+ });
+ assert.match(html,/advisor-wikidata/);
+ assert.match(html,/https:\/\/www.wikidata.org\/wiki\/Q1234/);
+ assert.match(html,/Enquête/);
+ assert.match(html,/Thriller/);
+ assert.doesNotMatch(html,/ISBN fran.ais enregistr./);
+ const malicious=advisorResultsMarkup({personalized:false,count:1,recommendations:[{
+  ...base,wikidata_id:"Q1234\" onmouseover=\"alert(1)",
+  wikidata_genres_fr:['<img onerror="alert(1)">']
+ }]},{L,e,tr:e,poster:()=>"",rating:()=>"",published:()=>""});
+ assert.doesNotMatch(malicious,/class="advisor-wikidata"/);
+ assert.doesNotMatch(malicious,/<img onerror/);
+});
+
 test("malicious titles, tags and feedback IDs are not injected",()=>{
  const html=advisorResultsMarkup({count:1,recommendations:[{
   id:'7" onclick="alert(1)',
