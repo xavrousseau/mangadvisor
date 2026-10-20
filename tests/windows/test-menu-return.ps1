@@ -55,6 +55,7 @@ function Check-Menu([string]$Name, [string]$InputText,
 $crlf=([string][char]13)+([string][char]10)
 # Extra zero lines tolerate how cmd.exe reads redirected pause / set /p.
 Check-Menu "wikidata" ((@("A","11","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Wikidata" "OUTILS AVANCES" $false
+Check-Menu "library_enrich" ((@("A","12","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_LibraryEnrichment" "OUTILS AVANCES" $false
 Check-Menu "bnf_failure" ((@("A","10","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_BnF" "OUTILS AVANCES" $true
 Check-Menu "github_sync" ((@("7","","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_SYNC_FINISHED" "MANGADVISOR" $false
 Check-Menu "normal_update" ((@("3","","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Update" "MANGADVISOR" $false

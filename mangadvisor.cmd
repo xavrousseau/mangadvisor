@@ -64,6 +64,7 @@ echo    8 - Arreter le conseiller IA local
 echo    9 - Consulter les journaux Docker
 echo   10 - Enrichir les fiches via la BnF (candidats a verifier)
 echo   11 - Completer les informations depuis Wikidata (titres FR, genres)
+echo   12 - Enrichir ma mangatheque automatiquement (Wikidata et BnF)
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -85,6 +86,7 @@ if "%CHOICE%"=="8" set "KEY=ai-stop"
 if "%CHOICE%"=="9" set "KEY=logs"
 if "%CHOICE%"=="10" set "KEY=bnf-enrich"
 if "%CHOICE%"=="11" set "KEY=wikidata-enrich"
+if "%CHOICE%"=="12" set "KEY=library-enrich"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -166,6 +168,7 @@ if /I "%~1"=="recommendations" set "ACTION=Recommendations"
 if /I "%~1"=="import" set "ACTION=Inventory"
 if /I "%~1"=="bnf-enrich" set "ACTION=BnF"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
+if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"
 if /I "%~1"=="benchmark" set "PS_SCRIPT=benchmark-mangatheque.ps1"
 if /I "%~1"=="mobile" set "PS_SCRIPT=mobile-setup.ps1"
 if /I "%~1"=="mobile-stop" set "PS_SCRIPT=mobile-setup.ps1"
@@ -232,7 +235,7 @@ echo   diagnostic       Verifier l'application
 echo   stop             Arreter sans supprimer les volumes
 echo.
 echo Autres : catalogue, recommendations, import, benchmark, bnf-enrich,
-echo          wikidata-enrich,
+echo          wikidata-enrich, library-enrich,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
 echo La suppression des volumes n'est jamais proposee.

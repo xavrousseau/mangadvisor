@@ -244,6 +244,25 @@ def choose_display_title(primary: str, international: str | None) -> str:
     return primary
 
 
+# Conservatively reject unwanted topics when Wikidata provides an explicit
+# genre label. These are *negative safeguards only*: Wikidata genre labels
+# are never treated as evidence of personal taste or a matching mood.
+WIKIDATA_AVOID_LABELS = {
+    "horror": ("horreur", "horror"),
+    "gore": ("gore",),
+    "romance": ("romance", "romantique"),
+}
+
+
+def explicit_wikidata_genres(item: dict[str, Any]) -> list[str]:
+    if not item.get("wikidata_id"):
+        return []
+    return [
+        str(tag).strip() for tag in (item.get("wikidata_genres_fr") or [])
+        if isinstance(tag, str) and tag.strip()
+    ][:12]
+
+
 def _tag_keys(item: dict[str, Any]) -> set[str]:
     """Namespaced *recorded* catalog tags for comparing different suggestions."""
     return {
@@ -361,6 +380,13 @@ def score_candidates(
         if context.avoid_gore and "gore" in tags:
             continue
         if context.avoid_romance and "romance" in tags:
+            continue
+        wikidata_labels = {normalize(label) for label in explicit_wikidata_genres(item)}
+        if context.avoid_horror and wikidata_labels.intersection(WIKIDATA_AVOID_LABELS["horror"]):
+            continue
+        if context.avoid_gore and wikidata_labels.intersection(WIKIDATA_AVOID_LABELS["gore"]):
+            continue
+        if context.avoid_romance and wikidata_labels.intersection(WIKIDATA_AVOID_LABELS["romance"]):
             continue
         matches: dict[str,list[str]]={"genres":[],"themes":[]}
         hits = 0
@@ -592,6 +618,21 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             if context.avoid_horror: excluded.append("horror")
             if context.avoid_gore: excluded.append("gore")
             params["excluded_tags"]=excluded
+            wikidata_excluded = []
+            if context.avoid_horror:
+                wikidata_excluded.extend(WIKIDATA_AVOID_LABELS["horror"])
+            if context.avoid_gore:
+                wikidata_excluded.extend(WIKIDATA_AVOID_LABELS["gore"])
+            if context.avoid_romance:
+                wikidata_excluded.extend(WIKIDATA_AVOID_LABELS["romance"])
+            params["wikidata_excluded"] = sorted(set(wikidata_excluded))
+            # Only labels from uniquely matched MAL manga IDs can exclude
+            # candidates. Positive taste and mood still require canonical tags.
+            conditions.append("""NOT EXISTS (
+                SELECT 1 FROM unnest(COALESCE(w.genres_fr, ARRAY[]::text[]))
+                    AS wg(label)
+                WHERE LOWER(wg.label)=ANY(%(wikidata_excluded)s)
+            )""")
             conditions.append("""NOT EXISTS (SELECT 1 FROM manga_genre eg
                 JOIN genre gex ON gex.id=eg.genre_id
                 WHERE eg.manga_id=m.id AND LOWER(gex.name)=ANY(%(excluded_tags)s))""")
@@ -606,6 +647,7 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                 m.popularity,m.manga_type,
                 w.label_fr AS wikidata_label_fr,
                 w.wikidata_id AS wikidata_id,
+                w.genres_fr AS wikidata_genres_fr,
                 ARRAY(SELECT g.name FROM manga_genre mg JOIN genre g ON g.id=mg.genre_id
                       WHERE mg.manga_id=m.id ORDER BY g.name) AS genres,
                 ARRAY(SELECT t.name FROM manga_theme mt JOIN theme t ON t.id=mt.theme_id
@@ -736,6 +778,9 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             if displayed_title != original_title:
                 row["title_original"] = original_title
                 row["title"] = displayed_title
+            # These are sourced community labels, not genre matches used for
+            # ranking or proof of an edition in France.
+            row["wikidata_genres_fr"] = explicit_wikidata_genres(row)
             row["french_editions"]=edition_summaries.get(row["id"])
         personalized=context.use_library and (
             any(preferences.values()) or any(feedback["interested"][kind]

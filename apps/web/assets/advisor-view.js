@@ -103,6 +103,8 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
   '<div class="mood-grid">'+response.recommendations.map((m,i)=>{
    const mood=[...(m.mood_matches?.genres||[]),...(m.mood_matches?.themes||[])];
    const common=[...(m.affinity_matches?.genres||[]),...(m.affinity_matches?.themes||[])];
+   const wikiGenres=Array.isArray(m.wikidata_genres_fr)&&/^Q[1-9][0-9]{0,11}$/.test(String(m.wikidata_id||""))
+     ?m.wikidata_genres_fr.filter(x=>typeof x==="string").slice(0,6):[];
    const narrative=Array.isArray(m.narrative_matches)?m.narrative_matches:[];
    const unmatched=Array.isArray(m.narrative_unverified)?m.narrative_unverified:[];
    const safeConcept=id=>["INVESTIGATION","PSYCHOLOGICAL","SURVIVAL"].includes(id)?id:null;
@@ -130,6 +132,10 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
     '<div class="tag-row">'+chips(mood)+'</div></div>')+
     (common.length?'<div class="mood-evidence"><strong>'+L("moodAffinity")+'</strong>'+
      '<div class="tag-row">'+chips(common)+'</div></div>':"")+
+    (wikiGenres.length?'<div class="mood-evidence advisor-wikidata"><strong>'+L("advisorWikidataGenres")+'</strong>'+
+      '<div class="tag-row">'+safeTags(wikiGenres)+'</div>'+
+      '<a href="https://www.wikidata.org/wiki/'+e(m.wikidata_id)+'" target="_blank" rel="noopener noreferrer">Wikidata ↗</a>'+
+      '<p class="advisor-unverified">'+L("advisorWikidataGenresCaution")+'</p></div>':"")+
     (interested.length?'<div class="mood-evidence advisor-feedback-interest"><strong>'+
       L("advisorInterestedEvidence")+'</strong><div class="tag-row">'+
       safeTags(interested)+'</div></div>':"")+

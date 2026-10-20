@@ -204,14 +204,26 @@ def run_batch(
     refresh: bool = False,
     search: Callable[[str], dict[str, Any]] = search_bnf_by_title,
     sleep: Callable[[float], Any] = time.sleep,
+    target_ids: list[int] | None = None,
 ) -> dict[str, int]:
     """One bounded, resumable batch. A successful work is checkpointed individually."""
     if not 1 <= limit <= MAX_BATCH:
         raise ValueError(f"Nombre de mangas : entre 1 et {MAX_BATCH}.")
+    if target_ids is not None and (len(target_ids) > 250 or any(
+        type(mid) is not int or mid <= 0 for mid in target_ids
+    )):
+        raise ValueError("Liste de mangas lies invalide ou trop longue.")
     ensure_bnf_schema(connection_factory)
+    query = WORK_SQL
+    params: dict[str, Any] = {"limit": limit, "refresh": refresh}
+    if target_ids is not None:
+        query = WORK_SQL.replace(
+            "ORDER BY priority ASC", "  AND m.id=ANY(%(target_ids)s)\nORDER BY priority ASC"
+        )
+        params["target_ids"] = target_ids
     with connection_factory() as conn:
         with conn.cursor() as cur:
-            cur.execute(WORK_SQL, {"limit": limit, "refresh": refresh})
+            cur.execute(query, params)
             works = list(cur.fetchall())
         conn.commit()
 

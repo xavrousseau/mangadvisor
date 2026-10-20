@@ -138,6 +138,8 @@ class OwnershipDiscoveryTests(unittest.TestCase):
         self.assertIn("user_manga_volume v", catalog_sql)
         self.assertEqual(params["genres"], ["mystery"])
         self.assertEqual(params["themes"], ["detective"])
+        self.assertIn("w.genres_fr AS wikidata_genres_fr",catalog_sql)
+        self.assertNotIn("OR LOWER(w.genres_fr)",catalog_sql)
 
     def test_recommendation_returns_international_name_with_original_title(self):
         db = FakeDatabase(owned_rows=[
