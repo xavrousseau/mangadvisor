@@ -20,6 +20,28 @@ test("english fallback is consistent without inventing a French official title",
  assert.equal(preferredMangaTitle({title_japanese:"日本語"},"fr"),"日本語");
 });
 
+test("BnF authority and exact MAL Wikidata French titles are displayed with source",()=>{
+ assert.equal(preferredMangaTitle({
+  title:"Shingeki no Kyojin",title_english:"Attack on Titan",
+  title_fr:"L'Attaque des Titans",title_fr_verified:true,
+  title_fr_source:"BNF_AUTHORITY_WORK"
+ },"fr"),"L'Attaque des Titans");
+ assert.equal(preferredMangaTitle({
+  title:"Shingeki no Kyojin",title_english:"Attack on Titan",
+  title_fr:"L'Attaque des Titans",title_fr_verified:false,
+  title_fr_source:"WIKIDATA_P4087_FR"
+ },"fr"),"L'Attaque des Titans");
+ assert.equal(preferredMangaTitle({
+  title:"Shingeki no Kyojin",title_english:"Attack on Titan",
+  title_fr:"Titre sans provenance",title_fr_verified:false,
+  title_fr_source:"SOURCE_INCONNUE"
+ },"fr"),"Attack on Titan");
+ assert.equal(preferredMangaTitle({
+  title:"Shingeki no Kyojin",title_english:"Attack on Titan",
+  title_fr:"L'Attaque des Titans",title_fr_verified:true,
+  title_fr_source:"BNF_AUTHORITY_WORK"
+ },"en"),"Attack on Titan");
+});
 test("declared physical editions count every copy once per manga",()=>{
  const data={
   scope:"owner_declared_unverified_editions_not_isbn_books",
