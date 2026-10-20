@@ -29,7 +29,9 @@ Le site est ensuite disponible par défaut sur **http://localhost:8501**. Le por
 2. Double-clique sur **`mangadvisor.cmd`**, puis appuie sur **1**.
 3. Suis l'assistant pour construire les images, créer les tables, récupérer les notices Tenrai et les relations manga. Une connexion Internet est nécessaire.
 4. Pour importer ta collection personnelle, dépose le CSV dans **`private-data/mangatheque.csv`**. Le format attendu est décrit dans [Import de l'inventaire physique](docs/04_product/safe_inventory_import_3_8.md) ; il contient notamment les colonnes `serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier`.
-5. L'assistant affiche un **aperçu** avant toute écriture ; il ne confirme jamais automatiquement les associations incertaines. Les éditions distinctes d'une même œuvre restent distinctes. La sauvegarde est vérifiée après l'import.
+5. L'assistant affiche un **aperçu** avant toute écriture ; il ne confirme jamais automatiquement les associations incertaines. Les éditions distinctes d'une même œuvre restent distinctes. Une sauvegarde est vérifiée avant l'import confirmé et une autre à la fin de l'installation.
+
+**Import ultérieur depuis A → 3 :** le menu présente d'abord un aperçu sans écriture. Si tu demandes l'import, il réalise automatiquement une sauvegarde PostgreSQL vérifiée **avant** toute modification. Une sauvegarde impossible bloque l'import.
 
 Les dossiers `private-data/`, `backups/` et le fichier `.env` sont exclus de Git. **Ne les publie pas sur GitHub**. Les fichiers Excel doivent être exportés ou convertis au format CSV attendu avant l'import physique, sans attribuer automatiquement d'ISBN, de notes ou de tomes lus.
 

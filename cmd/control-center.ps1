@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -343,6 +343,10 @@ function Inventory {
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptFile -PreviewOnly
   Assert-Exit "Echec de l'apercu de la mangatheque"
   if (Confirm "Executer maintenant l'import securise (confirmation supplementaire dans le script) ?" $false) {
+    # Every user-initiated import must have a verified recovery point.
+    # The preview above never writes to PostgreSQL; no backup is required
+    # unless the user explicitly chooses the write path.
+    Backup
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptFile
     Assert-Exit "Echec de l'import de la mangatheque"
   }
@@ -464,6 +468,7 @@ try {
     "Start"           { Open-Application }
     "Stop"            { Stop-Application }
     "Database"        { Initialize-Database }
+    "Inventory"       { Inventory }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
