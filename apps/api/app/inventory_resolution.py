@@ -148,6 +148,15 @@ def create_pending_resolution_router(
                     cur.execute("""
                         SELECT m.id,m.title,m.title_english,m.title_japanese,
                                m.source_mal_id,m.volumes,m.manga_type,
+                               (SELECT a.alias FROM manga_title_alias a
+                                WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+                                  AND a.language_code='fr'
+                                ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                                  WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END, a.alias
+                                LIMIT 1) AS title_fr_community,
+                               (SELECT COUNT(*)::int FROM user_manga_inventory_declaration d
+                                WHERE d.manga_id=m.id AND d.user_id=%(user_id)s
+                               ) AS already_declared_editions,
                                CASE WHEN LOWER(m.title)=%(exact)s
                                  OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                  OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
@@ -166,7 +175,8 @@ def create_pending_resolution_router(
                                 THEN 0 ELSE 1 END,
                                 m.popularity ASC NULLS LAST,m.id
                         LIMIT 12
-                    """, {"exact":exact,"pattern":pattern,"alias_key":normalize_title(term)})
+                    """, {"exact":exact,"pattern":pattern,"alias_key":normalize_title(term),
+                           "user_id":user_id})
                     matches = list(cur.fetchall())
         return {
             "source_key": source_key,
