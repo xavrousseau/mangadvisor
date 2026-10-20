@@ -18,6 +18,7 @@ Mangadvisor est une application locale, avec une interface Web accessible depuis
 | **4** | **Sauvegarder la mangathèque** | Enregistre une archive PostgreSQL privée et teste sa restauration dans une base isolée. |
 | **5** | **Vérifier le fonctionnement** | Contrôle PostgreSQL, API directe, Nginx, bibliothèque et principaux volumes de données. |
 | **6** | **Arrêter Mangadvisor** | Arrête Docker Compose sans supprimer les données. |
+| **7** | **Récupérer GitHub** | Télécharge le code officiel depuis GitHub, archive automatiquement les fichiers locaux non suivis qui bloquent l'arrivée de nouveaux fichiers, et ne touche pas à Docker. |
 | **A** | **Options avancées** | Catalogue, recommandations, imports, scanner mobile, IA locale, journaux, configuration et restauration. |
 | **0** | **Quitter le menu** | Ne stoppe pas une application déjà démarrée. |
 
@@ -41,9 +42,23 @@ Démarre Docker Desktop, lance `mangadvisor.cmd` puis **2**. La page doit s'ouvr
 
 ### Mettre à jour sans perdre les données
 
-Choisis **3** si le dossier Mangadvisor a été cloné via Git et que tu es sur la branche `main`. Une sauvegarde PostgreSQL avec restauration de vérification précède le `git pull --ff-only`. Les fichiers locaux suivis et modifiés sont conservés dans un stash Git uniquement après confirmation. Le programme ne supprime ni volume PostgreSQL ni fichiers privés.
+Pour simplement récupérer le dernier code, choisis **7** (« Récupérer GitHub »). Pour mettre à jour **et** reconstruire Docker, choisis **3**. Les deux commandes utilisent le synchroniseur sécurisé `cmd/github-sync.ps1`, qui :
+- télécharge `main` de `origin` et refuse les historiques divergents ou une autre branche ;
+- déplace **uniquement** les fichiers locaux non suivis qui entreraient en collision avec des nouveaux fichiers officiels, dans `mangadvisor-archives-git/` **à côté du dossier Mangadvisor** (jamais de suppression) ;
+- exige confirmation avant de placer les modifications **déjà suivies** dans une sauvegarde Git locale (stash), qui n'est jamais réappliquée automatiquement ;
+- ne lance jamais `git reset --hard`, `git clean`, `docker compose down -v`, et ne déplace jamais `.env`, `private-data/`, `backups/` ou `data/raw/`.
 
-Si tu as utilisé un **ZIP**, la mise à jour Git automatique n'est pas disponible. Conserve impérativement tes dossiers `private-data/`, `backups/` et `.env` avant de remplacer les fichiers du projet.
+L'option **3** réalise **d'abord** une sauvegarde PostgreSQL avec restauration de vérification, puis appelle le synchroniseur, applique les migrations SQL additives, reconstruit les images Docker et lance le diagnostic. L'option **7** ne fait que synchroniser le code : lance ensuite l'option 3 pour le mettre en service.
+
+**Premier déblocage si l'ancien menu ne propose pas encore 7 :** exécuter une seule fois, depuis PowerShell dans le dossier Mangadvisor, les commandes suivantes pour récupérer le synchroniseur depuis la branche officielle sans écraser les fichiers personnels :
+```powershell
+git fetch origin main
+git show FETCH_HEAD:cmd/github-sync.ps1 | Set-Content -Encoding Ascii .\cmd\github-sync.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\cmd\github-sync.ps1
+```
+L'outil archivera aussi cette copie temporaire du synchroniseur, puisque la nouvelle version officielle suit le même nom de fichier. Après cette première mise à jour, le menu **7** sera disponible.
+
+Un dossier téléchargé en **ZIP** ne contient pas d'historique `.git` : pour éviter une fusion destructrice, l'option 7 l'indique et ne tente pas de le convertir silencieusement. Pour les mises à jour automatiques futures, utiliser un clone Git initial. Conserve impérativement `private-data/`, `backups/` et `.env`.
 
 ### Sauvegarde et restauration
 
