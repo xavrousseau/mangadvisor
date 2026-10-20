@@ -74,6 +74,23 @@ export function physicalInventoryMarkup(data, lang, translate, escape, {compact=
         '</p>'+
         '<p class="muted tiny">'+e(item.edition_declared||
           (lang==="fr"?"Édition non précisée":"Unspecified edition"))+'</p>'+
+        (item.match_suggestion?.state==="ALREADY_IN_COLLECTION"?
+          '<p class="collection-caveat">'+e(
+            (lang==="fr"?"Piste : ":"Possible match: ")+
+            (item.match_suggestion.catalog_title||"")+
+            " · "+(item.match_suggestion.source_name||""))+
+          '<strong> · '+e(lang==="fr"?
+            "Œuvre déjà dans la collection : attention aux doublons.":
+            "Already in collection: check for duplicate copies.")+'</strong></p>':
+         item.match_suggestion?.state==="MATCH_POSSIBLE"?
+          '<p class="muted tiny">'+e(
+            (lang==="fr"?"Piste à confirmer : ":"Suggestion to verify: ")+
+            (item.match_suggestion.catalog_title||"")+
+            " · "+(item.match_suggestion.source_name||""))+'</p>':
+         item.match_suggestion?.state==="AMBIGUOUS"?
+          '<p class="collection-caveat">'+e(lang==="fr"?
+           "Plusieurs œuvres ont ce nom : choix manuel indispensable.":
+           "Multiple works have this name: choose manually.")+'</p>':"")+
         '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-start" data-key="'+
           e(item.source_key)+'">'+(lang==="fr"?"Rapprocher cette ligne":"Match this entry")+
         '</button></article>';
