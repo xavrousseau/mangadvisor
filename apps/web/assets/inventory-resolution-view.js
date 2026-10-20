@@ -18,15 +18,21 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
       const id=Number(manga.id);
       if(!Number.isSafeInteger(id)||id<=0)return "";
       return '<article class="inventory-match-candidate">'+
-        '<strong>'+e(manga.title)+'</strong>'+
+        '<strong>'+e(manga.title_fr_community||manga.title_english||manga.title)+'</strong>'+
+        (manga.title_fr_community?
+          '<span class="muted tiny"> · '+e(fr?"Nom français communautaire, pas une édition certifiée":"Community French title, not a certified edition")+'</span>':"")+
         (manga.title_english&&manga.title_english!==manga.title?
           '<span class="muted tiny"> · '+e(manga.title_english)+'</span>':"")+
         '<p class="muted tiny">MAL '+e(manga.source_mal_id||"—")+
         ' · '+e(manga.manga_type||"—")+
         (manga.volumes!==null&&manga.volumes!==undefined?
           ' · '+e(manga.volumes)+' '+(fr?"tomes":"volumes"):"")+
-        (manga.suggestion_kind==="EXACT_TITLE"?
-          ' · '+(fr?"Titre exact":"Exact title"):"")+'</p>'+
+        (manga.suggestion_kind==="EXACT_TITLE"||manga.suggestion_kind==="EXACT_ALIAS"?
+          ' · '+(fr?"Nom exact retrouvé":"Exact name found"):"")+'</p>'+
+        (Number(manga.already_declared_editions||0)>0?
+           '<p class="collection-caveat">'+e(fr?
+             "Attention : cette œuvre possède déjà une déclaration physique. Vérifie les doublons avant de confirmer.":
+             "Warning: you have already declared physical copies of this work. Check for duplicates.")+'</p>':"")+
         '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-select" data-id="'+e(id)+'">'+
           (fr?"Examiner cette œuvre":"Review this work")+'</button></article>';
     }).join("")+'</div>';
