@@ -198,6 +198,79 @@ jobs:
           print("BnF lot non destructif, API candidates, reprise sans doublons : OK")
           PY
 
+      - name: Valider l'enrichissement Wikidata P4087 sur PostgreSQL jetable
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json
+          import urllib.request
+          from apps.api.app.main import get_connection
+          from apps.api.app.wikidata_enrichment import run_batch
+
+          def counts():
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      return [
+                          (cur.execute("SELECT COUNT(*) AS n FROM "+table) or cur.fetchone()["n"])
+                          for table in (
+                              "manga","manga_fr_edition","manga_genre","manga_theme",
+                              "user_manga_library","user_manga_inventory_declaration",
+                              "user_manga_volume",
+                          )
+                      ]
+
+          def mock_lookup(ids):
+              bindings=[]
+              for mid, qid, label in [
+                  (ids[0],"Q123456","Libelle FR test"),
+                  (ids[1],"Q234567","Libelle alternatif un"),
+                  (ids[1],"Q345678","Libelle alternatif deux"),
+              ]:
+                  bindings.append({
+                      "malId":{"value":str(mid)},
+                      "item":{"value":"http://www.wikidata.org/entity/"+qid},
+                      "labelFr":{"value":label},
+                      "descriptionFr":{"value":"description Wikidata, pas synopsis"},
+                      "genreFr":{"value":"suspense"},
+                  })
+              return {"results":{"bindings":bindings}}
+          before=counts()
+          result=run_batch(get_connection,limit=2,lookup=mock_lookup)
+          assert result["selected"]==2 and result["matched"]==1,result
+          assert result["ambiguous"]==1 and result["labels_fr"]==1,result
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT manga_id FROM manga_wikidata_fact "
+                              "WHERE wikidata_id=%s",("Q123456",))
+                  row=cur.fetchone()
+                  assert row is not None
+                  manga_id=row["manga_id"]
+          with urllib.request.urlopen(
+              f"http://127.0.0.1:8000/enrichment/mangas/{manga_id}/wikidata",
+              timeout=15,
+          ) as response:
+              data=json.load(response)
+          assert data["status"]=="MATCHED",data
+          assert data["label_fr"]=="Libelle FR test",data
+          assert data["genres_fr"]==["suspense"],data
+          assert data["match_basis"]=="exact_mal_manga_id_P4087",data
+          assert not data["french_publisher_title_verified"],data
+          assert not data["editions_verified"],data
+          assert not data["description_is_plot_synopsis"],data
+          assert before==counts(),(before,counts())
+
+          repeated=run_batch(get_connection,limit=2,refresh=True,lookup=mock_lookup)
+          assert repeated["matched"]==1 and repeated["ambiguous"]==1,repeated
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT COUNT(*) AS n FROM manga_wikidata_fact")
+                  assert cur.fetchone()["n"]==1
+          assert before==counts(),(before,counts())
+          print("Wikidata P4087 : rapprochement exact, ambiguites et invariants SQL OK")
+          PY
+
       - name: Verifier le proxy 8501 apres recreation de l'API sans redemarrer Nginx
         shell: bash
         run: |
