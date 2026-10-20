@@ -42,6 +42,20 @@ class StabilisationSafetyTests(unittest.TestCase):
         self.assertNotIn('Git-Run @("clean"',sync)
         self.assertNotIn('down -v',sync)
 
+    def test_one_click_library_enrichment_is_bounded_and_backup_first(self):
+        menu=(ROOT/"mangadvisor.cmd").read_text("utf-8")
+        control=(ROOT/"cmd/control-center.ps1").read_text("utf-8")
+        source=(ROOT/"apps/api/app/library_enrichment.py").read_text("utf-8")
+        self.assertIn('if "%CHOICE%"=="12" set "KEY=library-enrich"',menu)
+        self.assertIn('if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"',menu)
+        self.assertIn("function Enrich-My-Library",control)
+        routine=control.split("function Enrich-My-Library {")[1].split("function Load-Recommendations {")[0]
+        self.assertLess(routine.index("  Backup"),routine.index('  Compose $argsList'))
+        self.assertIn("apps.api.app.library_enrichment",routine)
+        self.assertIn("user_manga_inventory_pending",source)
+        self.assertNotIn("UPDATE user_manga_library",source)
+        self.assertNotIn("INSERT INTO manga_fr_edition",source)
+
     def test_backup_restore_does_not_revive_legacy_streamlit(self):
         source=(ROOT/"cmd/library-backup.ps1").read_text("utf-8")
         self.assertIn("user_manga_inventory_pending",source)
