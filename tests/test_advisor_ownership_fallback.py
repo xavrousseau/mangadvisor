@@ -50,7 +50,7 @@ class FakeCursor:
             self.rows = []
         elif "WITH owned AS" in query:
             self.rows = self.owner.owned_rows
-        elif "FROM manga m WHERE" in query:
+        elif "FROM manga m" in query and "LEFT JOIN manga_wikidata_attempt" in query:
             # A real PostgreSQL query applies this filter BEFORE LIMIT.
             self.rows = [
                 row for row in CANDIDATES
@@ -150,6 +150,22 @@ class OwnershipDiscoveryTests(unittest.TestCase):
         self.assertEqual(suggestion["title"], "International Mystery")
         self.assertEqual(suggestion["title_original"], "Synthetic Mystery")
         self.assertEqual(suggestion["id"], 101)
+
+    def test_unique_wikidata_mal_link_can_supply_provenance_labeled_french_title(self):
+        db = FakeDatabase(owned_rows=[
+            {"kind": "genres", "tag": "mystery",
+             "source_count": 2, "owned_work_count": 2},
+        ])
+        with patch.dict(CANDIDATES[0], {
+            "wikidata_label_fr": "Titre français Wikidata",
+            "wikidata_id": "Q123456",
+        }):
+            result = advice(db)
+        suggestion = result["recommendations"][0]
+        self.assertEqual(suggestion["title"], "Titre français Wikidata")
+        self.assertEqual(suggestion["title_source"], "WIKIDATA_P4087")
+        self.assertEqual(suggestion["title_original"], "Synthetic Mystery")
+        self.assertEqual(suggestion["french_record_count"], 0)
 
     def test_positive_reading_preferences_take_priority_over_owned_titles(self):
         db = FakeDatabase(
