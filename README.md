@@ -95,6 +95,12 @@ Depuis **mangadvisor.cmd → A → 14**, lancer une **extraction progressive Ten
 
 **Important :** ce menu ne récupère **pas encore** un catalogue exhaustif des éditions françaises. Les titres français et ISBN continuent à relever des enrichissements Wikidata/BnF existants. La prochaine étape sera un import **spécifique au format UNIMARC/ISO 2709 des fichiers BnF**, avec contrôle des critères manga et association ISBN→œuvre sans attribution automatique à ta collection. Il n'existe aucune garantie que toutes les pages Tenrai soient disponibles ou que toute œuvre soit un manga français. Pour les fichiers BnF, conserver provenance, date de récupération et licence ouverte.
 
+## Importer les fichiers BnF de livres français (nouveau)
+
+Le menu **`mangadvisor.cmd → A → 15`** propose un import **documentaire** de fichiers BnF en **UNIMARC UTF-8 / ISO 2709**. Déposer les fichiers officiels de livres (.not, .mrc, .marc, .iso, .gz ou .zip) dans `data/raw/bnf/imports/`, puis lancer l'option 15. Un aperçu (1 000 premières notices par fichier) s'affiche **sans écrire en base**. L'import réel ne s'exécute qu'après confirmation et sauvegarde PostgreSQL vérifiée.
+
+La base `bnf_bulk_notice` reçoit **uniquement les notices candidates** selon leur indexation sujet/collection (manga), avec des ISBN validés et une provenance explicite. Les fichiers déjà traités ne sont pas réimportés. **Aucune édition/tome/ISBN n'est automatiquement associé à un manga**, et la mangathèque personnelle ne change pas. Voir le [guide de l'import BnF en masse](docs/04_product/bnf_bulk_import_4_8.md). Les produits BnF sont en [Licence Ouverte](https://www.bnf.fr/fr/conditions-de-reutilisations-des-donnees-de-la-bnf).
+
 ## Architecture et contrôle qualité
 
 | Composant | Emplacement |

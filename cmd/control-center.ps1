@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -289,6 +289,42 @@ function Load-Extended-Catalogue {
   Write-Host ("Catalogue avant : {0} / apres : {1} / variation nette : {2}" -f $before,$after,($after-$before))
   Write-Host ("Notices distinctes en provenance fournisseur : {0}" -f $sourceCount)
   Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
+}
+function Import-BnF-Bulk {
+  Say "Importer des lots bibliographiques officiels BnF (zone de candidats)"
+  Ensure-Environment
+  Check-Docker
+  $dir=Join-Path $root "data\raw\bnf\imports"
+  if (!(Test-Path -LiteralPath $dir)) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  }
+  Write-Host "Source officielle : https://api.bnf.fr/index.php/fr/produits_bibliographiques_mensuels"
+  Write-Host "Telecharge uniquement les LIVRES au format UNIMARC UTF8 (ISO 2709)."
+  Write-Host "Depose les archives ou fichiers .not/.mrc/.iso/.marc/.gz/.zip dans : $dir"
+  $files=@(Get-ChildItem -LiteralPath $dir -File | Where-Object {
+    $_.Name -match '\.(not|mrc|iso|marc|gz|zip)$'
+  })
+  if ($files.Count -eq 0) {
+    Write-Host "Aucun fichier BnF local. Aucun traitement lance."
+    return
+  }
+  Write-Host ("Fichiers detectes : " + $files.Count)
+  if ($files.Count -gt 20) {
+    throw "Plus de 20 fichiers BnF ; traiter des lots plus petits pour une reprise sure."
+  }
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  Say "Apercu sans modification"
+  Engine @("pipelines/engine/scripts/bnf_bulk_import.py","--preview")
+  Write-Host "Les notices retenues restent des candidates independantes."
+  Write-Host "Aucun ISBN ne sera rattache automatiquement a une oeuvre ou a ta collection."
+  if (!(Confirm "Sauvegarder puis importer le lot dans la zone BnF ?" $false)) {
+    Write-Host "Import annule. Les fichiers et donnees existants sont conserves."
+    return
+  }
+  Backup
+  Engine @("pipelines/engine/scripts/bnf_bulk_import.py")
+  Write-Host "Notices BnF candidates importees ; edition et tome non confirmes."
 }
 function Enrich-BnF {
   Say "Enrichissement progressif depuis le catalogue BnF"
@@ -593,6 +629,7 @@ try {
     "Database"        { Initialize-Database }
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
+    "BnFBulk"         { Import-BnF-Bulk }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
     "Aliases"         { Enrich-Multilingual-Aliases }

@@ -67,6 +67,7 @@ echo   11 - Completer les informations depuis Wikidata (titres FR, genres)
 echo   12 - Enrichir ma mangatheque automatiquement (Wikidata et BnF)
 echo   13 - Recuperer les titres alternatifs FR, EN et JA
 echo   14 - Etendre le catalogue Tenrai (mangas et one-shots)
+echo   15 - Importer des fichiers bibliographiques BnF (candidats)
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -91,6 +92,7 @@ if "%CHOICE%"=="11" set "KEY=wikidata-enrich"
 if "%CHOICE%"=="12" set "KEY=library-enrich"
 if "%CHOICE%"=="13" set "KEY=multilingual-aliases"
 if "%CHOICE%"=="14" set "KEY=catalogue-extended"
+if "%CHOICE%"=="15" set "KEY=bnf-bulk"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -172,6 +174,7 @@ if /I "%~1"=="jikan" set "ACTION=Catalogue"
 if /I "%~1"=="recommendations" set "ACTION=Recommendations"
 if /I "%~1"=="import" set "ACTION=Inventory"
 if /I "%~1"=="bnf-enrich" set "ACTION=BnF"
+if /I "%~1"=="bnf-bulk" set "ACTION=BnFBulk"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
 if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"
 if /I "%~1"=="multilingual-aliases" set "ACTION=Aliases"
@@ -240,7 +243,7 @@ echo   backup           Sauvegarder et tester la restauration
 echo   diagnostic       Verifier l'application
 echo   stop             Arreter sans supprimer les volumes
 echo.
-echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark, bnf-enrich,
+echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark, bnf-enrich, bnf-bulk,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
