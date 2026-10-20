@@ -134,6 +134,70 @@ jobs:
           print('OK : catalogue, filtres, couvertures, bibliothèque, fiche, traduction FR/EN et TROIS moteurs de recommandations.')
           PY
 
+      - name: Valider le lot BnF en SQL reel sans associations automatiques
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json
+          import urllib.request
+          from apps.api.app.main import get_connection
+          from apps.api.app.bnf_batch import run_batch
+
+          def counters():
+              totals=[]
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      for table in ("manga_fr_edition","user_manga_library",
+                                    "user_manga_inventory_declaration","user_manga_volume"):
+                          cur.execute("SELECT COUNT(*) AS n FROM "+table)
+                          totals.append(cur.fetchone()["n"])
+              return totals
+
+          def fake_bnf(title):
+              return {"items":[{
+                  "isbn13":"9782871294146",
+                  "title_fr":title+" Tome 1",
+                  "author_fr":"Auteur de démonstration",
+                  "publisher_fr":"Éditeur de démonstration",
+                  "source_url":"https://catalogue.bnf.fr/ark:/12148/cb12345678x",
+                  "status":"CANDIDATE_UNCONFIRMED",
+                  "manga_match_verified":False,
+                  "edition_kind_suggested":"UNKNOWN",
+              }]}
+
+          before=counters()
+          report=run_batch(get_connection,limit=1,search=fake_bnf,sleep=lambda _ : None)
+          assert report["selected"]==1 and report["checked"]==1,report
+          assert report["candidates"]==1,report
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT manga_id FROM manga_bnf_candidate WHERE isbn13=%s",
+                              ("9782871294146",))
+                  staged=cur.fetchone()
+                  assert staged,report
+                  manga_id=staged["manga_id"]
+          with urllib.request.urlopen(
+              "http://127.0.0.1:8000/collection/mangas/"+str(manga_id)+"/bnf-candidates",
+              timeout=15,
+          ) as response:
+              view=json.load(response)
+          assert view["candidate_only"] is True and view["manga_match_verified"] is False,view
+          assert view["items"][0]["registration_status"]=="TO_VERIFY",view
+          assert view["items"][0]["isbn13"]=="9782871294146",view
+          assert before==counters(),(before,counters())
+          report2=run_batch(get_connection,limit=1,refresh=True,search=fake_bnf,sleep=lambda _:None)
+          assert report2["candidates"]==1,report2
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT COUNT(*) AS n FROM manga_bnf_candidate WHERE manga_id=%s",
+                              (manga_id,))
+                  assert cur.fetchone()["n"]==1
+          assert before==counters()
+          print("BnF lot non destructif, API candidates, reprise sans doublons : OK")
+          PY
+
       - name: Verifier le proxy 8501 apres recreation de l'API sans redemarrer Nginx
         shell: bash
         run: |

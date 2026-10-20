@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -248,6 +248,25 @@ function Load-Catalogue {
   Write-Host "Notices fournisseur : $sourceCount ; mangas dans le catalogue : $catalogCount"
   if ($catalogCount -eq 0) { throw "Catalogue vide : chargement Tenrai invalide." }
 }
+function Enrich-BnF {
+  Say "Enrichissement progressif depuis le catalogue BnF"
+  Ensure-Environment
+  Check-Docker
+  # Ensure the API startup creates the additive, candidate-only staging tables.
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $limit=Ask-Number "Nombre de mangas a rechercher dans la BnF (max 25)" 10 25
+  $refresh=Confirm "Relancer aussi des recherches deja faites recemment ?" $false
+  Write-Host "Les resultats BnF seront des CANDIDATS, jamais des editions confirmees."
+  Write-Host "Aucune association de manga, ISBN ou tome n'est effectuee automatiquement."
+  # Consistent verified recovery point before any staged metadata write.
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.bnf_batch","--limit",[string]$limit)
+  if ($refresh) { $argsList+=@("--refresh") }
+  Compose $argsList
+  Write-Host "Recherche terminee : ouvre une fiche manga pour voir les candidats BnF."
+}
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
   Ensure-Environment
@@ -469,6 +488,7 @@ try {
     "Stop"            { Stop-Application }
     "Database"        { Initialize-Database }
     "Inventory"       { Inventory }
+    "BnF"             { Enrich-BnF }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }

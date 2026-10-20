@@ -6,6 +6,7 @@ import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js"
 import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS,ADVISOR_BALANCE_PROMPTS} from "./advisor-view.js";
 import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
 import { enrichmentPanel, enrichmentResults, reconcileEnrichment, mergeEnrichmentPages } from "./enrichment-view.js";
+import { bnfCachedCandidatesMarkup } from "./bnf-candidates-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
@@ -30,6 +31,7 @@ const state = {
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,biblioCandidates:null,biblioSearchNonce:0,
   enrichmentReport:null,enrichmentNonce:0,enrichmentAlias:"",enrichmentBusy:false,
+  bnfCache:null,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
 };
 let renderToken = 0, searchTimer = null;
@@ -424,16 +426,17 @@ async function renderDetail(token,id){
  try{
   const manga=state.detailCache[id]||await request("/mangas/"+id);
   state.detailCache[id]=manga;state.currentDetail=manga;
-  const [urls,libraryItem,translation,frCollection,physicalInventory]=await Promise.all([
+  const [urls,libraryItem,translation,frCollection,physicalInventory,bnfCache]=await Promise.all([
     covers([manga]),readLibraryItem(manga),
     state.lang==="fr"&&manga.synopsis?request("/localization/synopsis",{
       method:"POST",data:{manga_id:id,lang:"fr"}
     }).catch(()=>null):Promise.resolve(null),
     request("/collection/mangas/"+id+"/editions").catch(()=>null),
-    request("/inventory/declarations?manga_id="+id).catch(()=>null)
+    request("/inventory/declarations?manga_id="+id).catch(()=>null),
+    request("/collection/mangas/"+id+"/bnf-candidates").catch(()=>null)
   ]);
   if(token!==renderToken)return;
-  state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.editionPreview=null;
+  state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.bnfCache=bnfCache;state.editionPreview=null;
   state.biblioCandidates=null;state.biblioSearchNonce++;
   state.enrichmentReport=null;state.enrichmentAlias="";state.enrichmentNonce++;
   const synopsis=translation?.text||manga.synopsis||"";
@@ -476,7 +479,8 @@ async function renderDetail(token,id){
      '</section>':"")+
    '<div id="collection-book-panel">'+(frCollection?collectionPanel(frCollection,libraryItem,state.lang,t,escapeHtml)+
        bibliographyPanel(escapeHtml,t,state.lang,manga.title)+
-       enrichmentPanel(escapeHtml,t,state.lang):
+       enrichmentPanel(escapeHtml,t,state.lang)+
+       bnfCachedCandidatesMarkup(bnfCache,{escape:escapeHtml,lang:state.lang}):
      '<div class="home-empty">'+L("collectionLookupError")+'</div>')+'</div>'+
    '<div class="section-header" id="similar-heading"><h2 class="section-title">'+L("similarTitle")+'</h2></div>'+
    '<p class="page-desc">'+L("similarHelp")+'</p><div id="similar-results">'+
@@ -834,13 +838,17 @@ async function refreshFrenchCollection(){
  const target=document.querySelector("#collection-book-panel");
  if(!target)return;
  try{
-  const result=await request("/collection/mangas/"+manga.id+"/editions");
+  const [result,cache]=await Promise.all([
+    request("/collection/mangas/"+manga.id+"/editions"),
+    request("/collection/mangas/"+manga.id+"/bnf-candidates").catch(()=>null)
+  ]);
   if(routeInfo().view!=="detail"||Number(routeInfo().id)!==Number(manga.id))return;
-  state.frenchCollection=result;
+  state.frenchCollection=result;state.bnfCache=cache;
   state.enrichmentReport=reconcileEnrichment(state.enrichmentReport,result.editions);
   target.innerHTML=collectionPanel(result,state.libraryDetail,state.lang,t,escapeHtml)+
    bibliographyPanel(escapeHtml,t,state.lang,manga.title)+
-   enrichmentPanel(escapeHtml,t,state.lang);
+   enrichmentPanel(escapeHtml,t,state.lang)+
+   bnfCachedCandidatesMarkup(cache,{escape:escapeHtml,lang:state.lang});
   if(state.biblioCandidates)showBibliographyResults();
   const aliasInput=document.querySelector("#enrich-alt-title");
   if(aliasInput)aliasInput.value=state.enrichmentAlias;
@@ -930,7 +938,10 @@ async function searchFrenchBibliography(form){
 async function verifyBibliographyCandidate(button){
  const isbn=String(button.dataset.isbn||"");
  if(!/^[0-9]{13}$/.test(isbn))return;
- const item=button.dataset.action==="enrich-verify-isbn"
+ const item=button.dataset.action==="bnf-candidate-verify"
+  ?state.bnfCache?.items?.find(entry=>
+    entry.isbn13===isbn&&entry.registration_status==="TO_VERIFY")
+  :button.dataset.action==="enrich-verify-isbn"
   ?state.enrichmentReport?.items?.find(entry=>
     entry.isbn13===isbn&&entry.registration_status==="TO_VERIFY")
   :state.biblioCandidates?.items?.find(entry=>
@@ -1215,7 +1226,7 @@ root.addEventListener("click",async event=>{
  if(action==="bulk-apply")return applyBulkCsv(button);
  if(action==="bulk-compare")return reconcileBulkCounts(button);
  if(action==="edition-confirm")return confirmFrenchEdition(button);
- if(action==="biblio-verify-isbn"||action==="enrich-verify-isbn")
+ if(action==="biblio-verify-isbn"||action==="enrich-verify-isbn"||action==="bnf-candidate-verify")
   return verifyBibliographyCandidate(button);
  if(action==="enrich-discover")return discoverFrenchEnrichment(button);
  if(action==="enrich-more")return discoverFrenchEnrichment(button,true);

@@ -17,6 +17,7 @@ from apps.api.app.inventory_import import inventory_router,ensure_inventory_sche
 from apps.api.app.collection_scan import scan_router
 from apps.api.app.edition_discovery import edition_discovery_router
 from apps.api.app.edition_enrichment import create_enrichment_router
+from apps.api.app.bnf_batch import create_bnf_catalog_router, ensure_bnf_schema
 from apps.api.app.mood_discovery import make_discovery_router
 from apps.api.app.advisor import make_advisor_router
 
@@ -3676,6 +3677,7 @@ def get_manga_covers(
 def prepare_fr_collection() -> None:
     ensure_collection_schema(get_connection)
     ensure_inventory_schema(get_connection)
+    ensure_bnf_schema(get_connection)
 
 
 app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
@@ -3684,5 +3686,6 @@ app.include_router(inventory_router(get_connection, DEFAULT_USER_ID))
 app.include_router(scan_router(get_connection, DEFAULT_USER_ID))
 app.include_router(edition_discovery_router(get_connection))
 app.include_router(create_enrichment_router(get_connection))
+app.include_router(create_bnf_catalog_router(get_connection))
 app.include_router(make_discovery_router(get_connection, DEFAULT_USER_ID))
 app.include_router(make_advisor_router(get_connection, DEFAULT_USER_ID))
