@@ -129,14 +129,14 @@ call :result
 goto maintenance
 
 :result
+rem Ne jamais placer du texte avec parentheses dans un bloc IF (...) ELSE (...).
+rem Sous cmd.exe, une parenthese non echappee dans ECHO peut interrompre
+rem le script avant PAUSE et fermer la fenetre (constate apres A / 11).
 set "RC=%ERRORLEVEL%"
 echo.
-if "%RC%"=="0" (
-    echo Operation terminee.
-) else (
-    echo ECHEC (code %RC%). Lis le message ci-dessus.
-    echo Aucune suppression automatique des donnees n'a ete lancee.
-)
+if "%RC%"=="0" echo Operation terminee.
+if not "%RC%"=="0" echo ECHEC - code %RC%. Lis le message ci-dessus.
+if not "%RC%"=="0" echo Aucune suppression automatique des donnees n'a ete lancee.
 echo.
 pause
 exit /b 0
