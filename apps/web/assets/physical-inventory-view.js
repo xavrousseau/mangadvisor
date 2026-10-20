@@ -13,7 +13,7 @@ export function physicalInventoryMarkup(data, lang, translate, escape, {compact=
   for(const item of raw){
     const id=Number(item?.manga_id);
     if(!Number.isSafeInteger(id)||id<=0)continue;
-    if(!groups.has(id))groups.set(id,{title:item.work_title||"",editions:[]});
+    if(!groups.has(id))groups.set(id,{title:lang==="fr"?(item.work_title_fr||item.work_title||""):(item.work_title||""),editions:[]});
     groups.get(id).editions.push(item);
   }
   const stats=data.summary||{};
