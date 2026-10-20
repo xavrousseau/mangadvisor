@@ -73,6 +73,7 @@ L'option principale **4** réalise un `pg_dump` avec manifeste SHA256, suivi d'u
 - **Mangathèque physique** : quantités déclarées par édition distincte, sans confondre les exemplaires, les ISBN vérifiés ni les volumes lus.
 - **Éditions françaises** : rapprochements volontaires avec la BnF, recherche par titre/ISBN et scanner lorsque le navigateur/HTTPS le permet.
 - **Métadonnées complémentaires Wikidata (CC0)** : option **A → 11** pour récupérer par identifiant MyAnimeList manga exact (`P4087`) des libellés français, descriptions courtes et genres sourcés. Les correspondances ambiguës sont refusées ; aucune édition française n’est inventée.
+- **Enrichissement personnel en une opération** : option **A → 12** pour enrichir les séries déjà liées à ta mangathèque depuis Wikidata puis, au choix, la BnF. Les entrées physiques non rapprochées sont signalées séparément et les ISBN proposés restent à confirmer. Le conseiller peut afficher les genres Wikidata avec leur provenance et les utiliser uniquement comme précaution pour les exclusions explicites (« sans horreur », « sans gore », « sans romance »).
 - **Recommandations** : découverte par ambiance, par bibliothèque, par proximité d'œuvre et conseiller conversationnel ; exclusion des séries déjà enregistrées ou physiquement possédées quand la correspondance à l'œuvre est confirmée.
 - **IA locale facultative** : Ollama peut aider à interpréter les demandes mais ne décide pas seul quels mangas existent.
 
