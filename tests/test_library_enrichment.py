@@ -173,14 +173,17 @@ class LibraryEnrichmentTests(unittest.TestCase):
     def test_total_remote_failure_is_not_retried_repeatedly(self):
         db=FakeDb([11,12,13],pending=0)
         wiki=Mock(return_value={"selected":3,"error":3})
-        bnf=Mock(return_value={"selected":0,"error":0})
+        bnf=Mock(side_effect=[
+            {"selected":3,"checked":3,"error":0},
+            {"selected":0,"checked":0,"error":0},
+        ])
         result=run_library_enrichment(
             db,wikidata_batch=wiki,bnf_batch=bnf,sleep=lambda *_:None
         )
         self.assertEqual(wiki.call_count,1)
         self.assertEqual(result["failed_sources"],["wikidata"])
         self.assertEqual(result["sources"]["wikidata"]["halted"],1)
-        self.assertEqual(bnf.call_count,1)
+        self.assertEqual(bnf.call_count,2)
 
     def test_bounds_and_no_accidental_unscoped_fallback(self):
         db=FakeDb([1,2])
