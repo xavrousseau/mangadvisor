@@ -4,7 +4,6 @@ These tests are intentionally offline and cannot touch personal PostgreSQL data.
 """
 from __future__ import annotations
 
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
