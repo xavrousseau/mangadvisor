@@ -270,7 +270,7 @@ def list_mangas(
         )
         params["q"] = f"%{q}%"
         params["alias_pattern"] = "%" + (
-            title_key(q).replace("%",r"\%").replace("_",r"\_")
+            (title_key(q) or "nomatchaliaskey").replace("%",r"\%").replace("_",r"\_")
         ) + "%"
 
     if genre:
