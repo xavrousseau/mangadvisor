@@ -7,6 +7,7 @@ import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS,ADVISOR_BALANCE_P
 import { bibliographyPanel, bibliographyResults } from "./bibliography-view.js";
 import { enrichmentPanel, enrichmentResults, reconcileEnrichment, mergeEnrichmentPages } from "./enrichment-view.js";
 import { bnfCachedCandidatesMarkup } from "./bnf-candidates-view.js";
+import { wikidataFactsMarkup } from "./wikidata-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
@@ -31,7 +32,7 @@ const state = {
   similar:{},detailCache:{},currentDetail:null,libraryDetail:null,
   frenchCollection:null,editionPreview:null,biblioCandidates:null,biblioSearchNonce:0,
   enrichmentReport:null,enrichmentNonce:0,enrichmentAlias:"",enrichmentBusy:false,
-  bnfCache:null,
+  bnfCache:null,wikidataCache:null,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
 };
 let renderToken = 0, searchTimer = null;
@@ -426,17 +427,18 @@ async function renderDetail(token,id){
  try{
   const manga=state.detailCache[id]||await request("/mangas/"+id);
   state.detailCache[id]=manga;state.currentDetail=manga;
-  const [urls,libraryItem,translation,frCollection,physicalInventory,bnfCache]=await Promise.all([
+  const [urls,libraryItem,translation,frCollection,physicalInventory,bnfCache,wikidataCache]=await Promise.all([
     covers([manga]),readLibraryItem(manga),
     state.lang==="fr"&&manga.synopsis?request("/localization/synopsis",{
       method:"POST",data:{manga_id:id,lang:"fr"}
     }).catch(()=>null):Promise.resolve(null),
     request("/collection/mangas/"+id+"/editions").catch(()=>null),
     request("/inventory/declarations?manga_id="+id).catch(()=>null),
-    request("/collection/mangas/"+id+"/bnf-candidates").catch(()=>null)
+    request("/collection/mangas/"+id+"/bnf-candidates").catch(()=>null),
+    request("/enrichment/mangas/"+id+"/wikidata").catch(()=>null)
   ]);
   if(token!==renderToken)return;
-  state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.bnfCache=bnfCache;state.editionPreview=null;
+  state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.bnfCache=bnfCache;state.wikidataCache=wikidataCache;state.editionPreview=null;
   state.biblioCandidates=null;state.biblioSearchNonce++;
   state.enrichmentReport=null;state.enrichmentAlias="";state.enrichmentNonce++;
   const synopsis=translation?.text||manga.synopsis||"";
@@ -463,6 +465,7 @@ async function renderDetail(token,id){
       (reallyTranslated?'✦ '+L("translatedNote"): 'ⓘ '+L("originalEnglish")+' · '+L("translationUnavailable"))+'</div>':'')+
    '<div class="section-header"><h2 class="section-title">'+L("genres")+' & '+L("themes")+'</h2></div>'+
    '<div class="tag-row">'+badges([...(manga.genres||[]),...(manga.themes||[])],30)+'</div>'+
+   wikidataFactsMarkup(wikidataCache,{escape:escapeHtml,lang:state.lang})+
    '<div class="section-header" id="save-section"><h2 class="section-title">'+L("library")+'</h2></div>'+
    '<form class="library-editor" id="library-editor">'+
     '<div class="form-grid"><div class="field"><label for="edit-status">'+L("readingStatus")+'</label><select class="select" id="edit-status" name="status">'+
