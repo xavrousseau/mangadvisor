@@ -538,6 +538,10 @@ async function renderDetail(token,id){
    poster(manga,urls,false)+'<div class="detail-info"><div class="eyebrow">MANGADVISOR · '+L("mangaDetails")+'</div>'+
    '<h1>'+e(displayTitle)+'</h1>'+
    '<p class="detail-sub">'+alternateTitles.map(e).join(' · ')+'</p>'+
+   (state.lang==="fr" && manga.title_fr_community &&
+    displayTitle===manga.title_fr_community ?
+    '<p class="locale-note">ⓘ Nom français communautaire · '+e(manga.title_fr_source)+
+    ' · édition française non vérifiée</p>':"")+
    '<div class="tag-row">'+badges(manga.genres,5)+badges(manga.demographics,2)+'</div>'+
    '<p class="muted tiny">'+L("status")+' : '+e(publication(state.lang,manga.status))+' · '+
    (manga.manga_type?tr(manga.manga_type):'Manga')+'</p>'+
