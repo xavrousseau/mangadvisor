@@ -116,7 +116,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Sources raw à charger. "
             "legacy=data/raw/jikan/manga_page_*.json, "
-            "search=data/raw/jikan/search/search_page_*.json, "
+            "search=data/raw/jikan/search/**/search_page_*.json, "
             "top=data/raw/jikan/top/top_manga_page_*.json, "
             "all=legacy+search+top."
         ),
@@ -157,7 +157,7 @@ def iter_jikan_json_files(raw_dir: Path, sources: list[str]) -> list[Path]:
         files.extend(sorted(raw_dir.glob("manga_page_*.json")))
 
     if "search" in sources:
-        files.extend(sorted((raw_dir / "search").glob("search_page_*.json")))
+        files.extend(sorted((raw_dir / "search").rglob("search_page_*.json")))
 
     if "top" in sources:
         files.extend(sorted((raw_dir / "top").glob("top_manga_page_*.json")))

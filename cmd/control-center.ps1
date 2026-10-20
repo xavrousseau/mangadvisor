@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -247,6 +247,48 @@ function Load-Catalogue {
   $catalogCount=Get-Count "manga"
   Write-Host "Notices fournisseur : $sourceCount ; mangas dans le catalogue : $catalogCount"
   if ($catalogCount -eq 0) { throw "Catalogue vide : chargement Tenrai invalide." }
+}
+function Load-Extended-Catalogue {
+  Say "Catalogue Tenrai etendu : progression jusqu'a la derniere page"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  $before=Get-Count "manga"
+  Network
+  $maxPages=Ask-Number "Plafond de pages Manga (25 notices par page, max 2000)" 600 2000
+  $withOneShots=Confirm "Inclure aussi la categorie One-shot ?" $true
+  $force=Confirm "Rafraichir les pages Tenrai deja en cache ?" $false
+  Write-Host "Extraction progressive. L'arret intervient a la derniere page ou au plafond."
+  Write-Host "Les pages telechargees restent sur disque en cas de coupure ; la reprise les reutilise."
+  Backup
+  $base=@("--mode","search","--start-page","1","--limit","25",
+          "--sleep-seconds","1","--until-end","--no-legacy-search-copy",
+          "--sfw","true","--order-by","popularity","--sort","asc")
+  $mangaArgs=@("pipelines/engine/scripts/extract_jikan.py")+
+              $base+@("--manga-type","manga","--end-page",[string]$maxPages)
+  if ($force) { $mangaArgs+=@("--force") }
+  Engine $mangaArgs
+  if ($withOneShots) {
+    $oneShotMax=[Math]::Min($maxPages,200)
+    $oneShotArgs=@("pipelines/engine/scripts/extract_jikan.py")+
+                  $base+@("--manga-type","oneshot","--end-page",[string]$oneShotMax)
+    if ($force) { $oneShotArgs+=@("--force") }
+    Engine $oneShotArgs
+  }
+  Engine @("pipelines/engine/scripts/load_jikan_to_postgres.py","--sources","search","top")
+  foreach ($sql in @(
+    "sql\schema\003_build_canonical_from_jikan.sql",
+    "sql\schema\004_add_theme_demographic_tables.sql",
+    "sql\schema\005_build_theme_demographic_from_jikan.sql")) {
+    Sql-File $sql
+  }
+  $after=Get-Count "manga"
+  $sourceCount=Get-Count "jikan_manga_source"
+  if ($after -eq 0) { throw "Catalogue vide apres extraction : verifier les journaux." }
+  Write-Host ("Catalogue avant : {0} / apres : {1} / variation nette : {2}" -f $before,$after,($after-$before))
+  Write-Host ("Notices distinctes en provenance fournisseur : {0}" -f $sourceCount)
+  Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
 }
 function Enrich-BnF {
   Say "Enrichissement progressif depuis le catalogue BnF"
@@ -555,6 +597,7 @@ try {
     "LibraryEnrichment" { Enrich-My-Library }
     "Aliases"         { Enrich-Multilingual-Aliases }
     "Catalogue"       { Load-Catalogue }
+    "CatalogueExtended" { Load-Extended-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
     "Diagnostic"      { Diagnostic }
