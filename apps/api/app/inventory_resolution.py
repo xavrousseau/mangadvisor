@@ -261,7 +261,18 @@ def create_pending_resolution_router(
                 pending = review["_pending"]
                 manga = review["manga"]
                 edition_key = review["edition_key"]
-                cur.execute("""
+                mode = payload.resolution_mode
+                existing = review["existing_declarations"]
+                if mode not in review["allowed_actions"]:
+                    raise HTTPException(status_code=409,
+                        detail="Édition déjà déclarée. Pour éviter les doublons, "
+                               "compare les quantités puis choisis l'archivage.")
+                if existing and not payload.acknowledge_existing_inventory:
+                    raise HTTPException(status_code=422,
+                        detail="Tu dois confirmer la comparaison avec les "
+                               "déclarations physiques déjà présentes.")
+                if mode == "CREATE_DECLARATION":
+                    cur.execute("""
                     INSERT INTO user_manga_inventory_declaration (
                         user_id,manga_id,edition_key,edition_declared,entry_title,
                         source_reference,format_hint,main_volumes,
@@ -284,9 +295,9 @@ def create_pending_resolution_router(
                         "other_editions_unknown"
                     )},
                 })
-                if not cur.fetchone():
-                    raise HTTPException(status_code=409,
-                        detail="Cette oeuvre et cette edition viennent deja d'etre liees.")
+                    if not cur.fetchone():
+                        raise HTTPException(status_code=409,
+                            detail="Cette oeuvre et cette edition viennent deja d'etre liees.")
                 # Preserve source row and checksum before consuming the pending
                 # record; never delete pending before both inserts succeed.
                 audited = {key:value for key,value in pending.items()
@@ -294,10 +305,10 @@ def create_pending_resolution_router(
                 cur.execute("""
                     INSERT INTO user_manga_inventory_resolution (
                         user_id,source_key,manga_id,edition_key,
-                        original_declaration,original_sha256
+                        original_declaration,original_sha256,resolution_mode
                     ) VALUES (
                         %(user_id)s,%(source_key)s,%(manga_id)s,%(edition_key)s,
-                        %(original)s::jsonb,%(original_sha256)s
+                        %(original)s::jsonb,%(original_sha256)s,%(mode)s
                     )
                     ON CONFLICT (user_id,source_key) DO NOTHING
                     RETURNING source_key
@@ -308,6 +319,7 @@ def create_pending_resolution_router(
                     "edition_key":edition_key,
                     "original":json.dumps(audited,ensure_ascii=False,default=str),
                     "original_sha256":pending["content_sha256"],
+                    "mode":mode,
                 })
                 if not cur.fetchone():
                     raise HTTPException(status_code=409,
@@ -327,6 +339,8 @@ def create_pending_resolution_router(
             conn.commit()
         return {
             "status":"confirmed",
+            "resolution_mode":payload.resolution_mode,
+            "new_declaration_created":payload.resolution_mode=="CREATE_DECLARATION",
             "source_key":payload.source_key,
             "manga_id":manga["id"],
             "catalog_title":manga["title"],
