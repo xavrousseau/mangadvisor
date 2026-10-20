@@ -29,7 +29,9 @@ def make_record(*, notice="FRBNF99900001", title="Dragon Ball, tome 1",
         ("200", data_field(("a", title), ("f", "Akira Toriyama"))),
         ("214", data_field(("c", "Glénat"), ("d", "2024"))),
         ("225", data_field(("a", series), ("v", volume))),
-        ("606", data_field(("a", subject))),
+        ("606", data_field(("a", "Bandes dessinées"), ("x", "Japon"))
+         if subject == "Bandes dessinées -- Japon"
+         else data_field(("a", subject))),
         ("801", data_field(("b", "FR-BnF"), ("c", "20261020"))),
     ]
     directory, body = b"", b""
@@ -100,6 +102,12 @@ class BnfBulkTests(unittest.TestCase):
         item = importer.parse_candidate(manga, "x" * 64, importer.datetime.now(importer.timezone.utc))
         self.assertEqual(item["isbn13"], [])
         self.assertIn("sujet:Mangas", item["match_evidence"])
+
+    def test_unimarc_subdivided_subject_is_identified(self):
+        record = make_record(subject="Bandes dessinées -- Japon", series="Classiques")
+        item = importer.parse_candidate(record, "x" * 64, importer.datetime.now(importer.timezone.utc))
+        self.assertIsNotNone(item)
+        self.assertIn("sujet:Bandes dessinées -- Japon", item["match_evidence"])
 
     def test_isbn10_conversion_and_checksum(self):
         self.assertEqual(importer.isbn13("0-306-40615-2"), "9780306406157")
