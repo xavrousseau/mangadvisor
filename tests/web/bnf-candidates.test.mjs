@@ -28,6 +28,8 @@ test("unverified BnF records are visibly separate and require manual ISBN verifi
   assert.match(html,/Notice BnF/);
   assert.doesNotMatch(html,/data-action="volume-owned"/);
   assert.doesNotMatch(html,/data-action="edition-confirm"/);
+  assert.doesNotMatch(html,/class="edition-item/);
+  assert.match(html,/class="bnf-candidate-item"/);
 });
 
 test("registered records are never offered as fresh suggestions",()=>{
