@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -284,6 +284,23 @@ function Enrich-Wikidata {
   Compose $argsList
   Write-Host "Enrichissement Wikidata termine. Consulte les fiches mangas."
 }
+function Enrich-Multilingual-Aliases {
+  Say "Titres alternatifs fiables FR / EN / JA (Wikidata)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $limit=Ask-Number "Nombre de mangas Wikidata deja lies a enrichir (max 20)" 12 20
+  $refresh=Confirm "Reprendre meme les mangas deja enrichis recemment ?" $false
+  Write-Host "Les alias sont relies aux manga par MAL ID P4087, reverifie cote Wikidata."
+  Write-Host "Aucune edition francaise ou possession ne sera attribuee automatiquement."
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.multilingual_aliases","--limit",[string]$limit)
+  if ($refresh) { $argsList+=@("--refresh") }
+  Compose $argsList
+  Write-Host "Recherche catalogue / inventaire actualisee via les titres alternatifs verifies."
+}
 function Enrich-My-Library {
   Say "Enrichir toute ma mangatheque reconnue depuis Wikidata et la BnF"
   Ensure-Environment
@@ -536,6 +553,7 @@ try {
     "BnF"             { Enrich-BnF }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
+    "Aliases"         { Enrich-Multilingual-Aliases }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }

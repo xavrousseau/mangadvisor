@@ -435,6 +435,26 @@ async function searchPendingMatches(form,draft=state.pendingMatch){
   renderPendingMatcher();
  }
 }
+async function searchMangaDexPending(button){
+ const draft=state.pendingMatch;
+ if(!draft)return;
+ const typed=String(document.querySelector("#pending-match-query")?.value||draft.query||"").trim().slice(0,100);
+ if(typed.length<2){draft.message="Recherche trop courte";renderPendingMatcher();return;}
+ draft.loading=true;draft.review=null;draft.items=[];draft.searched=false;draft.message="";
+ draft.query=typed;renderPendingMatcher();
+ try{
+  const params=new URLSearchParams({source_key:draft.sourceKey,q:typed});
+  const result=await request("/inventory/pending/external-candidates?"+params);
+  if(draft!==state.pendingMatch||routeInfo().view!=="library")return;
+  draft.items=result.items||[];draft.searched=true;draft.loading=false;
+  if(!draft.items.length)draft.message="Aucune correspondance MangaDex avec un lien MyAnimeList vérifiable.";
+  renderPendingMatcher();
+ }catch(err){
+  if(draft!==state.pendingMatch)return;
+  draft.loading=false;draft.message=err.message||"MangaDex indisponible";
+  renderPendingMatcher();
+ }
+}
 async function selectPendingManga(button){
  const draft=state.pendingMatch;if(!draft)return;
  const id=idNumber(button.dataset.id);
@@ -1312,6 +1332,7 @@ root.addEventListener("click",async event=>{
  if(action==="pending-match-start")return startPendingMatcher(button);
  if(action==="pending-match-close"){state.pendingMatch=null;renderPendingMatcher();return;}
  if(action==="pending-match-select")return selectPendingManga(button);
+ if(action==="pending-match-external")return searchMangaDexPending(button);
  if(action==="pending-match-confirm")return confirmPendingManga(button);
  if(action==="bulk-preview")return previewBulkCsv();
  if(action==="bulk-resolve")return startBulkResolution(button);

@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, Query
 
+from apps.api.app.mangadex_discovery import search_verified_mangadex
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
 )
@@ -147,19 +148,34 @@ def create_pending_resolution_router(
                     cur.execute("""
                         SELECT m.id,m.title,m.title_english,m.title_japanese,
                                m.source_mal_id,m.volumes,m.manga_type,
+                               (SELECT ta.alias FROM manga_title_alias ta
+                                WHERE ta.manga_id=m.id AND ta.alias ILIKE %(pattern)s
+                                ORDER BY (LOWER(ta.alias)=%(exact)s) DESC,
+                                         (ta.language_code='fr') DESC,ta.alias
+                                LIMIT 1) AS matched_alias,
                                CASE WHEN LOWER(m.title)=%(exact)s
                                  OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                  OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
-                                    THEN 'EXACT_TITLE' ELSE 'SEARCH_SUGGESTION'
+                                    THEN 'EXACT_TITLE'
+                                 WHEN EXISTS (SELECT 1 FROM manga_title_alias ta
+                                   WHERE ta.manga_id=m.id AND LOWER(ta.alias)=%(exact)s)
+                                    THEN 'EXACT_MULTILINGUAL_ALIAS'
+                                 ELSE 'SEARCH_SUGGESTION'
                                END AS suggestion_kind
                         FROM manga m
                         WHERE m.title ILIKE %(pattern)s
                            OR m.title_english ILIKE %(pattern)s
                            OR m.title_japanese ILIKE %(pattern)s
+                           OR EXISTS (SELECT 1 FROM manga_title_alias ta
+                                WHERE ta.manga_id=m.id AND ta.alias ILIKE %(pattern)s)
                         ORDER BY CASE WHEN LOWER(m.title)=%(exact)s
                                 OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                 OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
-                                THEN 0 ELSE 1 END,
+                                THEN 0
+                                WHEN EXISTS (SELECT 1 FROM manga_title_alias ta
+                                    WHERE ta.manga_id=m.id
+                                      AND LOWER(ta.alias)=%(exact)s)
+                                THEN 1 ELSE 2 END,
                                 m.popularity ASC NULLS LAST,m.id
                         LIMIT 12
                     """, {"exact":exact,"pattern":pattern})
@@ -173,6 +189,29 @@ def create_pending_resolution_router(
             "items":matches,
             "automatic_association":False,
             "notice":"Suggestions de recherche, jamais un rapprochement automatique.",
+        }
+
+    @router.get("/pending/external-candidates")
+    def external_candidates(
+        source_key: str = Query(...,min_length=1,max_length=120),
+        q: str = Query(...,min_length=2,max_length=100),
+    ) -> dict[str,Any]:
+        # External lookups are opt-in, bounded and read only. Validate a
+        # pending row belongs to this user's own inventory before calling out.
+        with connection_factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute(PENDING_SQL, {"user_id":user_id,"source_key":source_key})
+                row=cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404,detail="Ligne en attente introuvable.")
+                matches=search_verified_mangadex(cur,q)
+        return {
+            "items":matches,"query":q,"source_name":"MANGADEX",
+            "source_url":"https://mangadex.org",
+            "automatic_association":False,
+            "notice":"MangaDex (non commercial, attribution). "
+                     "Seuls les identifiants manga MyAnimeList explicitement "
+                     "liés sont présentés ; confirme l'œuvre et l'édition.",
         }
 
     @router.post("/pending/resolve/preview")
