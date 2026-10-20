@@ -17,6 +17,8 @@ from fastapi import APIRouter, HTTPException, Query
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
 )
+from apps.api.app.title_aliases import title_key
+
 
 PENDING_SQL = """
 SELECT source_key,entry_title,source_reference,work_declared,edition_declared,
@@ -144,25 +146,74 @@ def create_pending_resolution_router(
                     pattern = "%" + (term.replace("\\","\\\\")
                         .replace("%","\\%").replace("_","\\_")) + "%"
                     exact = term.casefold()
+                    alias_key = title_key(term)
+                    alias_pattern = "%" + alias_key + "%"
                     cur.execute("""
                         SELECT m.id,m.title,m.title_english,m.title_japanese,
                                m.source_mal_id,m.volumes,m.manga_type,
-                               CASE WHEN LOWER(m.title)=%(exact)s
-                                 OR LOWER(COALESCE(m.title_english,''))=%(exact)s
-                                 OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
-                                    THEN 'EXACT_TITLE' ELSE 'SEARCH_SUGGESTION'
+                               (SELECT a.alias FROM manga_title_alias a
+                                WHERE a.manga_id=m.id AND a.language='fr'
+                                ORDER BY CASE
+                                  WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0
+                                  ELSE 1 END, a.alias LIMIT 1) AS title_fr,
+                               (SELECT a.alias FROM manga_title_alias a
+                                WHERE a.manga_id=m.id AND a.alias_key=%(alias_key)s
+                                ORDER BY CASE
+                                  WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0
+                                  ELSE 1 END,a.alias LIMIT 1) AS matched_alias,
+                               (SELECT a.source_name FROM manga_title_alias a
+                                WHERE a.manga_id=m.id AND a.alias_key=%(alias_key)s
+                                ORDER BY CASE
+                                  WHEN a.source_name='BNF_AUTHORITY_WORK' THEN 0
+                                  ELSE 1 END,a.alias LIMIT 1) AS alias_source,
+                               EXISTS (
+                                  SELECT 1 FROM user_manga_inventory_declaration d
+                                  WHERE d.manga_id=m.id AND d.user_id=%(user_id)s
+                               ) AS already_in_inventory,
+                               COALESCE((
+                                 SELECT jsonb_agg(jsonb_build_object(
+                                   'edition',d.edition_declared,
+                                   'entry_title',d.entry_title,
+                                   'main_volumes',d.main_volumes,
+                                   'duplicate_copies',d.duplicate_copies,
+                                   'other_editions_unknown',d.other_editions_unknown
+                                 ) ORDER BY d.edition_key)
+                                 FROM user_manga_inventory_declaration d
+                                 WHERE d.manga_id=m.id AND d.user_id=%(user_id)s
+                               ),'[]'::jsonb) AS known_editions,
+                               CASE
+                                 WHEN LOWER(m.title)=%(exact)s
+                                   OR LOWER(COALESCE(m.title_english,''))=%(exact)s
+                                   OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
+                                   OR EXISTS (
+                                     SELECT 1 FROM manga_title_alias a
+                                     WHERE a.manga_id=m.id
+                                       AND a.alias_key=%(alias_key)s
+                                   )
+                                 THEN 'EXACT_ALIAS' ELSE 'SEARCH_SUGGESTION'
                                END AS suggestion_kind
                         FROM manga m
                         WHERE m.title ILIKE %(pattern)s
                            OR m.title_english ILIKE %(pattern)s
                            OR m.title_japanese ILIKE %(pattern)s
+                           OR EXISTS (
+                              SELECT 1 FROM manga_title_alias a
+                              WHERE a.manga_id=m.id
+                                AND a.alias_key LIKE %(alias_pattern)s
+                           )
                         ORDER BY CASE WHEN LOWER(m.title)=%(exact)s
                                 OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                 OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
+                                OR EXISTS (
+                                  SELECT 1 FROM manga_title_alias a
+                                  WHERE a.manga_id=m.id
+                                    AND a.alias_key=%(alias_key)s)
                                 THEN 0 ELSE 1 END,
                                 m.popularity ASC NULLS LAST,m.id
                         LIMIT 12
-                    """, {"exact":exact,"pattern":pattern})
+                    """, {"exact":exact,"pattern":pattern,
+                           "alias_key":alias_key,
+                           "alias_pattern":alias_pattern,"user_id":user_id})
                     matches = list(cur.fetchall())
         return {
             "source_key": source_key,
