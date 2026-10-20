@@ -47,6 +47,76 @@ FROM user_manga_inventory_pending
 WHERE user_id=%(user_id)s
 """
 
+# This read-only preflight deliberately uses the exact eligibility and cache
+# rules of the two source collectors. A zero-result batch should never look
+# like a completed enrichment without explaining WHY no manga was selected.
+COVERAGE_SQL = """
+SELECT
+  COUNT(*)::int AS in_scope,
+  COUNT(*) FILTER (WHERE m.source_mal_id IS NULL OR m.source_mal_id <= 0)::int
+    AS without_mal_id,
+  COUNT(*) FILTER (
+    WHERE COALESCE(m.manga_type,'Manga') NOT IN
+      ('Manga','Manhwa','Manhua','One-shot')
+  )::int AS unsupported_type,
+  COUNT(*) FILTER (
+    WHERE m.source_mal_id > 0
+      AND COALESCE(m.manga_type,'Manga') IN
+        ('Manga','Manhwa','Manhua','One-shot')
+  )::int AS wikidata_eligible,
+  COUNT(*) FILTER (
+    WHERE m.source_mal_id > 0
+      AND COALESCE(m.manga_type,'Manga') IN
+        ('Manga','Manhwa','Manhua','One-shot')
+      AND wa.checked_at IS NOT NULL
+      AND wa.checked_at >= NOW() -
+        CASE WHEN wa.status='ERROR' THEN INTERVAL '1 day'
+             ELSE INTERVAL '45 days' END
+  )::int AS wikidata_cached,
+  COUNT(*) FILTER (
+    WHERE m.source_mal_id > 0
+      AND COALESCE(m.manga_type,'Manga') IN
+        ('Manga','Manhwa','Manhua','One-shot')
+      AND (wa.checked_at IS NULL OR wa.checked_at < NOW() -
+        CASE WHEN wa.status='ERROR' THEN INTERVAL '1 day'
+             ELSE INTERVAL '45 days' END)
+  )::int AS wikidata_due,
+  COUNT(*) FILTER (
+    WHERE COALESCE(m.manga_type,'Manga') IN
+        ('Manga','Manhwa','Manhua','One-shot')
+  )::int AS bnf_eligible,
+  COUNT(*) FILTER (
+    WHERE COALESCE(m.manga_type,'Manga') IN
+        ('Manga','Manhwa','Manhua','One-shot')
+      AND ba.checked_at IS NOT NULL
+      AND ba.checked_at >= NOW() -
+        CASE WHEN ba.status IN ('ERROR','PARTIAL')
+          THEN INTERVAL '1 day' ELSE INTERVAL '45 days' END
+  )::int AS bnf_cached,
+  COUNT(*) FILTER (
+    WHERE COALESCE(m.manga_type,'Manga') IN
+        ('Manga','Manhwa','Manhua','One-shot')
+      AND (ba.checked_at IS NULL OR ba.checked_at < NOW() -
+        CASE WHEN ba.status IN ('ERROR','PARTIAL')
+          THEN INTERVAL '1 day' ELSE INTERVAL '45 days' END)
+  )::int AS bnf_due
+FROM manga m
+LEFT JOIN manga_wikidata_attempt wa ON wa.manga_id=m.id
+LEFT JOIN manga_bnf_attempt ba ON ba.manga_id=m.id
+WHERE m.id=ANY(%(target_ids)s)
+"""
+
+
+def enrichment_coverage(factory: Callable[..., Any], ids: list[int]) -> dict[str, int]:
+    """Count processed, cache-hit and ineligible linked works, without writes."""
+    if len(ids) > MAX_WORKS or any(type(mid) is not int or mid <= 0 for mid in ids):
+        raise ValueError("Portee de mangatheque invalide.")
+    with factory() as conn:
+        with conn.cursor() as cur:
+            cur.execute(COVERAGE_SQL, {"target_ids": ids})
+            record = cur.fetchone()
+    return {key: int(value) for key, value in record.items()}
+
 
 def linked_library_scope(
     factory: Callable[..., Any], *, user_id: int = 1, max_works: int = DEFAULT_WORKS
@@ -99,9 +169,34 @@ def run_library_enrichment(
             "sans correspondance catalogue. AUCUN manga ni ISBN n'est devine.",
             flush=True,
         )
+    print(
+        "Sources choisies : Wikidata=OUI ; BnF="
+        + ("OUI" if include_bnf else "NON (option desactivee au lancement)"),
+        flush=True,
+    )
     if not ids:
         print("Aucune oeuvre de ta bibliotheque n'est liee au catalogue.", flush=True)
         return report
+    coverage = enrichment_coverage(factory, ids)
+    report["coverage"] = coverage
+    print(
+        "Eligibilite des oeuvres liees : "
+        f"Wikidata {coverage['wikidata_eligible']} eligibles, "
+        f"{coverage['wikidata_cached']} en cache, "
+        f"{coverage['wikidata_due']} a traiter ; "
+        f"BnF {coverage['bnf_eligible']} eligibles, "
+        f"{coverage['bnf_cached']} en cache, "
+        f"{coverage['bnf_due']} a traiter.",
+        flush=True,
+    )
+    if coverage["without_mal_id"] or coverage["unsupported_type"]:
+        print(
+            "Hors perimetre Wikidata : "
+            f"{coverage['without_mal_id']} sans ID MAL manga ; "
+            f"{coverage['unsupported_type']} type(s) non pris en charge "
+            "(ces groupes peuvent se recouper).",
+            flush=True,
+        )
 
     providers = [("wikidata", wikidata_batch, WIKIDATA_MAX_BATCH)]
     if include_bnf:
@@ -109,6 +204,16 @@ def run_library_enrichment(
 
     for name, collector, page_size in providers:
         summary: dict[str, int] = {"selected": 0}
+        due = coverage[name + "_due"]
+        cached = coverage[name + "_cached"]
+        if due == 0:
+            print(
+                f"[{name}] Aucune nouvelle oeuvre a interroger : "
+                f"{cached} deja en cache, {coverage[name + '_eligible']} eligibles.",
+                flush=True,
+            )
+            report["sources"][name] = {**summary, "due_before": 0, "cached": cached, "halted": 0}
+            continue
         halted = False
         # At most ceil(N / batch_size) + 1 selections; every selected work
         # is checkpointed in the source's attempt table.
@@ -146,7 +251,17 @@ def run_library_enrichment(
                     flush=True,
                 )
                 break
+        summary["due_before"] = due
+        summary["cached"] = cached
         summary["halted"] = int(halted)
+        if summary["selected"] == 0 and due:
+            print(
+                f"[{name}] ANOMALIE : {due} oeuvre(s) etaient eligibles "
+                "mais le collecteur n'en a selectionne aucune.",
+                flush=True,
+            )
+            halted = True
+            summary["halted"] = 1
         if halted:
             report["failed_sources"].append(name)
         report["sources"][name] = summary
@@ -178,6 +293,8 @@ def cli_main(argv: list[str] | None = None) -> int:
             f"  {source} : "
             + ", ".join(f"{k}={v}" for k, v in stats.items()), flush=True
         )
+    if "bnf" not in result["sources"]:
+        print("BnF non executee : source exclue au demarrage (--skip-bnf).", flush=True)
     if result["failed_sources"]:
         print(
             "ECHEC PARTIEL : fournisseur(s) indisponible(s) : "
