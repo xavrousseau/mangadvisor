@@ -1,0 +1,63 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const source=readFileSync("apps/web/assets/inventory-resolution-view.js","utf8");
+const {inventoryResolverMarkup}=await import(
+  "data:text/javascript;charset=utf-8,"+encodeURIComponent(source)
+);
+const escape=value=>String(value??"").replace(/[&<>"']/g,c=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
+const pending={
+ source_key:"Inventaire!A29",entry_title:"Dragon Ball (34 tomes)",
+ edition_declared:"Deluxe",main_volumes:34,duplicate_copies:0,
+ other_editions_unknown:0
+};
+const manga={
+ id:15,title:"Dragon Ball",title_english:"Dragon Ball",
+ manga_type:"Manga",volumes:42,source_mal_id:42
+};
+const base={
+ sourceKey:"Inventaire!A29",pending,query:"Dragon Ball",items:[
+  {...manga,suggestion_kind:"EXACT_TITLE"}
+ ],searched:true,loading:false,message:"",
+};
+
+test("manual series and edition confirmation does not imply ISBNs or individual volumes",()=>{
+ const html=inventoryResolverMarkup({
+  ...base,review:{
+   source:pending,manga,edition_key:"deluxe",
+   confirmation_token:"a".repeat(64),
+  }
+ },{escape,lang:"fr"});
+ assert.match(html,/data-action="pending-match-select"/);
+ assert.match(html,/data-id="15"/);
+ assert.match(html,/Dragon Ball/);
+ assert.match(html,/Deluxe/);
+ assert.match(html,/34 tomes principaux/);
+ assert.match(html,/Je confirme ce rapprochement/);
+ assert.match(html,/data-action="pending-match-confirm" disabled/);
+ assert.match(html,/Cela n&#39;ajoute ni ISBN/);
+ assert.doesNotMatch(html,/data-action="edition-confirm"/);
+ assert.doesNotMatch(html,/data-action="volume-owned"/);
+});
+test("pending manga titles and source labels are HTML escaped",()=>{
+ const markup=inventoryResolverMarkup({
+  ...base,pending:{...pending,entry_title:'<img src=x onerror="alert(1)">'},
+  items:[{...manga,title:'<script>alert(1)</script>'}],
+  review:null
+ },{escape});
+ assert.match(markup,/&lt;img/);
+ assert.match(markup,/&lt;script&gt;/);
+ assert.doesNotMatch(markup,/<img /);
+ assert.doesNotMatch(markup,/<script>/);
+});
+test("empty draft adds no fake selected manga",()=>{
+ assert.equal(inventoryResolverMarkup(null,{escape}),"");
+ const html=inventoryResolverMarkup({
+  ...base,items:[],searched:true,review:null,
+ },{escape,lang:"fr"});
+ assert.match(html,/Aucun résultat/);
+ assert.doesNotMatch(html,/pending-match-confirm/);
+});
