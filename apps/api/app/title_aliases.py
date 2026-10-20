@@ -481,10 +481,13 @@ def cli_main(argv:list[str]|None=None)->int:
     parser=argparse.ArgumentParser(description="Alias multilingues identifiants exacts.")
     parser.add_argument("--local-only",action="store_true")
     parser.add_argument("--mangadex-limit",type=int,default=15)
+    parser.add_argument("--pending-limit",type=int,default=15)
     parser.add_argument("--catalog-limit",type=int,default=20000)
     args=parser.parse_args(argv)
     if not 1<=args.mangadex_limit<=MAX_MANGADEX_BATCH:
         parser.error("--mangadex-limit doit etre entre 1 et 30")
+    if not 1<=args.pending_limit<=MAX_MANGADEX_BATCH:
+        parser.error("--pending-limit doit etre entre 1 et 30")
     if not 1<=args.catalog_limit<=100000:
         parser.error("--catalog-limit doit etre entre 1 et 100000")
     print("Indexation des noms alternatifs MAL et Wikidata déjà en base.",flush=True)
@@ -506,9 +509,19 @@ def cli_main(argv:list[str]|None=None)->int:
         step=import_mangadex_aliases(connect_database,target_ids=ids,limit=remaining)
         for key,val in step.items():aggregate[key]+=val
         if step["selected"]==0 or step["error"]:break
-    print("MangaDex : "+", ".join(f"{k}={v}" for k,v in aggregate.items()),flush=True)
+    print("MangaDex (oeuvres connues) : "+
+          ", ".join(f"{k}={v}" for k,v in aggregate.items()),flush=True)
+    pending_stats={"selected":0,"matched":0,"ambiguous":0,"not_found":0,
+                   "outside_catalog":0,"error":0,"aliases":0,"french":0}
+    while pending_stats["selected"]<args.pending_limit:
+        size=min(10,args.pending_limit-pending_stats["selected"])
+        step=pending_mangadex_aliases(connect_database,limit=size)
+        for key,value in step.items():pending_stats[key]+=value
+        if step["selected"]==0 or step["error"]:break
+    print("MangaDex (noms d'inventaire en attente) : "+
+          ", ".join(f"{k}={v}" for k,v in pending_stats.items()),flush=True)
     print("Correspondances par MAL ID uniquement. ISBN et editions inchanges.",flush=True)
-    return 1 if aggregate["error"] else 0
+    return 1 if aggregate["error"] or pending_stats["error"] else 0
 
 
 if __name__=="__main__":
