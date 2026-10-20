@@ -85,6 +85,8 @@ class WikidataEnrichmentTests(unittest.TestCase):
         q=sparql_for_ids([13, 1, 13])
         self.assertIn('VALUES ?malId { "1" "13" }',q)
         self.assertIn("wdt:P4087",q)
+        self.assertIn("skos:altLabel",q)
+        self.assertIn('LANG(?altTitle) IN ("fr", "en", "ja")',q)
         self.assertIn('LANG(?labelFr)="fr"',q)
         self.assertNotIn("wdt:P4086",q)
         for values in ([],[0],[-2],[1234567890],["1"],[1]*16):
@@ -108,6 +110,19 @@ class WikidataEnrichmentTests(unittest.TestCase):
         self.assertEqual(parsed[111]["status"],"AMBIGUOUS")
         self.assertIsNone(parsed[111]["fact"])
         self.assertEqual(parsed[42]["status"],"NOT_FOUND")
+
+    def test_multilingual_aliases_are_accepted_only_with_explicit_language(self):
+        item=binding(74,"Q12345","L'Attaque des Titans")
+        item["altTitle"]={"type":"literal","value":"Attack on Titan","xml:lang":"en"}
+        evil=binding(74,"Q12345")
+        evil["altTitle"]={"type":"literal","value":"Fake name","xml:lang":"xx"}
+        altjp=binding(74,"Q12345")
+        altjp["altTitle"]={"type":"literal","value":"進撃の巨人","xml:lang":"ja"}
+        record=normalize_wikidata([74],response(item,evil,altjp))[74]
+        self.assertEqual(record["status"],"MATCHED")
+        self.assertIn({"lang":"en","title":"Attack on Titan"},record["fact"]["alternate_titles"])
+        self.assertIn({"lang":"ja","title":"進撃の巨人"},record["fact"]["alternate_titles"])
+        self.assertFalse(any(t["title"]=="Fake name" for t in record["fact"]["alternate_titles"]))
 
     def test_invalid_or_truncated_provider_json_aborts_batch(self):
         for data in ({},{"results":{"bindings":"wrong"}},
