@@ -4,9 +4,14 @@
  */
 export function preferredMangaTitle(manga,lang="fr"){
   const read=x=>typeof x==="string"?x.trim():"";
-  const verified=lang==="fr" && manga?.title_fr_verified===true
-    ? read(manga.title_fr):"";
-  return verified || read(manga?.title_english) || read(manga?.title) ||
+  const frenchSource=read(manga?.title_fr_source);
+  const sourced=lang==="fr" && (
+    manga?.title_fr_verified===true ||
+    /^WIKIDATA_P4087(?:_(?:FR|EN|JA))?$/.test(frenchSource)
+  ) ? read(manga?.title_fr) : "";
+  // Wikidata is a multilingual community label, NOT proof of a marketed FR edition.
+  // Its origin is retained as title_fr_source and flagged on the detail page.
+  return sourced || read(manga?.title_english) || read(manga?.title) ||
     read(manga?.title_japanese) || (lang==="fr"?"Titre inconnu":"Unknown title");
 }
 
