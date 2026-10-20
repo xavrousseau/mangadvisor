@@ -52,6 +52,8 @@ class AliasTests(unittest.TestCase):
         self.assertEqual(title_key("Kaiju n°8"),"kaiju no 8")
         self.assertEqual(title_key("Kaiju nº 8"),"kaiju no 8")
         self.assertEqual(title_key("進撃の巨人"),"進撃の巨人")
+        self.assertEqual(title_key("ガッツ"),"ガッツ")
+        self.assertNotEqual(title_key("ガッツ"),title_key("カッツ"))
         self.assertNotEqual(title_key("Tokyo Ghoul"),title_key("Tokyo Ghoul:re"))
         self.assertNotEqual(title_key("Fairy Tail"),title_key("Fairy Tail 100 Years Quest"))
         self.assertNotEqual(title_key("Dragon Ball"),title_key("Dragon Ball Super"))
