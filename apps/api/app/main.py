@@ -20,6 +20,7 @@ from apps.api.app.edition_discovery import edition_discovery_router
 from apps.api.app.edition_enrichment import create_enrichment_router
 from apps.api.app.bnf_batch import create_bnf_catalog_router, ensure_bnf_schema
 from apps.api.app.wikidata_enrichment import create_wikidata_router, ensure_wikidata_schema
+from apps.api.app.title_aliases import ensure_alias_schema, title_key
 from apps.api.app.mood_discovery import make_discovery_router
 from apps.api.app.advisor import make_advisor_router
 
@@ -263,9 +264,14 @@ def list_mangas(
     if q:
         conditions.append(
             "(m.title ILIKE %(q)s OR m.title_english ILIKE %(q)s "
-            "OR m.title_japanese ILIKE %(q)s)"
+            "OR m.title_japanese ILIKE %(q)s OR EXISTS "
+            "(SELECT 1 FROM manga_title_alias sa WHERE sa.manga_id=m.id "
+            "AND sa.alias_key LIKE %(alias_pattern)s))"
         )
         params["q"] = f"%{q}%"
+        params["alias_pattern"] = "%" + (
+            title_key(q).replace("%",r"\%").replace("_",r"\_")
+        ) + "%"
 
     if genre:
         conditions.append(
@@ -3681,6 +3687,7 @@ def prepare_fr_collection() -> None:
     ensure_inventory_schema(get_connection)
     ensure_bnf_schema(get_connection)
     ensure_wikidata_schema(get_connection)
+    ensure_alias_schema(get_connection)
 
 
 app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
