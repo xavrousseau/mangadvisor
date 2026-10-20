@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -289,6 +289,30 @@ function Load-Extended-Catalogue {
   Write-Host ("Catalogue avant : {0} / apres : {1} / variation nette : {2}" -f $before,$after,($after-$before))
   Write-Host ("Notices distinctes en provenance fournisseur : {0}" -f $sourceCount)
   Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
+}
+function Benchmark-Catalogue-Sources {
+  Say "Comparatif de 50 mangas : Scrinis et MangaUpdates (lecture seule)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  $null=Get-Count "manga"
+  $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
+  Write-Host "Selection : entrees de mangatheque en attente, oeuvres possedees, autres mangas."
+  Write-Host "L'outil va afficher la selection sans aucun appel Internet."
+  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count,"--dry-run")
+  Write-Host "Si tu confirmes, seuls les TITRES des oeuvres seront transmis aux deux API."
+  Write-Host "Les quantites, les lectures, les notes, les sources privees et les ISBN ne seront pas transmis."
+  Write-Host "Resultats locaux uniquement, aucune ecriture PostgreSQL."
+  Write-Host "Quota Scrinis : maximum 15 appels par minute sans cle (pause 4,5 s)."
+  if (!(Confirm "Lancer maintenant les recherches publiques sur ces titres ?" $false)) {
+    Write-Host "Comparatif annule : aucune requete publique envoyee."
+    return
+  }
+  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count)
+  $reportDir=Join-Path $root "data\logs\catalog_sources"
+  Write-Host ("Rapports CSV et JSON disponibles dans : " + $reportDir)
+  Write-Host "Aucun resultat n'est associe automatiquement a ta mangatheque."
 }
 function Import-BnF-Bulk {
   Say "Importer des lots bibliographiques officiels BnF (zone de candidats)"
@@ -630,6 +654,7 @@ try {
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
     "BnFBulk"         { Import-BnF-Bulk }
+    "SourcesBenchmark" { Benchmark-Catalogue-Sources }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
     "Aliases"         { Enrich-Multilingual-Aliases }
