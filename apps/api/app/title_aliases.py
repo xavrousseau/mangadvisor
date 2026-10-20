@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
 import re
 import time
 import unicodedata
@@ -57,6 +58,17 @@ CREATE TABLE IF NOT EXISTS manga_mangadex_attempt (
     status TEXT NOT NULL CHECK (status IN ('MATCHED','NOT_FOUND','AMBIGUOUS','ERROR')),
     source_id TEXT,
     checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS manga_mangadex_pending_attempt (
+    user_id INTEGER NOT NULL,
+    source_key TEXT NOT NULL,
+    search_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN ('MATCHED','AMBIGUOUS','NOT_FOUND','OUTSIDE_CATALOG','ERROR')
+    ),
+    candidates INTEGER NOT NULL DEFAULT 0,
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY(user_id,source_key)
 );
 """
 
@@ -318,6 +330,113 @@ def import_mangadex_aliases(
             print("MangaDex indisponible : arret, reprise plus tard.",flush=True)
             break
     return report
+
+
+PENDING_OWNER_SQL = """
+SELECT p.source_key,p.entry_title,p.work_declared
+FROM user_manga_inventory_pending p
+LEFT JOIN manga_mangadex_pending_attempt a
+  ON a.user_id=p.user_id AND a.source_key=p.source_key
+WHERE p.user_id=%(user_id)s
+  AND (a.checked_at IS NULL
+    OR a.search_hash<>md5(COALESCE(NULLIF(BTRIM(p.work_declared),''),
+                                    p.entry_title))
+    OR a.checked_at<NOW()-CASE WHEN a.status='ERROR' THEN INTERVAL '1 day'
+                                ELSE INTERVAL '45 days' END)
+ORDER BY p.source_key
+LIMIT %(limit)s
+"""
+
+UPSERT_PENDING = """
+INSERT INTO manga_mangadex_pending_attempt
+    (user_id,source_key,search_hash,status,candidates,checked_at)
+VALUES (%(user_id)s,%(source_key)s,%(search_hash)s,%(status)s,%(candidates)s,NOW())
+ON CONFLICT (user_id,source_key) DO UPDATE SET
+ search_hash=EXCLUDED.search_hash,status=EXCLUDED.status,
+ candidates=EXCLUDED.candidates,checked_at=NOW()
+"""
+
+
+def pending_mangadex_aliases(
+    factory:Callable[...,Any], *,limit:int=15,user_id:int=1,
+    search:Callable[[str],dict[str,Any]]=fetch_mangadex,
+    sleep:Callable[[float],Any]=time.sleep,
+)->dict[str,int]:
+    """Look up UNRESOLVED owner's titles, never resolve them automatically."""
+    if type(limit) is not int or not 1<=limit<=MAX_MANGADEX_BATCH:
+        raise ValueError("Invalid pending MangaDex limit")
+    if type(user_id) is not int or user_id<=0:raise ValueError("Invalid user")
+    ensure_alias_schema(factory)
+    with factory() as conn:
+        with conn.cursor() as cur:
+            cur.execute(PENDING_OWNER_SQL,{"user_id":user_id,"limit":limit})
+            works=list(cur.fetchall())
+    result={"selected":len(works),"matched":0,"ambiguous":0,
+            "not_found":0,"outside_catalog":0,"error":0,
+            "aliases":0,"french":0}
+    for index,work in enumerate(works):
+        title=(work.get("work_declared") or work.get("entry_title") or "").strip()[:180]
+        digest=hashlib.md5(title.encode("utf-8")).hexdigest()
+        findings={}
+        status="NOT_FOUND"
+        try:
+            if len(title)>=2:
+                if index:sleep(1.6)
+                response=search(title)
+                for raw in response.get("data",[])[:20]:
+                    if not isinstance(raw,dict):continue
+                    attrs=raw.get("attributes") or {}
+                    if not isinstance(attrs,dict):continue
+                    links=attrs.get("links") or {}
+                    if not isinstance(links,dict):continue
+                    value=str(links.get("mal") or "")
+                    if not re.fullmatch(r"[1-9][0-9]{0,8}",value):continue
+                    mal=int(value)
+                    matched=matched_mangadex(mal,[{"data":[raw]}])
+                    if matched["status"]!="MATCHED":continue
+                    # A substring hit is NOT proof that this owner source title
+                    # denotes the result; require an exact title / altTitle.
+                    if normalize_title(title) not in {
+                        alias["search_key"] for alias in matched["aliases"]
+                    }:
+                        continue
+                    findings[mal]=matched
+            if findings:
+                ids=list(findings)
+                with factory() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT id,source_mal_id FROM manga
+                            WHERE source_mal_id=ANY(%(ids)s)
+                        """,{"ids":ids})
+                        canonical={int(row["source_mal_id"]):int(row["id"])
+                                   for row in cur.fetchall()}
+                if not canonical:
+                    status="OUTSIDE_CATALOG"
+                else:
+                    status="MATCHED" if len(canonical)==1 else "AMBIGUOUS"
+                    with factory() as conn:
+                        with conn.cursor() as cur:
+                            for mal,manga_id in canonical.items():
+                                for alias in findings[mal]["aliases"]:
+                                    cur.execute(UPSERT,{"manga_id":manga_id,**alias})
+                                    result["aliases"]+=1
+                                    result["french"]+=int(alias["language_code"]=="fr")
+                        conn.commit()
+        except (MangaDexUnavailable,ValueError,TimeoutError,OSError):
+            status="ERROR"
+        with factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute(UPSERT_PENDING,{
+                    "user_id":user_id,"source_key":work["source_key"],
+                    "search_hash":digest,"status":status,"candidates":len(findings),
+                })
+            conn.commit()
+        result[status.lower()]+=1
+        print(f"MangaDex inventaire {index+1}/{len(works)} : "
+              f"{status} ({len(findings)} liens MAL vérifiés)",flush=True)
+        if status=="ERROR":break
+    return result
 
 
 def create_title_alias_router(factory:Callable[...,Any])->APIRouter:
