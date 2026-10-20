@@ -292,7 +292,7 @@ function Enrich-Multilingual-Aliases {
   Wait-Postgres
   $limit=Ask-Number "Nombre de mangas Wikidata deja lies a enrichir (max 20)" 12 20
   $refresh=Confirm "Reprendre meme les mangas deja enrichis recemment ?" $false
-  Write-Host "Les alias sont relies aux manga par MAL ID P4087, revérifie cote Wikidata."
+  Write-Host "Les alias sont relies aux manga par MAL ID P4087, reverifie cote Wikidata."
   Write-Host "Aucune edition francaise ou possession ne sera attribuee automatiquement."
   Backup
   $argsList=@("run","--rm","--no-deps","api","python","-m",
