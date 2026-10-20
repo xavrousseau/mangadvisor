@@ -37,7 +37,7 @@ export function bnfCachedCandidatesMarkup(cache, {escape, lang = "fr"}) {
       ? '<a href="' + e(row.source_url) + '" target="_blank" rel="noopener noreferrer">' +
           (fr ? "Notice BnF" : "BnF source record") + ' ↗</a>'
       : '';
-    return '<article class="edition-item bnf-candidate-item"><div class="edition-main">' +
+    return '<article class="bnf-candidate-item"><div class="edition-main">' +
       '<h3>' + e(row.title_fr) + '</h3>' +
       '<p>' + [row.author_fr, row.publisher_fr, row.release_date_text].filter(Boolean).map(e).join(" · ") + '</p>' +
       '<p class="edition-source">ISBN ' + e(isbn) + ' · ' + e(info) + (source ? ' · ' + source : '') + '</p>' +
