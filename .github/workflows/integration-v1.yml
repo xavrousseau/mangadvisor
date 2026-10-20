@@ -662,6 +662,61 @@ jobs:
           print("2 editions distinctes, validation manuelle, audit, droits et nettoyage : OK")
           PY
 
+      - name: Verifier les recherches multilingues et le rapprochement manuel (SQL reel)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+          from apps.api.app.main import get_connection
+          title="L'Attaque des Titres de CI"
+          key="ci-multilingual-title-alias"
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT id,source_mal_id FROM manga ORDER BY id LIMIT 1")
+                  work=cur.fetchone()
+                  assert work
+                  cur.execute("""
+                    INSERT INTO manga_title_alias
+                    (manga_id,source_name,source_id,language_code,alias,alias_key,source_url)
+                    VALUES (%s,'TEST_CI','test','fr',%s,%s,'https://www.wikidata.org/wiki/Q1')
+                    ON CONFLICT DO NOTHING
+                  """,(work["id"],title,title.lower()))
+                  cur.execute("""
+                    INSERT INTO user_manga_inventory_pending
+                    (user_id,source_key,entry_title,source_reference,
+                    work_declared,edition_declared,format_hint,main_volumes,
+                    duplicate_copies,other_editions_unknown,review_status,
+                    candidate_ids,content_sha256)
+                    VALUES (1,%s,%s,%s,%s,NULL,NULL,35,0,0,'REVIEW_MISSING',
+                            ARRAY[]::integer[],%s)
+                    ON CONFLICT DO NOTHING
+                  """,(key,title,key,title,"7"*64))
+              conn.commit()
+          def api(path):
+              with urllib.request.urlopen("http://127.0.0.1:8000"+path,timeout=15) as response:
+                  return json.load(response)
+          q=urllib.parse.quote(title)
+          matches=api("/mangas?q="+q+"&limit=20")
+          assert work["id"] in [x["id"] for x in matches["items"]],matches
+          preview=api("/inventory/pending/candidates?"+urllib.parse.urlencode({
+              "source_key":key,"q":title,
+          }))
+          candidate=next(x for x in preview["items"] if x["id"]==work["id"])
+          assert candidate["matched_alias"]==title,candidate
+          assert candidate["suggestion_kind"]=="EXACT_MULTILINGUAL_ALIAS",candidate
+          assert preview["automatic_association"] is False,preview
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("DELETE FROM user_manga_inventory_pending WHERE user_id=1 AND source_key=%s",(key,))
+                  cur.execute("DELETE FROM manga_title_alias WHERE manga_id=%s AND source_name='TEST_CI'",(work["id"],))
+              conn.commit()
+          print("Recherche FR / inventaire / ID canonique / aucun rapprochement automatique : OK")
+          PY
+
       - name: Sauvegarder et valider une restauration complete de la mangatheque
         shell: bash
         run: |
