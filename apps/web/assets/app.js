@@ -382,13 +382,22 @@ async function updatePhysicalInventory(token){
  const host=document.querySelector("#physical-inventory-results");
  if(!host)return;
  try{
-  const [physical,pending]=await Promise.all([
+  const [physical,pending,multilingualHints]=await Promise.all([
     request("/inventory/declarations"),
     request("/inventory/pending"),
+    request("/inventory/pending/multilingual-suggestions").catch(()=>null),
   ]);
   if(token===renderToken && routeInfo().view==="library"){
-    state.pendingRows=Array.isArray(pending.items)?pending.items:[];
-    host.innerHTML=physicalInventoryMarkup({...physical,pending},state.lang,t,escapeHtml);
+    const hints=new Map((Array.isArray(multilingualHints?.items)?
+      multilingualHints.items:[]).map(item=>[item.source_key,item]));
+    const enrichedPending={
+      ...pending,
+      items:(Array.isArray(pending.items)?pending.items:[]).map(item=>({
+        ...item,match_suggestion:hints.get(item.source_key)||null,
+      }))
+    };
+    state.pendingRows=enrichedPending.items;
+    host.innerHTML=physicalInventoryMarkup({...physical,pending:enrichedPending},state.lang,t,escapeHtml);
     renderPendingMatcher();
   }
  }catch(err){
