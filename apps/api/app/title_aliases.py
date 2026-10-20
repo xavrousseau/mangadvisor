@@ -123,14 +123,14 @@ def aliases_from_source(row: dict[str,Any]) -> list[dict[str,str | None]]:
     wiki=row.get("wikidata_id")
     if isinstance(wiki,str) and re.fullmatch(r"Q[1-9]\d{0,11}",wiki):
         source_url=f"https://www.wikidata.org/wiki/{wiki}"
-        include(row.get("wikidata_label_fr"),"fr","WIKIDATA_P4087",
+        include(row.get("wikidata_label_fr"),"fr","WIKIDATA_P4087_FR",
                 source_url)
         raw_titles=row.get("wikidata_alternate_titles")
         if isinstance(raw_titles,list):
             for item in raw_titles[:40]:
                 if isinstance(item,dict) and item.get("lang") in ("fr","en","ja"):
                     include(item.get("title"),item["lang"],
-                            "WIKIDATA_P4087",source_url)
+                            "WIKIDATA_P4087_"+item["lang"].upper(),source_url)
     for verified_mal,title,lang,source,url in REVIEWED_WORK_ALIASES:
         if mal==verified_mal:
             include(title,lang,source,url)
@@ -172,11 +172,51 @@ def sync_aliases(factory:Callable[...,Any], *, max_works:int=50000) -> dict[str,
     return dict(totals)
 
 
+def refresh_library_wikidata(factory:Callable[...,Any],
+                             *, max_works:int=80,
+                             sleep:Callable[[float],Any]|None=None)->dict[str,int]:
+    """Opt-in only: requery cached linked MAL IDs for current multilingual labels."""
+    import time
+    from apps.api.app.library_enrichment import linked_library_scope
+    from apps.api.app.wikidata_enrichment import run_batch as wiki_batch
+    if type(max_works) is not int or not 1 <= max_works <= 250:
+        raise ValueError("Maximum d'oeuvres liees invalide (1..250).")
+    scope=linked_library_scope(factory,max_works=max_works)
+    ids=scope["ids"]
+    paused=sleep if sleep is not None else time.sleep
+    totals=Counter()
+    for offset in range(0,len(ids),15):
+        if offset: paused(2.5)
+        part=ids[offset:offset+15]
+        result=wiki_batch(factory,limit=len(part),refresh=True,target_ids=part)
+        for k,v in result.items():
+            if isinstance(v,int):totals[k]+=v
+        print(f"Alias Wikidata : lot {1+offset//15}, "
+              f"{result['matched']} correspondances, "
+              f"{result['error']} erreurs.",flush=True)
+        if result["selected"] and result["error"]==result["selected"]:
+            print("Source indisponible : arrêt immédiat des recherches Wikidata.",
+                  flush=True)
+            totals["aborted"]=1
+            break
+    return dict(totals)
+
+
 def cli_main(argv:list[str]|None=None)->int:
     parser=argparse.ArgumentParser(description="Index des titres et alias FR/EN/JA existants.")
     parser.add_argument("--max-works",type=int,default=50000)
+    parser.add_argument("--refresh-library-wikidata",action="store_true",
+                        help="Reconsulter Wikidata pour les oeuvres liees uniquement.")
+    parser.add_argument("--library-max-works",type=int,default=80)
     args=parser.parse_args(argv)
     if not 1<=args.max_works<=50000:parser.error("1..50000 attendus")
+    if not 1<=args.library_max_works<=250:parser.error("1..250 attendus")
+    if args.refresh_library_wikidata:
+        refresh=refresh_library_wikidata(
+            connect_database,max_works=args.library_max_works)
+        if refresh.get("aborted"):
+            print("Alias locaux deja recuperes inchanges. Nouvelle tentative "
+                  "Wikidata possible plus tard.",flush=True)
     result=sync_aliases(connect_database,max_works=args.max_works)
     print("Bilan index multilingue : "+", ".join(
         f"{key}={val}" for key,val in result.items()),flush=True)
