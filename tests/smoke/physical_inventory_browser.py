@@ -33,6 +33,26 @@ def main():
             expect(pending).to_contain_text("Inconnu de CI")
             expect(pending).to_contain_text("2 exemplaires")
             assert pending.locator('[data-go^="/manga/"]').count()==0
+            # The pending work now has a manual, opt-in resolution wizard.
+            pending.locator('[data-action="pending-match-start"]').first.click()
+            expect(page.locator("#inventory-match-panel")).to_be_visible(timeout=30000)
+            expect(page.locator("#inventory-match-panel")).to_contain_text("Inconnu de CI")
+            page.locator("#pending-match-query").fill("Demo CI 16")
+            page.locator('#pending-match-search-form button[type="submit"]').click()
+            options=page.locator(".inventory-match-candidate")
+            expect(options.first).to_be_visible(timeout=30000)
+            options.locator('[data-action="pending-match-select"][data-id="16"]').first.click()
+            expect(page.locator(".inventory-match-review")).to_be_visible(timeout=30000)
+            expect(page.locator(".inventory-match-review")).to_contain_text("Inconnu de CI")
+            expect(page.locator(".inventory-match-review")).to_contain_text("Demo CI 16")
+            expect(page.locator('[data-action="pending-match-confirm"]')).to_be_disabled()
+            page.locator("#pending-match-ack").check()
+            expect(page.locator('[data-action="pending-match-confirm"]')).to_be_enabled()
+            # Do not confirm in this browser smoke: original pending claims
+            # and the subsequent CI fixtures must remain unchanged.
+            page.locator('[data-action="pending-match-close"]').click()
+            expect(page.locator("#inventory-match-panel")).to_have_count(0)
+            expect(pending).to_contain_text("Inconnu de CI")
             page.screenshot(path=str(OUT/f"{device}-physical-inventory-3-9.png"),full_page=True)
             matches.locator('[data-go^="/manga/"]').click()
             expect(page).to_have_url(BASE+"/manga/16",timeout=30000)
