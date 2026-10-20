@@ -81,6 +81,8 @@ L'option principale **4** réalise un `pg_dump` avec manifeste SHA256, suivi d'u
 
 **Résoudre les lignes en attente :** dans **Ma bibliothèque → En attente de rapprochement**, clique sur **Rapprocher cette ligne**, recherche l'œuvre exacte, vérifie l'édition et les quantités, puis confirme explicitement. Deux éditions d'une même série (ex. Pastel et Deluxe) restent indépendantes. Aucune lecture ni aucun ISBN n'est inventé. [Guide du rapprochement manuel](docs/04_product/manual_pending_inventory_reconciliation_4_3.md).
 
+**Nouveauté — alias multilingues :** les recherches de mangas et le rapprochement peuvent utiliser les titres alternatifs Wikidata (P4087) et les synonymes déjà présents dans les données Tenrai/MyAnimeList, sans télécharger de nouveau catalogue. **A → 13** enrichit des alias supplémentaires FR/EN/JA par lots depuis Wikidata avec vérification de l'ID MAL. Dans l'atelier, un bouton facultatif lance une **recherche MangaDex** (usage personnel non commercial) et ne présente que les résultats qui indiquent explicitement le MAL manga ID du catalogue. Aucune association ni édition n'est automatique. [Guide multilingue](docs/04_product/multilingual_aliases_4_4.md).
+
 ## Architecture et contrôle qualité
 
 | Composant | Emplacement |
