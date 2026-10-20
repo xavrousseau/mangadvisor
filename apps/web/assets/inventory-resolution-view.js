@@ -21,12 +21,17 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
         '<strong>'+e(manga.title)+'</strong>'+
         (manga.title_english&&manga.title_english!==manga.title?
           '<span class="muted tiny"> · '+e(manga.title_english)+'</span>':"")+
+        (manga.matched_alias?
+          '<p class="muted tiny">'+e(fr?"Autre titre reconnu : ":"Matched alias: ")+e(manga.matched_alias)+'</p>':"")+
         '<p class="muted tiny">MAL '+e(manga.source_mal_id||"—")+
         ' · '+e(manga.manga_type||"—")+
         (manga.volumes!==null&&manga.volumes!==undefined?
           ' · '+e(manga.volumes)+' '+(fr?"tomes":"volumes"):"")+
         (manga.suggestion_kind==="EXACT_TITLE"?
-          ' · '+(fr?"Titre exact":"Exact title"):"")+'</p>'+
+          ' · '+(fr?"Titre exact":"Exact title"):"")+
+        (manga.suggestion_kind==="EXACT_MULTILINGUAL_ALIAS"?
+          ' · '+(fr?"Alias multilingue exact (à confirmer)":"Exact multilingual alias (confirm)"):"")+
+        '</p>'+
         '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-select" data-id="'+e(id)+'">'+
           (fr?"Examiner cette œuvre":"Review this work")+'</button></article>';
     }).join("")+'</div>';
