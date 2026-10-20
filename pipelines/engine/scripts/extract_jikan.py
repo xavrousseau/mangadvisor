@@ -112,12 +112,18 @@ def fetch_jikan_with_retry(
             response = requests.get(url, params=cleaned_params, timeout=timeout)
 
             if response.status_code == 429:
-                wait_seconds = retry_delay_seconds * attempt
-                print(
-                    f"[jikan] rate limit 429 sur {endpoint}. "
-                    f"Attente {wait_seconds}s avant retry..."
-                )
-                time.sleep(wait_seconds)
+                # Tenrai returns Retry-After when throttled. Never hammer the
+                # provider; keep the retry bounded and respect that header.
+                raw_delay = response.headers.get("Retry-After", "")
+                try:
+                    header_delay = float(raw_delay)
+                except (ValueError, TypeError):
+                    header_delay = 0
+                wait_seconds = max(retry_delay_seconds * attempt, min(max(header_delay, 0), 120))
+                if attempt < max_retries:
+                    print(f"[tenrai] quota 429 sur {endpoint} ; nouvelle tentative dans {wait_seconds:g}s.")
+                    time.sleep(wait_seconds)
+                    continue
                 response.raise_for_status()
 
             response.raise_for_status()
