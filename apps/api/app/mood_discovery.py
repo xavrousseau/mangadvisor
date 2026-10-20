@@ -143,6 +143,16 @@ def make_discovery_router(
                 SELECT 1 FROM user_manga_library l
                 WHERE l.user_id = %(user_id)s AND l.manga_id = m.id
             )""",
+            """NOT EXISTS (
+                SELECT 1 FROM user_manga_inventory_declaration physical
+                WHERE physical.user_id = %(user_id)s AND physical.manga_id = m.id
+            )""",
+            """NOT EXISTS (
+                SELECT 1 FROM user_manga_volume owned_volume
+                JOIN manga_fr_edition book ON book.id = owned_volume.edition_id
+                WHERE owned_volume.user_id = %(user_id)s AND book.manga_id = m.id
+                  AND (owned_volume.is_owned = TRUE OR owned_volume.is_read = TRUE)
+            )""",
             """(
                 EXISTS (
                     SELECT 1 FROM manga_genre mg
