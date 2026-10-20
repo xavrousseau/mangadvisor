@@ -82,8 +82,17 @@ def title_key(title: str | None) -> str:
         return ""
     t = unicodedata.normalize("NFKC",title).casefold()
     t = t.replace("n°","no ").replace("nº","no ")
-    t = "".join(c for c in unicodedata.normalize("NFKD", t)
-                if not unicodedata.combining(c))
+    # Strip French/Latin accent marks, but preserve voiced Japanese Kana.
+    # Stripping ALL combining marks would silently make ガ == カ, etc.
+    chars = []
+    base = ""
+    for ch in unicodedata.normalize("NFD", t):
+        if unicodedata.combining(ch) and "LATIN" in unicodedata.name(base, ""):
+            continue
+        chars.append(ch)
+        if not unicodedata.combining(ch):
+            base = ch
+    t = unicodedata.normalize("NFC", "".join(chars))
     t = "".join(c if c.isalnum() else " " for c in t)
     return " ".join(t.split())[:200]
 
