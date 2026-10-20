@@ -545,6 +545,10 @@ async function renderDetail(token,id){
   const elements='<section class="detail-hero">'+
    poster(manga,urls,false)+'<div class="detail-info"><div class="eyebrow">MANGADVISOR · '+L("mangaDetails")+'</div>'+
    '<h1>'+e(displayTitle)+'</h1>'+
+   (state.lang==="fr" && /^WIKIDATA_P4087/.test(String(manga.title_fr_source||""))?
+     '<p class="locale-note">ⓘ Libellé français communautaire · Wikidata (MAL ID vérifié), pas une édition certifiée.</p>':
+     state.lang==="fr" && manga.title_fr_source==="BNF_AUTHORITY_WORK"?
+     '<p class="locale-note">ⓘ Titre français sourcé · Notice d’autorité BnF.</p>':"")+
    '<p class="detail-sub">'+alternateTitles.map(e).join(' · ')+'</p>'+
    '<div class="tag-row">'+badges(manga.genres,5)+badges(manga.demographics,2)+'</div>'+
    '<p class="muted tiny">'+L("status")+' : '+e(publication(state.lang,manga.status))+' · '+
