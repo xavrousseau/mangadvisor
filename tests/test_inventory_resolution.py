@@ -58,6 +58,10 @@ class DummyCursor:
             return {"source_key":"Inventaire!A29"}
         return None
     def fetchall(self):
+        if "FROM manga_title_alias a" in self.last_sql and "JOIN manga m" in self.last_sql:
+            return self.db.alias_rows
+        if "ORDER BY entry_title,source_key LIMIT 1000" in self.last_sql:
+            return self.db.pending_items
         if "LIMIT 12" in self.last_sql and "FROM manga m" in self.last_sql:
             return self.db.candidates
         if "FROM user_manga_inventory_declaration" in self.last_sql:
@@ -80,6 +84,8 @@ class DummyDb:
         self.existing=existing
         self.rejected=rejected
         self.candidates=[dict(MANGA,suggestion_kind="EXACT_TITLE")]
+        self.pending_items=[]
+        self.alias_rows=[]
         self.queries=[]
         self.commits=0
     def __call__(self):return DummyConnection(self)
@@ -141,6 +147,39 @@ class PendingResolutionTests(unittest.TestCase):
         self.assertIn(r"\_",query["pattern"])
         self.assertEqual(result["query"],r"100%_\\")
         self.assertFalse(any("INSERT " in q for q,_ in db.queries))
+
+    def test_multilingual_pending_suggestions_are_read_only_and_duplicates_stay_pending(self):
+        db=DummyDb()
+        db.pending_items=[
+            {"source_key":"a","entry_title":"L'Attaque des Titans",
+             "work_declared":None},
+            {"source_key":"b","entry_title":"Naruto","work_declared":"Naruto"},
+            {"source_key":"c","entry_title":"Inconnu","work_declared":None},
+        ]
+        db.alias_rows=[
+            {"alias_key":"l attaque des titans","alias":"L'Attaque des Titans",
+             "source_name":"BNF_AUTHORITY_WORK","language":"fr",
+             "id":74,"title":"Shingeki no Kyojin","title_english":"Attack on Titan",
+             "already_in_inventory":True},
+            {"alias_key":"naruto","alias":"Naruto","source_name":"MAL_ORIGINAL",
+             "language":"romaji","id":44,"title":"Naruto",
+             "title_english":"Naruto","already_in_inventory":False},
+            {"alias_key":"naruto","alias":"Naruto","source_name":"MAL_ALT",
+             "language":"romaji","id":45,"title":"Naruto Novel",
+             "title_english":"Naruto Novel","already_in_inventory":False},
+        ]
+        endpoint=self.endpoints(db)["/inventory/pending/multilingual-suggestions"]
+        report=endpoint()
+        self.assertFalse(report["automatic_association"])
+        by={r["source_key"]:r for r in report["items"]}
+        self.assertEqual(by["a"]["state"],"ALREADY_IN_COLLECTION")
+        self.assertEqual(by["a"]["catalog_title"],"Shingeki no Kyojin")
+        self.assertEqual(by["a"]["source_name"],"BNF_AUTHORITY_WORK")
+        self.assertEqual(by["b"]["state"],"AMBIGUOUS")
+        self.assertIsNone(by["b"]["manga_id"])
+        self.assertEqual(by["c"]["state"],"NO_EXACT_ALIAS")
+        self.assertTrue(all(q.strip().startswith("SELECT") for q,_ in db.queries))
+        self.assertEqual(db.commits,0)
 
     def test_confirm_requires_review_token_and_manual_acknowledgment(self):
         from apps.api.app.inventory_import import PendingResolveConfirm
