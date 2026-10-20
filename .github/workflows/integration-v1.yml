@@ -741,6 +741,14 @@ jobs:
                   """,(pending_key,alias+" (35)",pending_key,alias,"c"*64))
               conn.commit()
 
+          batch_hint=api("/inventory/pending/multilingual-suggestions")
+          match_hint=next(row for row in batch_hint["items"]
+                          if row["source_key"]==pending_key)
+          assert not batch_hint["automatic_association"],batch_hint
+          assert match_hint["state"]=="ALREADY_IN_COLLECTION",match_hint
+          assert match_hint["catalog_title"]==work["title"],match_hint
+          assert match_hint["matched_alias"]==alias,match_hint
+          assert match_hint["source_name"]=="CI_MANUAL_TEST",match_hint
           q=urllib.parse.urlencode({"q":alias,"limit":20})
           catalog=api("/mangas?"+q)
           assert any(m["id"]==manga_id for m in catalog["items"]),catalog
