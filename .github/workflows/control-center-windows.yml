@@ -143,6 +143,14 @@ jobs:
             throw "Le parcours de mise a jour Git securisee est invalide."
           }
 
+      - name: Verifier le synchroniseur GitHub sur un clone Windows jetable
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-github-sync.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Synchronisation GitHub non securisee ou collisions non gerees."
+          }
+
       - name: Verifier la sauvegarde obligatoire avant l'import depuis le menu
         shell: powershell
         run: |
