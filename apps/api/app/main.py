@@ -14,6 +14,7 @@ from apps.api.app.library_seed_selection import (
 from apps.api.app.collection import create_collection_router, ensure_collection_schema
 from apps.api.app.collection_bulk import collection_import_router
 from apps.api.app.inventory_import import inventory_router,ensure_inventory_schema
+from apps.api.app.inventory_resolution import create_pending_resolution_router
 from apps.api.app.collection_scan import scan_router
 from apps.api.app.edition_discovery import edition_discovery_router
 from apps.api.app.edition_enrichment import create_enrichment_router
@@ -3685,6 +3686,7 @@ def prepare_fr_collection() -> None:
 app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
 app.include_router(collection_import_router(get_connection, DEFAULT_USER_ID))
 app.include_router(inventory_router(get_connection, DEFAULT_USER_ID))
+app.include_router(create_pending_resolution_router(get_connection, DEFAULT_USER_ID))
 app.include_router(scan_router(get_connection, DEFAULT_USER_ID))
 app.include_router(edition_discovery_router(get_connection))
 app.include_router(create_enrichment_router(get_connection))
