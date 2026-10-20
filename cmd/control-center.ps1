@@ -296,6 +296,7 @@ function Benchmark-Catalogue-Sources {
   Check-Docker
   Compose @("up","-d","postgres","meilisearch","api")
   Wait-Postgres
+  $null=Wait-Health
   $null=Get-Count "manga"
   $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
   Write-Host "Selection : entrees de mangatheque en attente, oeuvres possedees, autres mangas."
