@@ -79,6 +79,8 @@ L'option principale **4** réalise un `pg_dump` avec manifeste SHA256, suivi d'u
 
 **Important :** une entrée physique sans correspondance canonique (titre ambigu ou absent du catalogue) reste **en attente**. Elle ne peut pas exclure automatiquement un manga du catalogue sans risquer de faire une fausse association.
 
+**Résoudre les lignes en attente :** dans **Ma bibliothèque → En attente de rapprochement**, clique sur **Rapprocher cette ligne**, recherche l'œuvre exacte, vérifie l'édition et les quantités, puis confirme explicitement. Deux éditions d'une même série (ex. Pastel et Deluxe) restent indépendantes. Aucune lecture ni aucun ISBN n'est inventé. [Guide du rapprochement manuel](docs/04_product/manual_pending_inventory_reconciliation_4_3.md).
+
 ## Architecture et contrôle qualité
 
 | Composant | Emplacement |
