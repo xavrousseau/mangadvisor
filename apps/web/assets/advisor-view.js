@@ -120,6 +120,8 @@ export function advisorResultsMarkup(response,{L,e,tr,poster,rating,published}){
    return '<article class="rec-card advisor-card">'+poster(m)+
     '<div class="rec-body"><span class="rec-rank">'+L("advisorPick")+' #'+(i+1)+'</span>'+
     '<h3>'+e(m.title||"Manga")+'</h3>'+
+    (m.title_original&&m.title_original!==m.title?
+      '<p class="mood-card-meta">'+e(m.title_original)+'</p>':"")+
     '<p class="mood-card-meta">'+rating(m)+' · '+published(m.status)+
      (m.volumes?' · '+e(m.volumes)+' '+L("moodVolumes"):'')+'</p>'+
     (response.discovery_source==="library_tags"?"":'<div class="mood-evidence"><strong>'+L("advisorProof")+'</strong>'+
