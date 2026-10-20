@@ -39,6 +39,27 @@ class RepositoryHygieneTests(unittest.TestCase):
         self.assertNotIn("--reset-db", menu)
         self.assertNotIn("cmd\\run-jikan-pipeline.cmd", menu)
 
+    def test_windows_menu_never_exits_an_unmatched_if(self):
+        menu = (ROOT / "mangadvisor.cmd").read_text(encoding="utf-8")
+        self.assertNotRegex(
+            menu,
+            r'(?im)^if /I "(?:%CHOICE%|%~1)"=="[^"]+"[^\\n]*& goto (?:menu|:eof)\\s*
+        gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        for item in (".env", "private-data/", "backups/", ".env.mobile", "mobile-local/"):
+            self.assertIn(item, gitignore)
+
+    def test_recommendation_profile_has_only_one_output(self):
+        report = (ROOT / "pipelines/engine/scripts/run_recommendation_profile_tests.py").read_text(encoding="utf-8")
+        self.assertIn('recommendation_profile_tests_latest.md', report)
+        self.assertNotIn('LEGACY_REPORT_PATH', report)
+        self.assertNotIn('recommendation_profile_tests_v0_7_4.md', report)
+
+
+if __name__ == "__main__":
+    unittest.main()
+,
+        )
+
     def test_private_data_remain_gitignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for item in (".env", "private-data/", "backups/", ".env.mobile", "mobile-local/"):
