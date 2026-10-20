@@ -316,6 +316,10 @@ def main() -> int:
     print(f"Total lignes à charger       : {len(rows)}")
     print()
 
+    if total_files_in_error:
+        print("ERREUR : au moins un fichier catalogue est corrompu. Aucune insertion partielle.")
+        print("Corrige les fichiers JSON ou force leur nouvelle extraction avant de recharger.")
+        return 1
     if not rows:
         print("ERREUR : aucune ligne valide à charger (les données précédentes sont conservées).")
         return 1
