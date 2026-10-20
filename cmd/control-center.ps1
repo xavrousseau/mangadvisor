@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -284,6 +284,24 @@ function Enrich-Wikidata {
   Compose $argsList
   Write-Host "Enrichissement Wikidata termine. Consulte les fiches mangas."
 }
+function Enrich-My-Library {
+  Say "Enrichir toute ma mangatheque reconnue depuis Wikidata et la BnF"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $maxWorks=Ask-Number "Maximum de series de ma mangatheque liees au catalogue (max 250)" 80 250
+  $useBnf=Confirm "Rechercher aussi les notices BnF (plus lent, ISBN a verifier) ?" $true
+  Write-Host "Une seule sauvegarde verifiee est creee avant les recherches."
+  Write-Host "Les lignes d'inventaire sans manga identifie resteront en attente."
+  Write-Host "Aucune edition, aucun tome et aucun ISBN ne sont attribues automatiquement."
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.library_enrichment","--max-works",[string]$maxWorks)
+  if (-not $useBnf) { $argsList+=@("--skip-bnf") }
+  Compose $argsList
+  Write-Host "Bilan ci-dessus : consulte les fiches mangas et les candidats ISBN."
+}
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
   Ensure-Environment
@@ -515,6 +533,7 @@ try {
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
     "Wikidata"        { Enrich-Wikidata }
+    "LibraryEnrichment" { Enrich-My-Library }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
