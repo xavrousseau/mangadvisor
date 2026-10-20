@@ -157,7 +157,12 @@ def create_pending_resolution_router(
                                (SELECT COUNT(*)::int FROM user_manga_inventory_declaration d
                                 WHERE d.manga_id=m.id AND d.user_id=%(user_id)s
                                ) AS already_declared_editions,
-                               CASE WHEN LOWER(m.title)=%(exact)s
+                               CASE WHEN EXISTS (
+                                   SELECT 1 FROM manga_title_alias a
+                                   WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+                                     AND a.search_key=%(alias_key)s
+                               ) THEN 'EXACT_ALIAS'
+                               WHEN LOWER(m.title)=%(exact)s
                                  OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                  OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
                                     THEN 'EXACT_TITLE' ELSE 'SEARCH_SUGGESTION'
@@ -169,7 +174,11 @@ def create_pending_resolution_router(
                            OR EXISTS (SELECT 1 FROM manga_title_alias a
                                WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
                                  AND (a.search_key=%(alias_key)s OR a.alias ILIKE %(pattern)s))
-                        ORDER BY CASE WHEN LOWER(m.title)=%(exact)s
+                        ORDER BY CASE WHEN EXISTS (
+                                 SELECT 1 FROM manga_title_alias a
+                                 WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+                                   AND a.search_key=%(alias_key)s
+                               ) THEN -1 WHEN LOWER(m.title)=%(exact)s
                                 OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                 OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
                                 THEN 0 ELSE 1 END,
