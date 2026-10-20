@@ -42,9 +42,7 @@ if not defined KEY (
     goto menu
 )
 call :dispatch "%KEY%"
-call :direct
-call :dispatch "%~1"
-exit /b %ERRORLEVEL%
+call :result
 
 :result
 goto menu
@@ -138,6 +136,10 @@ if "%RC%"=="0" (
 echo.
 pause
 exit /b 0
+
+:direct
+call :dispatch "%~1"
+exit /b %ERRORLEVEL%
 
 :dispatch
 rem Command aliases remain available to scripts and to experienced users.
