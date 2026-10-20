@@ -143,6 +143,14 @@ jobs:
             throw "Le parcours de mise a jour Git securisee est invalide."
           }
 
+      - name: Verifier la sauvegarde obligatoire avant l'import depuis le menu
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-menu-import-backup.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "L'import de la mangatheque peut demarrer sans sauvegarde verifiee."
+          }
+
       - name: Verifier une requete psql avec identifiants sans vraie base
         shell: powershell
         run: |
