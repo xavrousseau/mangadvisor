@@ -1,120 +1,76 @@
 # Mangadvisor
 
-**Ta mangathèque, tes découvertes et ton conseiller manga personnel.** Application locale PC + mobile, avec catalogue Tenrai, enrichissement BnF des éditions françaises, bibliothèque et recommandations explicables. Interface sombre/orange, français/anglais, sans abonnement.
+**Ta mangathèque, tes éditions françaises et tes prochaines découvertes mangas.**
 
-[Structure actuelle du dépôt](docs/03_technical/project_structure.md) · [Compte rendu du nettoyage 4.1](docs/03_technical/cleanup_4_1.md)
+Mangadvisor est une application locale, avec une interface Web accessible depuis le PC. Elle réunit un catalogue alimenté par **Tenrai**, une bibliothèque personnelle, des éditions françaises vérifiées par ISBN/BnF et un conseiller en mangas. Les données sont conservées dans PostgreSQL (Docker). Un conseiller IA local Ollama et l'accès HTTPS sur téléphone sont **facultatifs**.
 
-### Stabilisation et audit 4.4
+## Démarrer sur Windows : un seul fichier
 
-[Audit transversal de tous les fichiers suivis](docs/03_technical/audit_transversal_4_4.md) · [Structure technique](docs/03_technical/project_structure.md)
+**Prérequis** : [Docker Desktop](https://www.docker.com/products/docker-desktop/) démarré et dossier de Mangadvisor téléchargé depuis ce GitHub. Git pour Windows est nécessaire uniquement pour la mise à jour automatique (commande 3). Pas besoin d'installer Python ni PostgreSQL sur le PC.
 
-Le site unique est servi sur **http://127.0.0.1:8501**. Le catalogue privilégie un titre international lisible quand la source en fournit un, **sans prétendre traduire automatiquement en français**. Les couvertures issues de MyAnimeList peuvent rester japonaises. Dans « Ma bibliothèque », une note vide n'est plus affichée comme « Possédé — » : les **exemplaires déclarés** figurent séparément lorsque ces données existent. Les séries sans rapprochement sont conservées dans une section distincte et ne sont jamais intégrées de force aux recommandations.
+**Double-clique sur \`mangadvisor.cmd\`** (à la racine du dépôt) puis choisis :
 
-`mangadvisor.cmd` reste l'entrée Windows. Les dossiers privés et les volumes Docker ne doivent jamais être supprimés pour une mise à jour. L'option **17** effectue une sauvegarde et une restauration de vérification ; le diagnostic **27** vérifie la communication du site avec l'API. Les difficultés de réconciliation d'alias français, le gel des dépendances et la séparation Docker dev/stable sont documentées comme travaux futurs.
+| Choix | Action | À quoi ça sert |
+| --- | --- | --- |
+| **1** | **Première installation** | Crée la configuration privée, initialise PostgreSQL, construit les images, récupère le catalogue Tenrai et les relations de recommandation, lance le site, vérifie l'installation et propose l'import de la collection. |
+| **2** | **Démarrer Mangadvisor** | Lance les conteneurs existants en arrière-plan, vérifie l'API et ouvre le site. **Ne retélécharge pas le catalogue** et **n'efface rien**. |
+| **3** | **Mettre à jour** | Vérifie la sauvegarde de la base, récupère \`main\` via Git, applique les évolutions non destructrices, reconstruit les images et lance le diagnostic. |
+| **4** | **Sauvegarder la mangathèque** | Enregistre une archive PostgreSQL privée et teste sa restauration dans une base isolée. |
+| **5** | **Vérifier le fonctionnement** | Contrôle PostgreSQL, API directe, Nginx, bibliothèque et principaux volumes de données. |
+| **6** | **Arrêter Mangadvisor** | Arrête Docker Compose sans supprimer les données. |
+| **A** | **Options avancées** | Catalogue, recommandations, imports, scanner mobile, IA locale, journaux, configuration et restauration. |
+| **0** | **Quitter le menu** | Ne stoppe pas une application déjà démarrée. |
 
+Le site est ensuite disponible par défaut sur **http://localhost:8501**. Le port exact vient du fichier privé \`.env\`, créé à la première installation. Chaque action s'exécute **dans la même fenêtre de commandes** et affiche clairement son succès ou son échec. Il n'est pas nécessaire de lancer des commandes Docker manuelles pour utiliser l'application.
 
-## Une seule interface et un Docker stable (Mangadvisor 4.5)
+### Première installation complète
 
-Le seul site du menu utilisateur est **http://127.0.0.1:8501** (Nginx + Web). Le Compose principal ne contient plus le service Streamlit. Le prototype Python `apps/ui/` subsiste temporairement comme référence de migration **dans l'overlay de tests `docker-compose.dev.yml` seulement**, avec le profil `legacy`; il n'est plus déployé par les commandes Windows normales. Lors du prochain démarrage, l'ancien conteneur `mangadvisor_ui` est arrêté puis retiré **sans effacer de volume**.
+1. Télécharge le dépôt (clone Git ou ZIP) et démarre Docker Desktop.
+2. Double-clique sur **\`mangadvisor.cmd\`**, puis appuie sur **1**.
+3. Suis l'assistant pour construire les images, créer les tables, récupérer les notices Tenrai et les relations manga. Une connexion Internet est nécessaire.
+4. Pour importer ta collection personnelle, dépose le CSV dans **\`private-data/mangatheque.csv\`**. Le format attendu est décrit dans [Import de l'inventaire physique](docs/04_product/safe_inventory_import_3_8.md) ; il contient notamment les colonnes \`serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier\`.
+5. L'assistant affiche un **aperçu** avant toute écriture ; il ne confirme jamais automatiquement les associations incertaines. Les éditions distinctes d'une même œuvre restent distinctes. La sauvegarde est vérifiée après l'import.
 
-Les scripts du menu utilisent maintenant **`docker-compose.local.yml`** : images Docker construites, API sans hot-reload, ports liés à `127.0.0.1`, seul le répertoire `data/raw/` est monté dans le moteur pour conserver les réponses Tenrai entre plusieurs tâches. L'ancien `docker-compose.dev.yml` monte le code source et active `--reload` **uniquement pour le développement et les tests automatisés**, jamais pour l'utilisation courante.
+Les dossiers \`private-data/\`, \`backups/\` et le fichier \`.env\` sont exclus de Git. **Ne les publie pas sur GitHub**. Les fichiers Excel doivent être exportés ou convertis au format CSV attendu avant l'import physique, sans attribuer automatiquement d'ISBN, de notes ou de tomes lus.
 
-Le proxy Nginx résout dynamiquement l'adresse du conteneur FastAPI. Un redémarrage ou une recréation d'API ne doit plus produire une erreur `HTTP 502` durable sur 8501. **L'option 27** vérifie désormais les URL `/api/health` et `/api/library?limit=1` empruntées par le navigateur : le simple affichage HTML ne suffit plus à déclarer le site opérationnel. Les options 3, 4 et le centre de pilotage retirent l'ancien conteneur UI 8502 sans toucher à PostgreSQL ni aux volumes.
+### Les jours suivants
 
-En cas de 502, consulter le diagnostic 27 et les logs de `mangadvisor_web` / `mangadvisor_api`. Éviter `Nuke` : le proxy n'exige aucune réinitialisation de données.
+Démarre Docker Desktop, lance \`mangadvisor.cmd\` puis **2**. La page doit s'ouvrir dans le navigateur. Lorsque tu souhaites arrêter les services, utilise **6**. En cas de problème, choisis **5** pour obtenir les contrôles et les messages d'erreur, puis ouvre les journaux dans **A**.
 
-## Source du catalogue manga depuis le 1er octobre 2026
+### Mettre à jour sans perdre les données
 
-**Attention :** le fournisseur public Jikan `api.jikan.moe` a officiellement été arrêté le 1er octobre 2026 ([annonce des mainteneurs](https://github.com/jikan-me/jikan-rest/issues/613)). Mangadvisor utilise désormais **[Tenrai v1](https://api.tenrai.org/documentation)**, qui documente un format compatible avec Jikan pour les recherches et les recommandations mangas.
+Choisis **3** si le dossier Mangadvisor a été cloné via Git et que tu es sur la branche \`main\`. Une sauvegarde PostgreSQL avec restauration de vérification précède le \`git pull --ff-only\`. Les fichiers locaux suivis et modifiés sont conservés dans un stash Git uniquement après confirmation. Le programme ne supprime ni volume PostgreSQL ni fichiers privés.
 
-L'URL `https://api.tenrai.org/v1` est utilisée automatiquement, **même si ton ancien fichier .env ne comporte pas encore la nouvelle variable**. Si besoin, elle peut être définie dans `.env` via `MANGA_API_BASE_URL=https://api.tenrai.org/v1`. Aucune clé payante n'est nécessaire, les limitations publiques restent applicables (120 appels/minute, 4 appels/seconde). Le fournisseur est encore en bêta : une coupure est possible.
+Si tu as utilisé un **ZIP**, la mise à jour Git automatique n'est pas disponible. Conserve impérativement tes dossiers \`private-data/\`, \`backups/\` et \`.env\` avant de remplacer les fichiers du projet.
 
-Les scripts historiques dont le nom contient « Jikan » et les dossiers `data/raw/jikan/` sont conservés pour compatibilité avec les bases et tests déjà existants, **mais les nouveaux JSON enregistrent le fournisseur réel** ; les écritures SQL conservent également `source_name=tenrai`. Le chargement est additif et les associations aux mangas existants restent basées sur les identifiants MyAnimeList (`mal_id`).
+### Sauvegarde et restauration
 
-L'option **29** vérifie dorénavant la connexion HTTPS au fournisseur configuré **et une vraie réponse manga JSON**. Après mise à jour, relancer 29 puis 25 pour charger le catalogue, 26 pour les recommandations. Aucune réinstallation ni suppression de volume n'est requise.
+L'option principale **4** réalise un \`pg_dump\` avec manifeste SHA256, suivi d'une **restauration de vérification dans une base temporaire**. La restauration réelle n'est pas automatique : elle se trouve sous **A → S → 5** et demande une confirmation explicite ; une nouvelle sauvegarde de sécurité est créée avant le basculement. [Procédure détaillée](docs/04_product/library_backup_recovery_3_2.md).
 
-## Tout piloter depuis mangadvisor.cmd (centre de pilotage 4.x)
+**Copie tes archives de \`backups/\` sur un deuxième support.** Un disque dur défaillant pourrait détruire à la fois la base et les sauvegardes conservées uniquement sur le même PC.
 
-Pour une première installation sur Windows : **télécharge le dépôt GitHub (ZIP ou Git), démarre Docker Desktop, double-clique sur mangadvisor.cmd et choisis l'option 22 — Installer de A à Z**. Aucun Python, psql ou terminal technique à installer sur Windows : les opérations data fonctionnent dans Docker.
+## Ce qui est dans Mangadvisor
 
-L'assistant prépare le fichier .env avec des secrets aléatoires, crée les tables PostgreSQL, démarre l'application, **extrait les JSON Tenrai SEARCH + TOP, les charge dans PostgreSQL, construit le catalogue et récupère les recommandations communautaires**, vérifie API/SQL/UI, effectue une sauvegarde testée et propose l'aperçu puis l'import confirmé de ta bibliothèque personnelle (CSV à placer dans private-data/mangatheque.csv). Les éditions françaises ISBN sont à compléter séparément après vérification BnF.
+- **Catalogue et fiches** : recherche, filtres, couvertures, synopsis et genres/thèmes issus de données réelles.
+- **Bibliothèque de lecture** : statuts, notes, favoris, progression et historique personnel.
+- **Mangathèque physique** : quantités déclarées par édition distincte, sans confondre les exemplaires, les ISBN vérifiés ni les volumes lus.
+- **Éditions françaises** : rapprochements volontaires avec la BnF, recherche par titre/ISBN et scanner lorsque le navigateur/HTTPS le permet.
+- **Recommandations** : découverte par ambiance, par bibliothèque, par proximité d'œuvre et conseiller conversationnel ; exclusion des séries déjà enregistrées ou physiquement possédées quand la correspondance à l'œuvre est confirmée.
+- **IA locale facultative** : Ollama peut aider à interpréter les demandes mais ne décide pas seul quels mangas existent.
 
-Les options **23 à 29** permettent ensuite de refaire chaque opération sans réinstallation : configuration, tables, catalogue, recommandations, diagnostic, **mise à jour Git + sauvegarde + Docker** et diagnostic réseau Docker/Tenrai (29). Les étapes 25 et 26 vérifient maintenant l'accès externe avant de lancer leurs extractions. Les options historiques de maintenance, sauvegarde et import sont conservées ; l'ancien sous-menu 12 a été remplacé par un alias de compatibilité vers l'option 25. **L'option 22 n'efface jamais tes volumes**, et l'option destructive 11 doit rester exceptionnelle et volontaire.
+**Important :** une entrée physique sans correspondance canonique (titre ambigu ou absent du catalogue) reste **en attente**. Elle ne peut pas exclure automatiquement un manga du catalogue sans risquer de faire une fausse association.
 
-Voir [le guide complet du centre de pilotage 4.0](docs/04_product/control_center_4_0.md).
+## Architecture et contrôle qualité
 
-## Démarrage habituel sur Windows (base déjà initialisée)
+| Composant | Emplacement |
+| --- | --- |
+| Menu Windows et orchestration | \`mangadvisor.cmd\`, \`cmd/control-center.ps1\` |
+| Front Web | \`apps/web/\` |
+| API FastAPI, bibliothèque, conseiller | \`apps/api/\` |
+| Extracteurs Tenrai et chargements SQL | \`pipelines/engine/\` et \`sql/schema/\` |
+| Docker stable (sans Streamlit) | \`infra/compose/docker-compose.yml\` + \`docker-compose.local.yml\` |
+| Tests unitaires et intégration | \`tests/\`, \`.github/workflows/\` |
 
-1. Installer et démarrer **Docker Desktop**. Placer le dépôt GitHub sur le PC.
-2. À la racine, exécuter **mangadvisor.cmd**, puis choisir **3 — Build + démarrage**.
-3. Ouvrir **http://localhost:8501** : c'est l'unique interface de Mangadvisor lancée par défaut. Le conteneur Streamlit 8502 est retiré du parcours utilisateur ; son ancien code reste provisoirement utilisable dans l'overlay de développement pour vérifier les fonctions à migrer.
-4. Naviguer dans **Découvrir**, **Ma bibliothèque** et **Pour moi → Mon conseiller**.
+L'ancien prototype Streamlit est encore présent uniquement pour les tests et la transition technique ; **il ne fait pas partie de l'interface normale**. Les scripts de données historiquement nommés Jikan restent utilisables mais l'API source normale est Tenrai. Aucun historique de nommage ne justifie une suppression des volumes.
 
-Pour mettre à jour après une nouvelle version : lancer git pull origin main puis le menu 3. **Ne jamais supprimer les volumes Docker de production ni utiliser l'option Nuke** si l'on souhaite conserver la collection.
-
-### Voir les éditions physiques dans l'application (Mangadvisor 3.9)
-
-Dans **Ma bibliothèque**, le volet **Mon inventaire physique par édition** affiche les éditions déclarées d'une même œuvre et leurs quantités séparées. Chaque fiche manga affiche également les éditions physiques déclarées, distinctes des livres par **ISBN réellement vérifiés**. Cela ne crée ni ISBN, ni tomes lus, ni séries supposées complètes. Le volet est vide jusqu'à l'import confirmé du CSV personnel.
-
-Voir : [Tableau des éditions physiques 3.9](docs/04_product/physical_inventory_dashboard_3_9.md).
-
-### Importer ton inventaire avec confirmation (option 21)
-
-Après avoir effectué une **sauvegarde validée (option 17)**, place le CSV privé dans `private-data/mangatheque.csv`. Démarre l'application et choisis l'**option 21**. Le script rapproche seulement les œuvres aux titres correspondants de façon exacte et unique, puis affiche un **aperçu sans écriture** : lignes prêtes, éditions distinctes, lignes ambiguës et données préexistantes. Une confirmation textuelle explicite est obligatoire avant l'import, notamment pour accepter un import partiel.
-
-Les quantités par **édition déclarée** sont conservées séparément des ISBN vérifiés. Une œuvre absente de la bibliothèque est ajoutée comme « Possédée » pour éviter qu'elle soit recommandée ; **aucune note, favori, statut existant ou tome lu n'est écrasé**. Un titre manquant ou homonyme reste à vérifier. Les fichiers et rapports restent exclusivement dans `private-data/`, ignoré par Git.
-
-Voir [Import sécurisé historique 3.8](docs/04_product/safe_inventory_import_3_8.md) et [Conservation des titres en attente 4.3](docs/04_product/inventaire_en_attente_4_3.md).
-
-### Tester ta vraie mangathèque sans importer les données (option 20)
-
-Copier ton CSV de collection dans le dossier local `private-data/mangatheque.csv`, puis lancer Mangadvisor et choisir **option 20** dans `mangadvisor.cmd`. Le test rapproche les titres avec le catalogue réel via `dry_run=true`, signale les homonymes/éditions et mesure des recommandations en lecture seule. Après tes réactions aux suggestions, relancer l'option 20 permet de comparer les recommandations avant/après. **Ne jamais publier la collection sur GitHub** : `private-data/` est exclu de Git.
-
-Voir : [Benchmark privé de la mangathèque 3.6](docs/04_product/private_library_benchmark_3_6.md).
-
-### Sauvegarder ta mangathèque (recommandé avant les grosses mises à jour)
-
-Dans `mangadvisor.cmd`, **17 — Sauvegarder et vérifier** produit un dump PostgreSQL complet dans `backups/` et **teste une vraie restauration isolée**. **18** revérifie la dernière archive ; **19** permet une restauration volontaire avec confirmation explicite, copie de sécurité de la base courante et conservation de l'ancienne base. Les archives privées ne sont jamais envoyées sur GitHub.
-
-**Copie ensuite les fichiers `.dump` et `.dump.json` sur un deuxième support** : une sauvegarde restée sur le PC ne protège pas d'une panne de son disque. Les secrets `.env` et les modèles Ollama sont hors du dump et nécessitent une sauvegarde séparée.
-
-Voir : [Sauvegarde et récupération 3.2](docs/04_product/library_backup_recovery_3_2.md).
-
-### Activer le vrai modèle IA local (optionnel)
-
-Le conseiller fonctionne **sans IA générative** dès le premier démarrage, grâce à son moteur de recherche guidée. Pour augmenter sa compréhension du langage :
-
-1. Ouvrir mangadvisor.cmd puis choisir **15 — Installer et activer le conseiller IA local**.
-2. Valider le téléchargement du modèle Ollama **qwen2.5:3b**. Prévoir plusieurs Go libres et assez de mémoire.
-3. Ouvrir **Pour moi → Mon conseiller**. Le bandeau indique **IA locale active** si le modèle répond.
-4. Utiliser **16 — Arrêter le conseiller IA local** si nécessaire : l'application et les recommandations continuent en mode guidé.
-
-**Les recommandations continuent toujours de venir du catalogue Mangadvisor**, pas d'une liste inventée par l'IA. Aucune clé payante nécessaire. Plus de détails : docs/04_product/local_ai_advisor_3_0.md.
-
-## Fonctionnalités
-
-- **Catalogue manga** : fiches, couvertures, recherche, genres, thèmes, notes, synopsis et traductions identifiées quand une source réelle est configurée.
-- **Bibliothèque personnelle** : favoris, statuts, notes, lectures, suivi possédé/lu, import CSV et ajout par ISBN/scanner.
-- **Éditions françaises** : notices BnF confirmées, ISBN, éditeurs, formats distincts (classique, Deluxe, Perfect…), recherche assistée des notices manquantes. Pas de disponibilité commerciale supposée.
-- **Recommandations** : personnalisation depuis les lectures et préférences, explications fondées sur les tags réels, exclusion des œuvres connues, retours utilisateur et modes de découverte par ambiance.
-- **Conseiller conversationnel** : affinage multi-tours (longueur, ambiance, édition française, exclusions romance/horreur/gore selon les tags) et compréhension IA locale facultative. Le panneau « Comment cette sélection est-elle construite ? » mesure la diversité des tags et les affinités documentées, sans inventer de pourcentage de compatibilité. Les contraintes explicites restent prioritaires même si l'IA locale les interprète mal. Les statuts **WANT_TO_READ** sont des indices d'intérêt faibles et des refus de plusieurs mangas ayant des tags communs peuvent moduler légèrement l'ordre, jamais bannir un genre.
-- **Mobile privé** : option 13 du menu pour configurer le scanner en HTTPS sur le Wi-Fi domestique ; authentification séparée.
-
-## Limites connues
-
-Le modèle local augmente la souplesse de compréhension mais n'est pas encore un agent autonome capable de surveiller ou d'acheter des nouveautés. Les sources de parutions françaises ne sont pas exhaustives. La présence d'un ISBN BnF ne signifie pas que le livre soit en stock, ni que toute la série soit publiée. Les critères d'âge et les avertissements de contenu ne sont pas certifiés par le catalogue.
-
-## Architecture
-
-Sources publiques et notices autorisées → pipelines Python → PostgreSQL + pgvector / Meilisearch → API FastAPI → interface Web. Docker Compose orchestre PostgreSQL, Meilisearch, API et une seule interface Web. Ollama est un **service facultatif**, non accessible de l'extérieur.
-
-Répertoires :
-- apps/api : API et moteur de recommandation.
-- apps/web : interface PC/mobile.
-- apps/ui : ancien prototype Streamlit exclu des démarrages utilisateur, conservé provisoirement pour la migration et les tests.
-- pipelines : ingestion et normalisation des sources.
-- infra : Docker, réseau, HTTPS local.
-- tests : tests unitaires, API PostgreSQL jetable, Chromium PC/mobile.
-- docs : architecture, décisions produit et procédures.
-
-Les évolutions sont proposées en pull requests GitHub et ne sont fusionnées qu'après validation des deux workflows. Les tests ne modifient jamais la base personnelle.
+[Audit et anomalies connues](docs/reports/repository_audit_2026_10_20.md) · [Architecture](docs/03_technical/project_structure.md) · [Import physique](docs/04_product/safe_inventory_import_3_8.md) · [Sauvegardes](docs/04_product/library_backup_recovery_3_2.md)
