@@ -546,6 +546,8 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             "COALESCE(m.score,0) >= %(min_score)s",
             """NOT EXISTS (SELECT 1 FROM user_manga_library u
                WHERE u.user_id=%(user_id)s AND u.manga_id=m.id)""",
+            """NOT EXISTS (SELECT 1 FROM user_manga_inventory_declaration physical
+               WHERE physical.user_id=%(user_id)s AND physical.manga_id=m.id)""",
             """NOT EXISTS (SELECT 1 FROM user_manga_volume v
                JOIN manga_fr_edition ee ON ee.id=v.edition_id
                WHERE v.user_id=%(user_id)s AND ee.manga_id=m.id
