@@ -312,8 +312,10 @@ function Index-Manga-Titles {
   Wait-Postgres
   $useMangaDex=Confirm "Interroger aussi MangaDex pour les mangas de ma bibliotheque ?" $true
   $limit=15
+  $pendingLimit=15
   if ($useMangaDex) {
-    $limit=Ask-Number "Nombre maximal de series a interroger sur MangaDex (1-30)" 15 30
+    $limit=Ask-Number "Series deja liees a interroger sur MangaDex (max 30)" 15 30
+    $pendingLimit=Ask-Number "Lignes d'inventaire en attente a rechercher sur MangaDex (max 30)" 15 30
   }
   Write-Host "Indexation des titres MAL deja charges pour tout le catalogue."
   Write-Host "Les alias francais restent des titres communautaires non certifies par un editeur."
@@ -322,7 +324,8 @@ function Index-Manga-Titles {
   Backup
   $argsList=@("run","--rm","--no-deps","api","python","-m",
               "apps.api.app.title_aliases","--catalog-limit","20000",
-              "--mangadex-limit",[string]$limit)
+              "--mangadex-limit",[string]$limit,
+              "--pending-limit",[string]$pendingLimit)
   if (-not $useMangaDex) { $argsList+=@("--local-only") }
   Compose $argsList
   Write-Host "Termine. Les recherches FR/EN/JP seront disponibles sur les fiches et dans l'inventaire."
