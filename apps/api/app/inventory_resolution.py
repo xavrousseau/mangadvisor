@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
 )
+from apps.api.app.title_aliases import normalize_title
 
 PENDING_SQL = """
 SELECT source_key,entry_title,source_reference,work_declared,edition_declared,
@@ -156,13 +157,16 @@ def create_pending_resolution_router(
                         WHERE m.title ILIKE %(pattern)s
                            OR m.title_english ILIKE %(pattern)s
                            OR m.title_japanese ILIKE %(pattern)s
+                           OR EXISTS (SELECT 1 FROM manga_title_alias a
+                               WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+                                 AND (a.search_key=%(alias_key)s OR a.alias ILIKE %(pattern)s))
                         ORDER BY CASE WHEN LOWER(m.title)=%(exact)s
                                 OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                 OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
                                 THEN 0 ELSE 1 END,
                                 m.popularity ASC NULLS LAST,m.id
                         LIMIT 12
-                    """, {"exact":exact,"pattern":pattern})
+                    """, {"exact":exact,"pattern":pattern,"alias_key":normalize_title(term)})
                     matches = list(cur.fetchall())
         return {
             "source_key": source_key,
