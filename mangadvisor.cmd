@@ -60,6 +60,7 @@ echo    6 - Arreter le scanner mobile HTTPS
 echo    7 - Activer le conseiller IA local
 echo    8 - Arreter le conseiller IA local
 echo    9 - Consulter les journaux Docker
+echo   10 - Enrichir les fiches via la BnF (candidats a verifier)
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -79,6 +80,7 @@ if "%CHOICE%"=="6" set "KEY=mobile-stop"
 if "%CHOICE%"=="7" set "KEY=ai"
 if "%CHOICE%"=="8" set "KEY=ai-stop"
 if "%CHOICE%"=="9" set "KEY=logs"
+if "%CHOICE%"=="10" set "KEY=bnf-enrich"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -157,6 +159,7 @@ if /I "%~1"=="catalogue" set "ACTION=Catalogue"
 if /I "%~1"=="jikan" set "ACTION=Catalogue"
 if /I "%~1"=="recommendations" set "ACTION=Recommendations"
 if /I "%~1"=="import" set "ACTION=Inventory"
+if /I "%~1"=="bnf-enrich" set "ACTION=BnF"
 if /I "%~1"=="benchmark" set "PS_SCRIPT=benchmark-mangatheque.ps1"
 if /I "%~1"=="mobile" set "PS_SCRIPT=mobile-setup.ps1"
 if /I "%~1"=="mobile-stop" set "PS_SCRIPT=mobile-setup.ps1"
@@ -221,7 +224,7 @@ echo   backup           Sauvegarder et tester la restauration
 echo   diagnostic       Verifier l'application
 echo   stop             Arreter sans supprimer les volumes
 echo.
-echo Autres : catalogue, recommendations, import, benchmark,
+echo Autres : catalogue, recommendations, import, benchmark, bnf-enrich,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
 echo La suppression des volumes n'est jamais proposee.
