@@ -272,6 +272,77 @@ jobs:
           print("Wikidata P4087 : rapprochement exact, ambiguites et invariants SQL OK")
           PY
 
+      - name: Verifier l'enrichissement de la mangatheque liee uniquement (SQL reel)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          from apps.api.app.main import get_connection
+          from apps.api.app.library_enrichment import (
+              linked_library_scope, run_library_enrichment
+          )
+          from apps.api.app.wikidata_enrichment import run_batch as wd_batch
+          from apps.api.app.bnf_batch import run_batch as bnf_batch
+
+          def counts():
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      result = []
+                      for table in (
+                          "manga", "manga_fr_edition", "manga_genre", "manga_theme",
+                          "user_manga_library", "user_manga_inventory_declaration",
+                          "user_manga_inventory_pending", "user_manga_volume",
+                      ):
+                          cur.execute("SELECT COUNT(*) AS n FROM " + table)
+                          result.append(cur.fetchone()["n"])
+                      return result
+
+          def linked():
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      cur.execute("""
+                          SELECT COUNT(DISTINCT manga_id)::int AS n
+                          FROM (
+                            SELECT manga_id FROM user_manga_library WHERE user_id=1
+                            UNION
+                            SELECT manga_id FROM user_manga_inventory_declaration
+                            WHERE user_id=1
+                          ) linked
+                      """)
+                      return cur.fetchone()["n"]
+
+          before = counts()
+          scope = linked_library_scope(get_connection,max_works=250)
+          assert len(scope["ids"]) == linked(),scope
+          assert len(scope["ids"]) < before[0],scope  # not the full catalog
+          calls=[]
+          def wbatch(factory,**kw):
+              assert set(kw["target_ids"]) == set(scope["ids"]),kw
+              calls.append(("wikidata",kw["limit"]))
+              return wd_batch(factory,lookup=lambda ids: {"results":{"bindings":[]}},**kw)
+          def bbatch(factory,**kw):
+              assert set(kw["target_ids"]) == set(scope["ids"]),kw
+              calls.append(("bnf",kw["limit"]))
+              return bnf_batch(factory,search=lambda title: {"items":[]},
+                               sleep=lambda _:None,**kw)
+          report=run_library_enrichment(get_connection,max_works=250,
+                                        wikidata_batch=wbatch,bnf_batch=bbatch,
+                                        sleep=lambda _:None)
+          assert report["linked_works"] == linked(),report
+          assert not report["failed_sources"],report
+          assert len(calls) >= 2,calls
+          assert before == counts(),(before,counts())
+          repeated=run_library_enrichment(get_connection,max_works=250,
+                                          wikidata_batch=wbatch,bnf_batch=bbatch,
+                                          sleep=lambda _:None)
+          assert not repeated["failed_sources"],repeated
+          assert before == counts(),(before,counts())
+          assert repeated["sources"]["wikidata"]["selected"] == 0,repeated
+          assert repeated["sources"]["bnf"]["selected"] == 0,repeated
+          print("Collection reliee uniquement, reprise idempotente, inventaire inchange : OK")
+          PY
+
       - name: Verifier le proxy 8501 apres recreation de l'API sans redemarrer Nginx
         shell: bash
         run: |
