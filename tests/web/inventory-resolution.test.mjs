@@ -42,6 +42,34 @@ test("manual series and edition confirmation does not imply ISBNs or individual 
  assert.doesNotMatch(html,/data-action="edition-confirm"/);
  assert.doesNotMatch(html,/data-action="volume-owned"/);
 });
+test("French/English/Japanese alias and prior quantities are visible before reviewing",()=>{
+ const result=inventoryResolverMarkup({
+  ...base,items:[{...manga,title:"Shingeki no Kyojin",
+   title_fr:"L'Attaque des Titans",matched_alias:"L'Attaque des Titans",
+   alias_source:"BNF_AUTHORITY_WORK",suggestion_kind:"EXACT_ALIAS",
+   already_in_inventory:true,known_editions:[{
+    edition:null,main_volumes:34,duplicate_copies:0,
+    other_editions_unknown:1
+   }]}],
+  review:{source:{...pending,main_volumes:35,edition_declared:null},
+    manga:{...manga,title:"Shingeki no Kyojin"},
+    existing_declarations:[{edition_declared:null,main_volumes:34,
+      duplicate_copies:0,other_editions_unknown:1}],
+    same_edition_exists:true,
+    allowed_actions:["MARK_DUPLICATE"]
+  },
+  reviewMode:""
+ },{escape,lang:"fr"});
+ assert.match(result,/L&#39;Attaque des Titans/);
+ assert.match(result,/BNF_AUTHORITY_WORK/);
+ assert.match(result,/Déjà présent dans ta collection/);
+ assert.match(result,/34 tomes principaux/);
+ assert.match(result,/35 tomes principaux/);
+ assert.match(result,/ne double pas les quantités/);
+ assert.match(result,/value="MARK_DUPLICATE"/);
+ assert.doesNotMatch(result,/value="CREATE_DECLARATION"/);
+ assert.match(result,/data-action="pending-match-confirm" disabled/);
+});
 test("pending manga titles and source labels are HTML escaped",()=>{
  const markup=inventoryResolverMarkup({
   ...base,pending:{...pending,entry_title:'<img src=x onerror="alert(1)">'},
