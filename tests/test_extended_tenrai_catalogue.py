@@ -98,6 +98,20 @@ class ProgressiveCatalogTests(unittest.TestCase):
                 self.assertEqual(fetch.call_count, 1)
                 self.assertEqual(json.loads(path.read_text())["data"][0]["mal_id"], 2)
 
+    def test_tenrai_throttle_respects_retry_after(self):
+        from unittest.mock import Mock
+        too_fast = Mock(status_code=429, headers={"Retry-After": "7"})
+        ok = Mock(status_code=200)
+        ok.json.return_value = page([99], False)
+        with patch.object(extractor.requests, "get", side_effect=[too_fast, ok]), patch.object(
+            extractor.time, "sleep"
+        ) as sleep:
+            result = extractor.fetch_jikan_with_retry(
+                "/manga", {"page": 1}, max_retries=2, retry_delay_seconds=1
+            )
+        self.assertEqual(result["data"][0]["mal_id"], 99)
+        sleep.assert_called_once_with(7)
+
     def test_page_cap_is_hard_bounded(self):
         with self.assertRaisesRegex(ValueError, "2000"):
             extractor.validate_args(arguments(end_page=2001))
