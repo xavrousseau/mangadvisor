@@ -315,6 +315,10 @@ def cli_main(argv: list[str] | None = None) -> int:
     print("Ni la mangathèque, ni les éditions confirmées ne sont modifiées.", flush=True)
     stats = run_batch(connect_database, limit=args.limit, refresh=args.refresh)
     print("Bilan :", ", ".join(f"{key}={value}" for key, value in stats.items()), flush=True)
+    if stats["selected"] and stats["error"] == stats["selected"]:
+        print("ECHEC : toutes les recherches BnF ont échoué. "
+              "Aucune édition ni donnée personnelle n'a été modifiée.", flush=True)
+        return 1
     print("Consulte les fiches mangas : les ISBN à vérifier sont affichés séparément.",
           flush=True)
     return 0
