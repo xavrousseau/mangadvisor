@@ -233,6 +233,17 @@ def interpret(message: str, context: AdvisorContext) -> tuple[AdvisorContext, li
     # Dedicated clarification rather than pretending arbitrary unknown text was parsed.
     return current, list(dict.fromkeys(changes)), bool(MORE.search(normalized)), warnings
 
+def choose_display_title(primary: str, international: str | None) -> str:
+    """Prefer the recorded international title to Japanese romanization.
+
+    Never manufacture a French translation: MAL/Tenrai international titles
+    are not necessarily the titles used by French publishers.
+    """
+    if isinstance(international, str) and international.strip():
+        return international.strip()
+    return primary
+
+
 def _tag_keys(item: dict[str, Any]) -> set[str]:
     """Namespaced *recorded* catalog tags for comparing different suggestions."""
     return {
@@ -591,7 +602,7 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             conditions.append("NOT (m.id=ANY(%(seen_ids)s))")
             params["seen_ids"]=payload.seen_ids
         sql = """
-            SELECT m.id,m.title,m.status,m.volumes,m.chapters,m.synopsis,m.score::float AS score,
+            SELECT m.id,m.title,m.title_english,m.status,m.volumes,m.chapters,m.synopsis,m.score::float AS score,
                 m.popularity,m.manga_type,
                 ARRAY(SELECT g.name FROM manga_genre mg JOIN genre g ON g.id=mg.genre_id
                       WHERE mg.manga_id=m.id ORDER BY g.name) AS genres,
@@ -706,6 +717,13 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             connection_factory,[row["id"] for row in chosen]
         ) if chosen else {}
         for row in chosen:
+            original_title = row["title"]
+            displayed_title = choose_display_title(
+                original_title, row.get("title_english")
+            )
+            if displayed_title != original_title:
+                row["title_original"] = original_title
+                row["title"] = displayed_title
             row["french_editions"]=edition_summaries.get(row["id"])
         personalized=context.use_library and (
             any(preferences.values()) or any(feedback["interested"][kind]
