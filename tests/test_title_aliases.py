@@ -18,7 +18,7 @@ class FakeCursor:
     def __exit__(self,*_):return False
     def execute(self,sql,params=None):
         self.db.queries.append((sql,params))
-        if sql.startswith("INSERT INTO manga_title_alias"):
+        if sql.strip().startswith("INSERT INTO manga_title_alias"):
             self.db.writes.append(params)
     def fetchmany(self,size):
         if not self.named:raise AssertionError("bulk cursor expected")
