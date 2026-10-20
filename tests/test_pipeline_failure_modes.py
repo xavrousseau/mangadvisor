@@ -29,6 +29,18 @@ class IngestionExitCodeTests(unittest.TestCase):
             args.return_value.no_dedupe = False
             self.assertEqual(catalogue.main(), 1)
 
+    def test_catalogue_rejects_partial_corruption_before_db_writes(self):
+        good = {"mal_id": 31, "title": "Verified title"}
+        with patch.object(catalogue, "parse_args") as args, patch.object(
+            catalogue, "iter_jikan_json_files", return_value=[Path("good.json"), Path("broken.json")]
+        ), patch.object(catalogue, "collect_rows_from_files", return_value=([good], 1, 0, 1)), patch.object(
+            catalogue, "get_postgres_connection"
+        ) as open_database:
+            args.return_value.sources = ["search"]
+            args.return_value.no_dedupe = False
+            self.assertEqual(catalogue.main(), 1)
+            open_database.assert_not_called()
+
     def test_recommendations_without_files_is_an_error(self):
         with patch.object(recommendations, "parse_args") as args, patch.object(
             recommendations, "iter_recommendation_files", return_value=[]
@@ -46,6 +58,30 @@ class IngestionExitCodeTests(unittest.TestCase):
         ), patch.object(recommendations, "load_json_file", return_value={"data": []}), patch.object(
             recommendations, "upsert_recommendation_rows"
         ) as upsert:
+            args.return_value.reset = False
+            self.assertEqual(recommendations.main(), 1)
+            upsert.assert_not_called()
+            database.close.assert_called_once()
+
+    def test_recommendations_reject_partial_corruption_before_db_writes(self):
+        database = Mock()
+        rows = {"mal_id": 1, "title": "Synthetic"}
+        files = [Path("manga_1_recommendations.json"), Path("manga_2_recommendations.json")]
+        def read_file(path):
+            if "manga_2_" in path.name:
+                raise ValueError("Invalid JSON")
+            return {"data": [rows]}
+        with patch.object(recommendations, "parse_args") as args, patch.object(
+            recommendations, "iter_recommendation_files", return_value=files
+        ), patch.object(recommendations, "get_postgres_connection", return_value=database), patch.object(
+            recommendations, "get_manga_mapping", return_value=({1: 100, 2: 200}, {1: "A", 2: "B"})
+        ), patch.object(recommendations, "load_json_file", side_effect=read_file), patch.object(
+            recommendations, "parse_recommendation_item", return_value={
+                "source_manga_id": 100, "recommended_mal_id": 2,
+                "recommended_manga_id": 200, "recommended_title": "Synthetic",
+                "votes": 2, "raw_json": "{}"
+            }
+        ), patch.object(recommendations, "upsert_recommendation_rows") as upsert:
             args.return_value.reset = False
             self.assertEqual(recommendations.main(), 1)
             upsert.assert_not_called()
