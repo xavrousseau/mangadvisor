@@ -58,9 +58,11 @@ class DummyCursor:
             return {"source_key":"Inventaire!A29"}
         return None
     def fetchall(self):
+        if "LIMIT 12" in self.last_sql and "FROM manga m" in self.last_sql:
+            return self.db.candidates
         if "FROM user_manga_inventory_declaration" in self.last_sql:
             return [self.db.existing] if self.db.existing else []
-        return self.db.candidates if "FROM manga m" in self.last_sql else []
+        return []
 
 
 class DummyConnection:
