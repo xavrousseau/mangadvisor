@@ -101,6 +101,21 @@ Le menu **`mangadvisor.cmd → A → 15`** propose un import **documentaire** de
 
 La base `bnf_bulk_notice` reçoit **uniquement les notices candidates** selon leur indexation sujet/collection (manga), avec des ISBN validés et une provenance explicite. Les fichiers déjà traités ne sont pas réimportés. **Aucune édition/tome/ISBN n'est automatiquement associé à un manga**, et la mangathèque personnelle ne change pas. Voir le [guide de l'import BnF en masse](docs/04_product/bnf_bulk_import_4_8.md). Les produits BnF sont en [Licence Ouverte](https://www.bnf.fr/fr/conditions-de-reutilisations-des-donnees-de-la-bnf).
 
+## Comparer des sources manga complémentaires (nouveau)
+
+Le menu **`mangadvisor.cmd → A → 16`** prépare un comparatif de **50 mangas**
+déjà présents ou en attente de rapprochement, puis interroge les recherches
+publiques de **Scrinis** et **MangaUpdates** seulement après confirmation.
+Il ne retélécharge pas Tenrai et **ne modifie jamais PostgreSQL**.
+Les titres de mangathèque en attente ont priorité ; une confirmation explicite
+précède leur envoi en tant que recherches publiques aux fournisseurs.
+
+Les deux rapports restent sur le PC, dans `data/logs/catalog_sources/`.
+Les résultats distinguent les titres exacts des simples suggestions,
+des ambiguïtés, et des erreurs de fournisseur. Le benchmark ne constitue
+pas une preuve d'édition française et n'effectue aucun rapprochement
+automatique. Voir le [guide détaillé](docs/04_product/benchmark_sources_4_9.md).
+
 ## Architecture et contrôle qualité
 
 | Composant | Emplacement |
