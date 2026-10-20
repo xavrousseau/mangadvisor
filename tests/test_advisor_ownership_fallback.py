@@ -133,7 +133,7 @@ class OwnershipDiscoveryTests(unittest.TestCase):
         self.assertIn("library_status='OWNED'", owner_sql)
         self.assertIn("user_score IS NULL", owner_sql)
         self.assertIn("source_count>=2", owner_sql)
-        catalog_sql, params = next((q, p) for q, p in db.queries if "FROM manga m WHERE" in q)
+        catalog_sql, params = next((q, p) for q, p in db.queries if "FROM manga m" in q and "LEFT JOIN manga_wikidata_attempt" in q)
         self.assertIn("NOT EXISTS (SELECT 1 FROM user_manga_library", catalog_sql)
         self.assertIn("user_manga_volume v", catalog_sql)
         self.assertEqual(params["genres"], ["mystery"])
