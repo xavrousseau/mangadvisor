@@ -147,19 +147,34 @@ def create_pending_resolution_router(
                     cur.execute("""
                         SELECT m.id,m.title,m.title_english,m.title_japanese,
                                m.source_mal_id,m.volumes,m.manga_type,
+                               (SELECT ta.alias FROM manga_title_alias ta
+                                WHERE ta.manga_id=m.id AND ta.alias ILIKE %(pattern)s
+                                ORDER BY (LOWER(ta.alias)=%(exact)s) DESC,
+                                         (ta.language_code='fr') DESC,ta.alias
+                                LIMIT 1) AS matched_alias,
                                CASE WHEN LOWER(m.title)=%(exact)s
                                  OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                  OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
-                                    THEN 'EXACT_TITLE' ELSE 'SEARCH_SUGGESTION'
+                                    THEN 'EXACT_TITLE'
+                                 WHEN EXISTS (SELECT 1 FROM manga_title_alias ta
+                                   WHERE ta.manga_id=m.id AND LOWER(ta.alias)=%(exact)s)
+                                    THEN 'EXACT_MULTILINGUAL_ALIAS'
+                                 ELSE 'SEARCH_SUGGESTION'
                                END AS suggestion_kind
                         FROM manga m
                         WHERE m.title ILIKE %(pattern)s
                            OR m.title_english ILIKE %(pattern)s
                            OR m.title_japanese ILIKE %(pattern)s
+                           OR EXISTS (SELECT 1 FROM manga_title_alias ta
+                                WHERE ta.manga_id=m.id AND ta.alias ILIKE %(pattern)s)
                         ORDER BY CASE WHEN LOWER(m.title)=%(exact)s
                                 OR LOWER(COALESCE(m.title_english,''))=%(exact)s
                                 OR LOWER(COALESCE(m.title_japanese,''))=%(exact)s
-                                THEN 0 ELSE 1 END,
+                                THEN 0
+                                WHEN EXISTS (SELECT 1 FROM manga_title_alias ta
+                                    WHERE ta.manga_id=m.id
+                                      AND LOWER(ta.alias)=%(exact)s)
+                                THEN 1 ELSE 2 END,
                                 m.popularity ASC NULLS LAST,m.id
                         LIMIT 12
                     """, {"exact":exact,"pattern":pattern})
