@@ -618,6 +618,7 @@ jobs:
               confirmed=api("/inventory/pending/resolve",{
                   **query,"confirmation_token":reviewed["confirmation_token"],
                   "acknowledge_work_and_edition":True,
+                  "acknowledge_existing_inventory":True,
               })
               assert confirmed["status"]=="confirmed",confirmed
               assert confirmed["edition_declared"]==edition,confirmed
