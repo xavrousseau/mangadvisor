@@ -251,7 +251,22 @@ def compare_works(sample: list[dict[str, Any]], *, session=None, sleep=time.slee
                                for row in entries))
         for provider in providers
     }
+    matched_states = {"SAME_MAL_ID", "EXACT_TITLE"}
+    evaluated_states = matched_states | {"AMBIGUOUS", "SUGGESTION_ONLY", "NO_MATCH"}
+    rates = {}
+    for provider in providers:
+        evaluated = sum(aggregates[provider].get(x, 0) for x in evaluated_states)
+        exact = sum(aggregates[provider].get(x, 0) for x in matched_states)
+        rates[provider] = {
+            "evaluated": evaluated,
+            "identity_or_exact_title_count": exact,
+            # An exact title is an index hit, not proof of work identity.
+            "exact_title_or_id_rate_percent": round(exact * 100 / evaluated, 1)
+                if evaluated else None,
+            "unknown_or_error_count": len(entries) - evaluated,
+        }
     return {
+        "rates": rates,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "notice": ("Diagnostic exploratoire uniquement. Une suggestion ou un titre exact "
                    "ne prouve ni l'identite de l'oeuvre, ni l'edition francaise, "
