@@ -16,6 +16,15 @@ class StabilisationSafetyTests(unittest.TestCase):
                     run_jikan_pipeline.main()
                 launch.assert_not_called()
 
+    def test_catalogue_refresh_can_go_beyond_ten_thousand_manga(self):
+        source = (ROOT/"cmd/control-center.ps1").read_text("utf-8")
+        self.assertIn(
+            'Ask-Number "Nombre de pages SEARCH Tenrai (25 mangas/page)" 40 2000',
+            source,
+        )
+        self.assertIn('"--order-by","popularity","--sort","asc"', source)
+        self.assertIn('"--sources","search","top"', source)
+
     def test_backup_restore_does_not_revive_legacy_streamlit(self):
         source=(ROOT/"cmd/library-backup.ps1").read_text("utf-8")
         self.assertIn("user_manga_inventory_pending",source)
