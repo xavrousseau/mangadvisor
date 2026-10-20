@@ -15,6 +15,7 @@
 | A03 | P1, élevé | `load_jikan_recommendations_to_postgres.py` | Aucun fichier ou aucune relation valide pouvait produire un succès avec `--reset` inactif, malgré une phase d'alimentation improductive. | Codes d'erreur corrigés + tests dans PR #58. |
 | A04 | P1, élevé | `extract_jikan.py` | Un fichier SEARCH/TOP déjà sur disque était réutilisé sans vérifier son origine Tenrai/Jikan : risque de données anciennes présentées comme nouvelles. | Contrôle source/cache et retéléchargement si provenance invalide ajoutés dans PR #58. |
 | A05 | P1, élevé | `inventory_import.py`, `main.py`, `advisor.py`, `mood_discovery.py` | Possession déclarée et statut de bibliothèque sont des tables distinctes. Supprimer la ligne `user_manga_library` laisse la déclaration physique et certains moteurs de recommandation n'excluent plus l'œuvre malgré sa possession. | Non corrigé. Définir un invariant, couvrir les trois chemins de recommandation et ajouter un test PostgreSQL avant recette. |
+| A07 | P1, élevé | `main.py : find_manga_for_import` | L'ancien import CSV choisissait arbitrairement le premier manga trouvé via `ILIKE '%titre%'` et `LIMIT 1`, même si plusieurs œuvres correspondaient. Risque d'association silencieuse à la mauvaise série. | Recherche exacte (titre/alias) **et unique** seulement, ambiguïtés non importées + tests ajoutés dans PR #58. |
 | A06 | P1, élevé | `control-center.ps1` | Le diagnostic post-ingestion vérifie le nombre total de lignes mais pas systématiquement que l'exécution courante en a réellement chargé de nouvelles ; un état antérieur peut masquer une étape interrompue/partiellement invalide. | Atténué par A02/A03 ; ajouter ensuite bilan par exécution, compteur/horodatage et décision échec partiel. |
 
 ## Cohérence, duplications et dette technique
@@ -53,6 +54,6 @@
 
 ## Décision de validation
 **GO conditionnel sur les corrections ciblées / NO-GO pour la recette finale.**
-L'architecture est substantielle et le code a des protections sérieuses, mais les défauts A01–A06 et l'absence de test du poste personnel interdisent de déclarer le produit entièrement propre et validé. Aucun effacement de données n'est nécessaire pour réaliser ces corrections.
+L'architecture est substantielle et le code a des protections sérieuses, mais les défauts A01–A07 et l'absence de test du poste personnel interdisent de déclarer le produit entièrement propre et validé. Aucun effacement de données n'est nécessaire pour réaliser ces corrections.
 
 Fin du rapport.
