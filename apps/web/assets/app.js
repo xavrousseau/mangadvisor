@@ -407,7 +407,7 @@ async function startPendingMatcher(button){
  const pending=state.pendingRows.find(item=>item.source_key===sourceKey);
  if(!pending)return;
  const draft={sourceKey,pending,query:pending.work_declared||pending.entry_title,
-   items:[],searched:false,review:null,loading:true,message:""};
+   items:[],searched:false,review:null,reviewMode:"",loading:true,message:""};
  state.pendingMatch=draft;
  renderPendingMatcher();
  document.querySelector("#inventory-match-panel")?.scrollIntoView({behavior:"smooth",block:"nearest"});
@@ -416,7 +416,7 @@ async function startPendingMatcher(button){
 async function searchPendingMatches(form,draft=state.pendingMatch){
  if(!draft)return;
  const query=form?String(new FormData(form).get("query")||"").trim().slice(0,100):"";
- draft.loading=true;draft.message="";draft.review=null;draft.items=[];
+ draft.loading=true;draft.message="";draft.review=null;draft.reviewMode="";draft.items=[];
  draft.searched=false;
  if(form)draft.query=query;
  renderPendingMatcher();
@@ -439,13 +439,14 @@ async function selectPendingManga(button){
  const draft=state.pendingMatch;if(!draft)return;
  const id=idNumber(button.dataset.id);
  if(!id||!draft.items.some(row=>Number(row.id)===id))return;
- draft.loading=true;draft.message="";draft.review=null;renderPendingMatcher();
+ draft.loading=true;draft.message="";draft.review=null;draft.reviewMode="";renderPendingMatcher();
  try{
   const review=await request("/inventory/pending/resolve/preview",{
     method:"POST",data:{source_key:draft.sourceKey,manga_id:id}
   });
   if(draft!==state.pendingMatch)return;
   draft.review=review;
+  draft.reviewMode=(review.existing_declarations||[]).length?"":"CREATE_DECLARATION";
   draft.loading=false;renderPendingMatcher();
   document.querySelector(".inventory-match-review")?.scrollIntoView({behavior:"smooth",block:"nearest"});
  }catch(err){
@@ -458,19 +459,26 @@ async function confirmPendingManga(button){
  const draft=state.pendingMatch;
  const review=draft?.review;
  const acknowledged=document.querySelector("#pending-match-ack")?.checked;
- if(!draft||!review||!acknowledged)return;
+ const mode=(review.existing_declarations||[]).length
+   ?String(document.querySelector("#pending-match-mode")?.value||"")
+   :"CREATE_DECLARATION";
+ if(!draft||!review||!acknowledged||!review.allowed_actions?.includes(mode))return;
  button.disabled=true;
  try{
   const outcome=await request("/inventory/pending/resolve",{
     method:"POST",data:{
       source_key:draft.sourceKey,manga_id:review.manga.id,
       confirmation_token:review.confirmation_token,
-      acknowledge_work_and_edition:true
+      acknowledge_work_and_edition:true,
+      acknowledge_existing_inventory:Boolean(review.existing_declarations?.length),
+      resolution_mode:mode
     }
   });
   if(draft!==state.pendingMatch)return;
   state.pendingMatch=null;state.recResult=null;
-  toast("✓ "+outcome.catalog_title+" — "+(outcome.edition_declared||"édition non précisée"));
+  toast("✓ "+outcome.catalog_title+" — "+(outcome.resolution_mode==="MARK_DUPLICATE"
+    ?"ligne en double archivée, aucun tome ajouté"
+    :(outcome.edition_declared||"édition non précisée")));
   await updatePhysicalInventory(renderToken);
   await updateLibrary(renderToken);
  }catch(err){
@@ -1409,9 +1417,16 @@ root.addEventListener("change",async event=>{
  if(input.id==="catalog-finished"){state.catalogFinished=input.checked;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="lib-status"){state.libraryStatus=input.value;state.libraryPage=1;await updateLibrary(renderToken);}
  if(input.id==="bulk-resolve-ack")syncBulkConfirmation();
- if(input.id==="pending-match-ack"){
+ if(input.id==="pending-match-ack"||input.id==="pending-match-mode"){
+   if(input.id==="pending-match-mode"&&state.pendingMatch)
+     state.pendingMatch.reviewMode=input.value;
    const save=document.querySelector('[data-action="pending-match-confirm"]');
-   if(save)save.disabled=!input.checked;
+   const mode=document.querySelector("#pending-match-mode");
+   const allowed=state.pendingMatch?.review?.allowed_actions||["CREATE_DECLARATION"];
+   const chosen=mode?mode.value:"CREATE_DECLARATION";
+   if(save)save.disabled=!(
+     document.querySelector("#pending-match-ack")?.checked && allowed.includes(chosen)
+   );
  }
  if(input.id==="bulk-csv-file"&&input.files?.[0]){
   const file=input.files[0];
