@@ -31,7 +31,11 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
           ' · '+(fr?"Titre exact":"Exact title"):"")+
         (manga.suggestion_kind==="EXACT_MULTILINGUAL_ALIAS"?
           ' · '+(fr?"Alias multilingue exact (à confirmer)":"Exact multilingual alias (confirm)"):"")+
+        (manga.suggestion_kind==="MANGADEX_MAL_LINK"?
+          ' · '+(fr?"MangaDex : lien MyAnimeList vérifié (à confirmer)":"MangaDex: verified MAL link (confirm)"):"")+
         '</p>'+
+        (manga.source_name==="MANGADEX" && /^https:\/\/mangadex\.org\/title\/[a-f0-9-]{36}$/i.test(String(manga.source_url||""))?
+          '<a href="'+e(manga.source_url)+'" target="_blank" rel="noopener noreferrer">MangaDex ↗</a>':"")+
         '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-select" data-id="'+e(id)+'">'+
           (fr?"Examiner cette œuvre":"Review this work")+'</button></article>';
     }).join("")+'</div>';
@@ -70,6 +74,11 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
       (state.loading?' disabled':"")+'/>'+
       '<button class="btn btn-soft" type="submit"'+(state.loading?' disabled':"")+'>'+
       e(fr?"Rechercher":"Search")+'</button></div></form>'+
+      '<button class="btn btn-small btn-soft" type="button" data-action="pending-match-external"'+(state.loading?' disabled':"")+'>'+
+      e(fr?"Recherche étendue MangaDex (facultative)":"Extended MangaDex search (optional)")+'</button>'+
+      '<p class="muted tiny">'+e(fr?
+        "Source publique MangaDex : uniquement pour un usage personnel non commercial ; aucune correspondance automatique.":
+        "Public MangaDex source: personal non-commercial use only; no automatic matches.")+'</p>'+
       (state.loading?'<p class="info">'+e(fr?"Recherche en cours…":"Searching…")+'</p>':"")+
       (state.message?'<p class="message" role="alert">'+e(state.message)+'</p>':"")+
       items+review+'</section>';
