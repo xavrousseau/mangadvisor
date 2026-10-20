@@ -298,7 +298,7 @@ function Diagnostic {
   }
   if ($counts["manga"] -eq 0) { throw "Catalogue vide : lance l'installation (1) ou actualise le catalogue (options avancees)." }
   if ($counts["manga_recommendation_edge"] -eq 0) {
-    Write-Warning "Aucune recommandation communautaire : lance l'option 26."
+    Write-Warning "Aucune recommandation communautaire : menu A puis option 2 (actualiser les recommandations)."
   }
   $url="http://127.0.0.1:$(Config 'API_PORT')/mangas?limit=1"
   $result=Invoke-RestMethod -Uri $url -TimeoutSec 15
@@ -356,7 +356,7 @@ function Benchmark-Inventory {
   Say "Benchmark de la mangatheque et du conseiller (lecture seule)"
   $scriptFile=Join-Path $root "cmd\benchmark-mangatheque.ps1"
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptFile -CsvFile $csv
-  Assert-Exit "Benchmark personnel impossible. Relance l'option 20 apres diagnostic"
+  Assert-Exit "Benchmark personnel impossible. Menu A puis option 4 apres diagnostic"
 }
 function Update {
   Say "Mise a jour sans suppression des donnees"
