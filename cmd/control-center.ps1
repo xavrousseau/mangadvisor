@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -267,6 +267,23 @@ function Enrich-BnF {
   Compose $argsList
   Write-Host "Recherche terminee : ouvre une fiche manga pour voir les candidats BnF."
 }
+function Enrich-Wikidata {
+  Say "Enrichissement Wikidata des mangas (libelles FR et genres documentes)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $limit=Ask-Number "Nombre de mangas a interroger via Wikidata (max 15)" 8 15
+  $refresh=Confirm "Actualiser les informations deja interrogees ?" $false
+  Write-Host "Source CC0 Wikidata : association uniquement par identifiant MAL manga P4087."
+  Write-Host "Une etiquette en francais ne certifie pas une edition francaise."
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.wikidata_enrichment","--limit",[string]$limit)
+  if ($refresh) { $argsList+=@("--refresh") }
+  Compose $argsList
+  Write-Host "Enrichissement Wikidata termine. Consulte les fiches mangas."
+}
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
   Ensure-Environment
@@ -497,6 +514,7 @@ try {
     "Database"        { Initialize-Database }
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
+    "Wikidata"        { Enrich-Wikidata }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
