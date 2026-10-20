@@ -34,6 +34,7 @@
 | C10 | Moyenne | Dépendances Python non épinglées ; bases d'images Docker et composants peuvent évoluer entre installations. | Geler versions/contraintes reproductibles, mettre à jour en CI de façon contrôlée. |
 | C11 | Qualité fonctionnelle | Mise à jour SQL additive des genres et thèmes ; les tags retirés côté fournisseur demeurent, faute de provenance. | Ajouter provenance par association et stratégie de désactivation non destructive ; vérifier l'effet sur recommandations. |
 | C12 | Qualité documentaire | Scripts Jikan historiques encore nommés Jikan malgré migration Tenrai, docs V1 distinctes d'éléments réellement actifs (Meilisearch/embeddings). | Marquer l'historique, consolider documentation d'architecture actuelle et renommage progressif avec compatibilité. |
+| C13 | Tests / fiabilité | Un essai d'intégration Docker a échoué sur `ConnectionResetError` en interrogeant Nginx immédiatement après le démarrage ; le contrôle ne réessayait pas avant la recréation API, contrairement au contrôle après. | Ajouter des tentatives bornées avant test (PR #58), garder l'échec si le proxy demeure indisponible. |
 
 ## Points positifs vérifiés
 - PostgreSQL/collection est conservateur : mises à jour canoniques SQL par `ON CONFLICT` sans `TRUNCATE`; sauvegarde `pg_dump` et restauration de vérification isolée.
