@@ -197,7 +197,7 @@ function Load-Catalogue {
   $pages=Ask-Number "Nombre de pages SEARCH Tenrai (25 mangas/page)" 40 400
   $topPages=Ask-Number "Nombre de pages TOP Tenrai (25 mangas/page)" 10 100
   $force=Confirm "Actualiser aussi les fichiers JSON deja telecharges ?" $false
-  $base=@("--start-page","1","--limit","25","--sleep-seconds","1")
+  $base=@("--start-page","1","--limit","25","--sleep-seconds","1","--no-legacy-search-copy")
   $search=@("pipelines/engine/scripts/extract_jikan.py","--mode","search")+
           $base+@("--end-page",[string]$pages,"--order-by","popularity","--sort","asc","--sfw","true")
   $top=@("pipelines/engine/scripts/extract_jikan.py","--mode","top")+
