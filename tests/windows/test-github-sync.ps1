@@ -8,7 +8,7 @@ $working=Join-Path $base "working"
 $sync=Join-Path $PWD "cmd\github-sync.ps1"
 New-Item -ItemType Directory -Force -Path $base | Out-Null
 
-function Git([string[]]$Commands) {
+function Fixture-Git([string[]]$Commands) {
   & git @Commands | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Git command failed: $($Commands -join ' ')" }
 }
@@ -20,19 +20,19 @@ function Write-Text([string]$File,[string]$Value) {
   [IO.File]::WriteAllText($File,$Value,(New-Object Text.UTF8Encoding($false)))
 }
 
-Git @("init","--initial-branch=main",$seed)
-Git @("-C",$seed,"config","user.email","mangadvisor-ci@example.invalid")
-Git @("-C",$seed,"config","user.name","Mangadvisor CI")
+Fixture-Git @("init","--initial-branch=main",$seed)
+Fixture-Git @("-C",$seed,"config","user.email","mangadvisor-ci@example.invalid")
+Fixture-Git @("-C",$seed,"config","user.name","Mangadvisor CI")
 Copy-Item (Join-Path $PWD ".gitignore") (Join-Path $seed ".gitignore")
 Write-Text (Join-Path $seed "README.txt") "old code"
-Git @("-C",$seed,"add",".")
-Git @("-C",$seed,"commit","-m","initial")
-Git @("init","--bare","--initial-branch=main",$remote)
-Git @("-C",$seed,"remote","add","origin",$remote)
-Git @("-C",$seed,"push","-u","origin","main")
-Git @("clone",$remote,$working)
-Git @("-C",$working,"config","user.email","mangadvisor-ci@example.invalid")
-Git @("-C",$working,"config","user.name","Mangadvisor CI")
+Fixture-Git @("-C",$seed,"add",".")
+Fixture-Git @("-C",$seed,"commit","-m","initial")
+Fixture-Git @("init","--bare","--initial-branch=main",$remote)
+Fixture-Git @("-C",$seed,"remote","add","origin",$remote)
+Fixture-Git @("-C",$seed,"push","-u","origin","main")
+Fixture-Git @("clone",$remote,$working)
+Fixture-Git @("-C",$working,"config","user.email","mangadvisor-ci@example.invalid")
+Fixture-Git @("-C",$working,"config","user.name","Mangadvisor CI")
 
 # Exactly the kind of collision experienced by the user: a manually copied
 # file that was untracked before it became an official upstream tracked file.
@@ -49,9 +49,9 @@ Write-Text (Join-Path $working "backups\existing.dump") "PRIVATE BACKUP"
 Write-Text (Join-Path $working "data\raw\original.json") "CACHED CATALOG"
 Write-Text (Join-Path $working "notes-perso.txt") "UNRELATED UNTRACKED WORK"
 Write-Text (Join-Path $seed "README.txt") "new code"
-Git @("-C",$seed,"add",".")
-Git @("-C",$seed,"commit","-m","new version")
-Git @("-C",$seed,"push","origin","main")
+Fixture-Git @("-C",$seed,"add",".")
+Fixture-Git @("-C",$seed,"commit","-m","new version")
+Fixture-Git @("-C",$seed,"push","origin","main")
 
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $sync -Root $working -NonInteractive
 if ($LASTEXITCODE -ne 0) { throw "Safe GitHub sync failed despite recoverable collisions." }
@@ -98,9 +98,9 @@ if (@(Get-ChildItem (Join-Path $base "mangadvisor-archives-git") -Directory).Cou
 
 # Local tracked changes require consent, not silent stash.
 Write-Text (Join-Path $seed "README.txt") "new upstream code 3"
-Git @("-C",$seed,"add","README.txt")
-Git @("-C",$seed,"commit","-m","upstream-again")
-Git @("-C",$seed,"push","origin","main")
+Fixture-Git @("-C",$seed,"add","README.txt")
+Fixture-Git @("-C",$seed,"commit","-m","upstream-again")
+Fixture-Git @("-C",$seed,"push","origin","main")
 Write-Text (Join-Path $working "README.txt") "LOCAL IMPORTANT MODIFICATION"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $sync -Root $working -NonInteractive
 if ($LASTEXITCODE -eq 0) { throw "Noninteractive dirty tracked update should fail closed." }
