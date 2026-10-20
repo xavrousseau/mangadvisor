@@ -16,6 +16,8 @@ import urllib.parse
 import urllib.request
 from typing import Any, Callable
 
+from fastapi import APIRouter, HTTPException
+
 from apps.api.app.bnf_batch import connect_database
 
 SOURCE_MANGADEX = "MANGADEX_MAL_LINK"
@@ -316,6 +318,44 @@ def import_mangadex_aliases(
             print("MangaDex indisponible : arret, reprise plus tard.",flush=True)
             break
     return report
+
+
+def create_title_alias_router(factory:Callable[...,Any])->APIRouter:
+    router=APIRouter(prefix="/mangas",tags=["Noms multilingues sourcés"])
+
+    @router.get("/{manga_id}/title-aliases")
+    def title_aliases(manga_id:int)->dict[str,Any]:
+        if manga_id<=0:
+            raise HTTPException(status_code=422,detail="Identifiant manga invalide.")
+        with factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id,source_mal_id FROM manga WHERE id=%(id)s",
+                            {"id":manga_id})
+                manga=cur.fetchone()
+                if manga is None:
+                    raise HTTPException(status_code=404,detail="Manga introuvable.")
+                cur.execute("""
+                    SELECT alias,language_code,source_name,source_ref
+                    FROM manga_title_alias
+                    WHERE manga_id=%(manga_id)s AND source_mal_id=%(mal_id)s
+                    ORDER BY CASE language_code WHEN 'fr' THEN 0
+                         WHEN 'en' THEN 1 WHEN 'ja-ro' THEN 2
+                         WHEN 'ja' THEN 3 ELSE 4 END,
+                         CASE source_name WHEN 'MANGADEX_MAL_LINK' THEN 0
+                         WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END,
+                         alias LIMIT 60
+                """,{"manga_id":manga_id,"mal_id":manga["source_mal_id"]})
+                rows=list(cur.fetchall())
+        return {
+            "manga_id":manga_id,"count":len(rows),"items":rows,
+            "verified_identity":True,
+            "french_publisher_titles_verified":False,
+            "automatic_edition_match":False,
+            "notice":"Noms de communauté reliés à la même œuvre par MAL ID. "
+                     "Les titres français ne prouvent pas une édition commercialisée.",
+        }
+
+    return router
 
 
 def cli_main(argv:list[str]|None=None)->int:
