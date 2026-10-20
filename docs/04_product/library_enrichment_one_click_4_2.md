@@ -48,6 +48,16 @@ conservées pour explorer également les œuvres du catalogue **hors collection*
 - Le traitement est **reprenable** : les tables
   `manga_wikidata_attempt` et `manga_bnf_attempt` évitent de revérifier
   immédiatement une série déjà analysée.
+- Un pré-bilan SQL **en lecture seule** distingue pour chaque fournisseur :
+  œuvres éligibles, déjà recherchées récemment (cache) et restant à traiter.
+  Wikidata compte aussi les mangas sans ID MyAnimeList ou dont le type
+  n'est pas couvert. La mention « 53 œuvres liées » ne signifie donc
+  **pas** « 53 œuvres enrichies ». Une exécution avec `selected=0` peut
+  être normale si toutes les séries éligibles sont en cache ; toute anomalie
+  entre le pré-bilan et le traitement est explicitement signalée.
+- La sélection BnF est affichée en clair **avant la sauvegarde** :
+  « Wikidata=OUI ; BnF=OUI/NON ». Si l'utilisateur choisit Non,
+  aucun appel BnF n'a lieu et le bilan le mentionne explicitement.
 - Un échec général d'une source arrête ses appels suivants ; son bilan
   signale un **échec partiel**. Les résultats sauvegardés restent présents.
 - Les seules écritures des collecteurs sont dans

@@ -292,6 +292,8 @@ function Enrich-My-Library {
   Wait-Postgres
   $maxWorks=Ask-Number "Maximum de series de ma mangatheque liees au catalogue (max 250)" 80 250
   $useBnf=Confirm "Rechercher aussi les notices BnF (plus lent, ISBN a verifier) ?" $true
+  $bnfLabel=if ($useBnf) { "OUI" } else { "NON" }
+  Write-Host "Sources selectionnees : Wikidata = OUI ; BnF = $bnfLabel"
   Write-Host "Une seule sauvegarde verifiee est creee avant les recherches."
   Write-Host "Les lignes d'inventaire sans manga identifie resteront en attente."
   Write-Host "Aucune edition, aucun tome et aucun ISBN ne sont attribues automatiquement."

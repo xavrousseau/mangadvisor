@@ -5,8 +5,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 from apps.api.app.library_enrichment import (
-    LINKED_SQL, PENDING_SQL, DEFAULT_WORKS, MAX_WORKS,
-    run_library_enrichment, linked_library_scope, cli_main,
+    LINKED_SQL, PENDING_SQL, COVERAGE_SQL, DEFAULT_WORKS, MAX_WORKS,
+    run_library_enrichment, linked_library_scope, enrichment_coverage, cli_main,
 )
 from apps.api.app import bnf_batch, wikidata_enrichment
 
@@ -26,6 +26,15 @@ class FakeCursor:
             self.rows=[{"id":i} for i in self.database.linked_ids[:params["limit"]]]
         elif sql==PENDING_SQL:
             self.one={"count":self.database.pending}
+        elif sql==COVERAGE_SQL:
+            ids=params["target_ids"]
+            eligible=len(ids)
+            self.one=self.database.coverage or {
+                "in_scope":eligible,"without_mal_id":0,"unsupported_type":0,
+                "wikidata_eligible":eligible,"wikidata_cached":0,
+                "wikidata_due":eligible,"bnf_eligible":eligible,
+                "bnf_cached":0,"bnf_due":eligible,
+            }
         else:
             raise AssertionError("Unexpected DB query from orchestrator")
 
@@ -41,9 +50,10 @@ class FakeConnection:
 
 
 class FakeDb:
-    def __init__(self,ids, pending=0):
+    def __init__(self,ids, pending=0, coverage=None):
         self.linked_ids=ids
         self.pending=pending
+        self.coverage=coverage
         self.queries=[]
     def __call__(self):return FakeConnection(self)
 
@@ -111,17 +121,69 @@ class LibraryEnrichmentTests(unittest.TestCase):
         self.assertEqual(len(delays),(5-1)+(7-1))
         self.assertEqual(result["failed_sources"],[])
 
+    def test_when_everything_is_cached_no_source_is_called(self):
+        db=FakeDb([9, 11, 15], pending=49, coverage={
+            "in_scope":3, "without_mal_id":0, "unsupported_type":0,
+            "wikidata_eligible":3, "wikidata_cached":3, "wikidata_due":0,
+            "bnf_eligible":3, "bnf_cached":3, "bnf_due":0,
+        })
+        wiki=Mock()
+        bnf=Mock()
+        report=run_library_enrichment(
+            db,wikidata_batch=wiki,bnf_batch=bnf,sleep=lambda _:None,
+        )
+        self.assertEqual(report["coverage"]["wikidata_cached"],3)
+        self.assertEqual(report["sources"]["wikidata"]["selected"],0)
+        self.assertEqual(report["sources"]["bnf"]["selected"],0)
+        self.assertEqual(report["sources"]["bnf"]["cached"],3)
+        self.assertEqual(report["failed_sources"],[])
+        wiki.assert_not_called()
+        bnf.assert_not_called()
+
+    def test_when_all_wikidata_ids_are_missing_bnf_can_still_run(self):
+        db=FakeDb([9, 11],coverage={
+            "in_scope":2,"without_mal_id":2,"unsupported_type":0,
+            "wikidata_eligible":0,"wikidata_cached":0,"wikidata_due":0,
+            "bnf_eligible":2,"bnf_cached":0,"bnf_due":2,
+        })
+        wiki=Mock()
+        bnf=Mock(side_effect=[
+            {"selected":2,"checked":2,"error":0},
+            {"selected":0,"checked":0,"error":0},
+        ])
+        report=run_library_enrichment(
+            db,wikidata_batch=wiki,bnf_batch=bnf,sleep=lambda _:None
+        )
+        wiki.assert_not_called()
+        self.assertEqual(bnf.call_count,2)
+        self.assertEqual(report["sources"]["bnf"]["selected"],2)
+        self.assertEqual(report["coverage"]["without_mal_id"],2)
+
+    def test_zero_selected_despite_due_items_is_flagged(self):
+        db=FakeDb([9,11])
+        wiki=Mock(return_value={"selected":0,"matched":0,"error":0})
+        report=run_library_enrichment(
+            db,wikidata_batch=wiki,include_bnf=False,sleep=lambda _:None
+        )
+        self.assertEqual(report["failed_sources"],["wikidata"])
+        self.assertEqual(report["sources"]["wikidata"]["due_before"],2)
+        self.assertEqual(report["sources"]["wikidata"]["halted"],1)
+        self.assertNotIn("bnf",report["sources"])
+
     def test_total_remote_failure_is_not_retried_repeatedly(self):
         db=FakeDb([11,12,13],pending=0)
         wiki=Mock(return_value={"selected":3,"error":3})
-        bnf=Mock(return_value={"selected":0,"error":0})
+        bnf=Mock(side_effect=[
+            {"selected":3,"checked":3,"error":0},
+            {"selected":0,"checked":0,"error":0},
+        ])
         result=run_library_enrichment(
             db,wikidata_batch=wiki,bnf_batch=bnf,sleep=lambda *_:None
         )
         self.assertEqual(wiki.call_count,1)
         self.assertEqual(result["failed_sources"],["wikidata"])
         self.assertEqual(result["sources"]["wikidata"]["halted"],1)
-        self.assertEqual(bnf.call_count,1)
+        self.assertEqual(bnf.call_count,2)
 
     def test_bounds_and_no_accidental_unscoped_fallback(self):
         db=FakeDb([1,2])
@@ -150,6 +212,19 @@ class LibraryEnrichmentTests(unittest.TestCase):
             source=inspect.getsource(module.run_batch)
             self.assertIn("m.id=ANY(%(target_ids)s)",source)
             self.assertIn('params["target_ids"] = target_ids',source)
+
+    def test_coverage_is_read_only_and_bound_to_scope(self):
+        db=FakeDb([1,2])
+        coverage=enrichment_coverage(db,[1,2])
+        self.assertEqual(coverage["in_scope"],2)
+        self.assertEqual(len(db.queries),1)
+        self.assertEqual(db.queries[0][0],COVERAGE_SQL)
+        self.assertEqual(db.queries[0][1],{"target_ids":[1,2]})
+        self.assertTrue(all(sql.strip().startswith("SELECT") for sql,_ in db.queries))
+        with self.assertRaises(ValueError):
+            enrichment_coverage(db,[-1])
+        with self.assertRaises(ValueError):
+            enrichment_coverage(db,list(range(1,252)))
 
     def test_cli_rejects_out_of_range_before_network(self):
         for value in ["0","251"]:
