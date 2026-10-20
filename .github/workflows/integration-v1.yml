@@ -212,14 +212,15 @@ jobs:
           def counts():
               with get_connection() as conn:
                   with conn.cursor() as cur:
-                      return [
-                          (cur.execute("SELECT COUNT(*) AS n FROM "+table) or cur.fetchone()["n"])
-                          for table in (
-                              "manga","manga_fr_edition","manga_genre","manga_theme",
-                              "user_manga_library","user_manga_inventory_declaration",
-                              "user_manga_volume",
-                          )
-                      ]
+                      values=[]
+                      for table in (
+                          "manga","manga_fr_edition","manga_genre","manga_theme",
+                          "user_manga_library","user_manga_inventory_declaration",
+                          "user_manga_volume",
+                      ):
+                          cur.execute("SELECT COUNT(*) AS n FROM "+table)
+                          values.append(cur.fetchone()["n"])
+                      return values
 
           def mock_lookup(ids):
               bindings=[]
