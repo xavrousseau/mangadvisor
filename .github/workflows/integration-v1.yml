@@ -663,6 +663,153 @@ jobs:
           print("2 editions distinctes, validation manuelle, audit, droits et nettoyage : OK")
           PY
 
+      - name: Vérifier titres FR et doublons physiques sans fausser les compteurs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+          import urllib.error
+          from apps.api.app.main import get_connection
+          from apps.api.app.title_aliases import title_key,sync_aliases
+
+          base="http://127.0.0.1:8000"
+          alias="L’Épopée des Titans CI"
+          pending_key="ci-multilingual-duplicate-35"
+          def api(path,data=None):
+              req=urllib.request.Request(base+path,
+                  data=json.dumps(data).encode("utf-8") if data is not None else None,
+                  headers={"Content-Type":"application/json"} if data is not None else {},
+                  method="POST" if data is not None else "GET")
+              with urllib.request.urlopen(req,timeout=20) as result:
+                  return json.load(result)
+          def snapshot():
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      result=[]
+                      for table in (
+                          "manga","manga_fr_edition","user_manga_library",
+                          "user_manga_volume","user_manga_inventory_declaration",
+                          "user_manga_inventory_pending","user_manga_inventory_resolution"
+                      ):
+                          cur.execute("SELECT COUNT(*) AS n FROM "+table)
+                          result.append(cur.fetchone()["n"])
+                      return result
+
+          initial=snapshot()
+          rebuilt=sync_aliases(get_connection,max_works=100)
+          assert rebuilt["works"]>0,rebuilt
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                    SELECT m.id,m.title FROM manga m WHERE NOT EXISTS (
+                      SELECT 1 FROM user_manga_inventory_declaration d
+                      WHERE d.manga_id=m.id AND d.user_id=1)
+                    AND NOT EXISTS (
+                      SELECT 1 FROM user_manga_library l
+                      WHERE l.manga_id=m.id AND l.user_id=1
+                        AND l.library_status='NOT_INTERESTED')
+                    ORDER BY m.id LIMIT 1
+                  """)
+                  work=cur.fetchone()
+                  assert work
+                  manga_id=work["id"]
+                  cur.execute("""
+                    INSERT INTO manga_title_alias
+                    (manga_id,alias,alias_key,language,source_name,source_url)
+                    VALUES (%s,%s,%s,'fr','CI_MANUAL_TEST',NULL)
+                  """,(manga_id,alias,title_key(alias)))
+                  cur.execute("""
+                    INSERT INTO user_manga_inventory_declaration
+                    (user_id,manga_id,edition_key,edition_declared,entry_title,
+                     source_reference,format_hint,main_volumes,
+                     duplicate_copies,other_editions_unknown)
+                    VALUES (1,%s,'__UNSPECIFIED__',NULL,'CI 34+1',
+                            'ci-manual-duplicate',NULL,34,0,1)
+                  """,(manga_id,))
+                  cur.execute("""
+                    INSERT INTO user_manga_inventory_pending
+                    (user_id,source_key,entry_title,source_reference,
+                     work_declared,edition_declared,format_hint,main_volumes,
+                     duplicate_copies,other_editions_unknown,review_status,
+                     candidate_ids,content_sha256)
+                    VALUES (1,%s,%s,%s,%s,NULL,NULL,35,0,0,
+                            'REVIEW_MISSING',ARRAY[]::integer[],%s)
+                  """,(pending_key,alias+" (35)",pending_key,alias,"c"*64))
+              conn.commit()
+
+          q=urllib.parse.urlencode({"q":alias,"limit":20})
+          catalog=api("/mangas?"+q)
+          assert any(m["id"]==manga_id for m in catalog["items"]),catalog
+          matches=api("/inventory/pending/candidates?"+urllib.parse.urlencode(
+              {"source_key":pending_key,"q":alias}))
+          hit=next(m for m in matches["items"] if m["id"]==manga_id)
+          assert hit["suggestion_kind"]=="EXACT_ALIAS",hit
+          assert hit["already_in_inventory"] is True,hit
+          assert hit["known_editions"][0]["main_volumes"]==34,hit
+          assert hit["known_editions"][0]["other_editions_unknown"]==1,hit
+          payload={"source_key":pending_key,"manga_id":manga_id}
+          preview=api("/inventory/pending/resolve/preview",payload)
+          assert preview["same_edition_exists"] is True,preview
+          assert preview["allowed_actions"]==["MARK_DUPLICATE"],preview
+          assert preview["source"]["main_volumes"]==35,preview
+          confirm={**payload,"confirmation_token":preview["confirmation_token"],
+                   "acknowledge_work_and_edition":True}
+          for invalid,expected in (
+              ({**confirm,"resolution_mode":"CREATE_DECLARATION"},409),
+              ({**confirm,"resolution_mode":"MARK_DUPLICATE"},422)
+          ):
+              try:
+                  api("/inventory/pending/resolve",invalid)
+                  raise AssertionError("Unapproved or double-counted change accepted")
+              except urllib.error.HTTPError as exc:
+                  assert exc.code==expected,(expected,exc)
+          confirmed=api("/inventory/pending/resolve",{
+              **confirm,"resolution_mode":"MARK_DUPLICATE",
+              "acknowledge_existing_inventory":True})
+          assert confirmed["resolution_mode"]=="MARK_DUPLICATE",confirmed
+          assert confirmed["new_declaration_created"] is False,confirmed
+          observed=snapshot()
+          assert observed[0:4]==initial[0:4],(initial,observed)
+          assert observed[4]==initial[4]+1,(initial,observed)
+          assert observed[5]==initial[5],(initial,observed)
+          assert observed[6]==initial[6]+1,(initial,observed)
+
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                    SELECT resolution_mode,original_declaration
+                    FROM user_manga_inventory_resolution
+                    WHERE user_id=1 AND source_key=%s
+                  """,(pending_key,))
+                  audit=cur.fetchone()
+                  assert audit["resolution_mode"]=="MARK_DUPLICATE",audit
+                  assert audit["original_declaration"]["main_volumes"]==35,audit
+                  cur.execute("""
+                    SELECT main_volumes,other_editions_unknown
+                    FROM user_manga_inventory_declaration
+                    WHERE user_id=1 AND manga_id=%s
+                      AND edition_key='__UNSPECIFIED__'
+                  """,(manga_id,))
+                  declared=cur.fetchone()
+                  assert declared["main_volumes"]==34 and declared["other_editions_unknown"]==1,declared
+                  cur.execute("DELETE FROM user_manga_inventory_resolution "
+                              "WHERE user_id=1 AND source_key=%s",(pending_key,))
+                  cur.execute("""
+                    DELETE FROM user_manga_inventory_declaration
+                    WHERE user_id=1 AND manga_id=%s
+                      AND edition_key='__UNSPECIFIED__'
+                  """,(manga_id,))
+                  cur.execute("DELETE FROM manga_title_alias WHERE manga_id=%s "
+                              "AND source_name='CI_MANUAL_TEST'",(manga_id,))
+              conn.commit()
+          assert snapshot()==initial,(initial,snapshot())
+          print("Recherche FR alias, doublon 34+1/35, audit et volumes preserves : OK")
+          PY
+
       - name: Sauvegarder et valider une restauration complete de la mangatheque
         shell: bash
         run: |
