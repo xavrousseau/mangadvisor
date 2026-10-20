@@ -39,10 +39,13 @@ CREATE TABLE IF NOT EXISTS manga_wikidata_fact (
     wikidata_id TEXT NOT NULL CHECK (wikidata_id ~ '^Q[1-9][0-9]*$'),
     label_fr TEXT,
     description_fr TEXT,
+    alternate_titles JSONB NOT NULL DEFAULT '[]'::jsonb,
     genres_fr TEXT[] NOT NULL DEFAULT ARRAY[]::text[],
     source_name TEXT NOT NULL DEFAULT 'WIKIDATA_P4087',
     checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE manga_wikidata_fact ADD COLUMN IF NOT EXISTS
+    alternate_titles JSONB NOT NULL DEFAULT '[]'::jsonb;
 CREATE TABLE IF NOT EXISTS manga_wikidata_attempt (
     manga_id INTEGER PRIMARY KEY REFERENCES manga(id) ON DELETE CASCADE,
     status TEXT NOT NULL CHECK (status IN ('MATCHED','NOT_FOUND','AMBIGUOUS','ERROR')),
@@ -95,11 +98,14 @@ def sparql_for_ids(ids: list[int]) -> str:
     return (
         "PREFIX wdt: <http://www.wikidata.org/prop/direct/>\n"
         "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"
+        "PREFIX skos: <http://www.w3.org/2004/02/skos/core#>\n"
         "PREFIX schema: <http://schema.org/>\n"
-        "SELECT ?malId ?item ?labelFr ?descriptionFr ?genreFr WHERE {\n"
+        "SELECT ?malId ?item ?labelFr ?descriptionFr ?genreFr ?altTitle WHERE {\n"
         f"  VALUES ?malId {{ {literal_ids} }}\n"
         "  ?item wdt:P4087 ?malId .\n"
         '  OPTIONAL { ?item rdfs:label ?labelFr FILTER(LANG(?labelFr)="fr") }\n'
+        '  OPTIONAL { ?item (rdfs:label|skos:altLabel) ?altTitle '
+        'FILTER(LANG(?altTitle) IN ("fr", "en", "ja")) }\n'
         '  OPTIONAL { ?item schema:description ?descriptionFr FILTER(LANG(?descriptionFr)="fr") }\n'
         "  OPTIONAL { ?item wdt:P136 ?genre . "
         '?genre rdfs:label ?genreFr FILTER(LANG(?genreFr)="fr") }\n'
@@ -166,11 +172,17 @@ def normalize_wikidata(
         qid = entity.group(1)
         entry = matched[mid].setdefault(
             qid, {"wikidata_id": qid, "label_fr": None,
-                  "description_fr": None, "genres_fr": set()}
+                  "description_fr": None, "genres_fr": set(), "alternate_titles": set()}
         )
         label = _binding(raw, "labelFr").strip()
         description = _binding(raw, "descriptionFr").strip()
         genre = _binding(raw, "genreFr").strip()
+        alt_part = raw.get("altTitle")
+        if isinstance(alt_part, dict):
+            alt = _binding(raw, "altTitle").strip()
+            lang = alt_part.get("xml:lang", "")
+            if lang in ("fr", "en", "ja") and 0 < len(alt) <= 200:
+                entry["alternate_titles"].add((lang, alt))
         if label and len(label) <= 200:
             entry["label_fr"] = label
         if description and len(description) <= 500:
@@ -185,21 +197,29 @@ def normalize_wikidata(
             continue
         fact = next(iter(entities.values()))
         fact["genres_fr"] = sorted(fact["genres_fr"], key=str.casefold)[:12]
+        fact["alternate_titles"] = [
+            {"lang": lang, "title": title}
+            for lang, title in sorted(fact["alternate_titles"],
+                                      key=lambda item: (item[0], item[1].casefold()))[:40]
+        ]
         result[mid] = {"status": "MATCHED", "match_count": 1, "fact": fact}
     return result
 
 
 UPSERT_FACT_SQL = """
 INSERT INTO manga_wikidata_fact
-(manga_id,source_mal_id,wikidata_id,label_fr,description_fr,genres_fr,source_name,checked_at)
+(manga_id,source_mal_id,wikidata_id,label_fr,description_fr,genres_fr,
+ alternate_titles,source_name,checked_at)
 VALUES (%(manga_id)s,%(source_mal_id)s,%(wikidata_id)s,
-        %(label_fr)s,%(description_fr)s,%(genres_fr)s,%(source_name)s,NOW())
+        %(label_fr)s,%(description_fr)s,%(genres_fr)s,
+        %(alternate_titles)s::jsonb,%(source_name)s,NOW())
 ON CONFLICT (manga_id) DO UPDATE SET
   source_mal_id=EXCLUDED.source_mal_id,
   wikidata_id=EXCLUDED.wikidata_id,
   label_fr=EXCLUDED.label_fr,
   description_fr=EXCLUDED.description_fr,
   genres_fr=EXCLUDED.genres_fr,
+  alternate_titles=EXCLUDED.alternate_titles,
   source_name=EXCLUDED.source_name,
   checked_at=NOW()
 """
@@ -266,6 +286,7 @@ def run_batch(
                             "label_fr": fact["label_fr"],
                             "description_fr": fact["description_fr"],
                             "genres_fr": fact["genres_fr"],
+                            "alternate_titles": json.dumps(fact["alternate_titles"], ensure_ascii=False),
                             "source_name": SOURCE,
                         })
                         counts["labels_fr"] += int(bool(fact["label_fr"]))
