@@ -222,7 +222,7 @@ def main() -> int:
     if not files:
         print("Aucun fichier de recommandations trouvé.")
         print("Lance d'abord l'option 26 du menu Mangadvisor (recommandations Tenrai).")
-        return 0
+        return 1
 
     print(f"Fichiers détectés : {len(files)}")
     print()
@@ -324,7 +324,7 @@ def main() -> int:
             print()
 
         # A partial or corrupt source must not replace a known-good graph.
-        if args.reset and (total_files_in_error > 0 or not all_rows):
+        if not all_rows or (args.reset and total_files_in_error > 0):
             print("[load_recommendations] REFUS : fichiers invalides ou zéro recommandation exploitable.")
             print("[load_recommendations] Relations existantes conservées.")
             return 1
