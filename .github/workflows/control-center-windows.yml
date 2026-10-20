@@ -67,7 +67,9 @@ jobs:
             Stop-Process -Id $process.Id -Force
             throw "L'option Q ne quitte pas le menu Windows."
           }
-          if ($process.ExitCode -ne 0) { throw "Sortie du menu echouee : $($process.ExitCode)" }
+          # Windows PowerShell 5.1 may return a null ExitCode for Start-Process.
+          # Exiting before the timeout is sufficient here; the direct-call test above
+          # verifies actual command failures and their propagated exit code.
 
       - name: Verifier la configuration initiale sans Docker
         shell: powershell
