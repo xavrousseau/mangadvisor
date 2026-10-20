@@ -4,12 +4,26 @@ import unittest
 from pydantic import ValidationError
 
 from apps.api.app.advisor import (
-    AdvisorContext, AdvisorRequest, interpret, match_mood, score_candidates,
+    AdvisorContext, AdvisorRequest, choose_display_title, interpret, match_mood, score_candidates,
 )
 from apps.api.app.narrative_evidence import narrative_matches
 
 
 class ConversationalAdvisorTests(unittest.TestCase):
+    def test_advisor_title_uses_source_international_name_without_inventing_french(self):
+        self.assertEqual(
+            choose_display_title("Shingeki no Kyojin", "Attack on Titan"),
+            "Attack on Titan",
+        )
+        self.assertEqual(
+            choose_display_title("Shingeki no Kyojin", "  "),
+            "Shingeki no Kyojin",
+        )
+        self.assertEqual(
+            choose_display_title("進撃の巨人", None),
+            "進撃の巨人",
+        )
+
     def test_complex_request_and_soft_french_preference(self):
         text=("Je cherche un manga mature avec une intrigue prenante, "
               "pas trop long, terminé, idéalement disponible en français.")
