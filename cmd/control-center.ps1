@@ -225,7 +225,7 @@ function Load-Catalogue {
   Wait-Postgres
   $null=Get-Count "manga"
   Network
-  $pages=Ask-Number "Nombre de pages SEARCH Tenrai (25 mangas/page)" 40 400
+  $pages=Ask-Number "Nombre de pages SEARCH Tenrai (25 mangas/page)" 40 2000
   $topPages=Ask-Number "Nombre de pages TOP Tenrai (25 mangas/page)" 10 100
   $force=Confirm "Actualiser aussi les fichiers JSON deja telecharges ?" $false
   $base=@("--start-page","1","--limit","25","--sleep-seconds","1","--no-legacy-search-copy")
