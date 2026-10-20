@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment","TitleIndex")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -304,6 +304,25 @@ function Enrich-My-Library {
   Compose $argsList
   Write-Host "Bilan ci-dessus : consulte les fiches mangas et les candidats ISBN."
 }
+function Refresh-Title-Index {
+  Say "Indexer les titres multilingues et synonymes de manga (FR, EN, JP)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  Write-Host "Les titres du catalogue MyAnimeList et les alias Wikidata deja verifies sont reindexes."
+  Write-Host "Aucune edition, ISBN, quantite ou donnee utilisateur ne sera modifiee."
+  $refresh=Confirm "Rechercher aussi les alias multilingues recents sur Wikidata pour ta collection ?" $true
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.title_aliases")
+  if($refresh) {
+    $count=Ask-Number "Nombre maximum de series de ta collection a rafraichir sur Wikidata" 80 250
+    $argsList+=@("--refresh-library-wikidata","--library-max-works",[string]$count)
+  }
+  Backup
+  Compose $argsList
+  Write-Host "Indexation des noms terminee. Recherche maintenant en francais, anglais ou japonais."
+}
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
   Ensure-Environment
@@ -536,6 +555,7 @@ try {
     "BnF"             { Enrich-BnF }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
+    "TitleIndex"        { Refresh-Title-Index }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
