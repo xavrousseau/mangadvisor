@@ -139,6 +139,18 @@ class OwnershipDiscoveryTests(unittest.TestCase):
         self.assertEqual(params["genres"], ["mystery"])
         self.assertEqual(params["themes"], ["detective"])
 
+    def test_recommendation_returns_international_name_with_original_title(self):
+        db = FakeDatabase(owned_rows=[
+            {"kind": "genres", "tag": "mystery",
+             "source_count": 2, "owned_work_count": 2},
+        ])
+        with patch.dict(CANDIDATES[0], {"title_english": "International Mystery"}):
+            result = advice(db)
+        suggestion = result["recommendations"][0]
+        self.assertEqual(suggestion["title"], "International Mystery")
+        self.assertEqual(suggestion["title_original"], "Synthetic Mystery")
+        self.assertEqual(suggestion["id"], 101)
+
     def test_positive_reading_preferences_take_priority_over_owned_titles(self):
         db = FakeDatabase(
             rated_rows=[{"kind": "genres", "tag": "mystery"}],
