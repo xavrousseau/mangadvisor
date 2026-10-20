@@ -432,7 +432,15 @@ function Update {
     Write-Host "Pour les retrouver plus tard : git stash list"
   }
   try {
-    Run "git" @("-C",$root,"pull","--ff-only","origin","main") "Git pull a echoue"
+    # The shared Git synchronizer detects untracked files which now exist
+    # upstream and archives ONLY those conflicts outside this repository.
+    # Tracked edits have already been backed up into Git stash above.
+    $syncScript=Join-Path $root "cmd\github-sync.ps1"
+    if (!(Test-Path -LiteralPath $syncScript -PathType Leaf)) {
+      throw "Synchronisation GitHub indisponible : cmd\github-sync.ps1 manque."
+    }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Root $root -NonInteractive
+    Assert-Exit "La synchronisation GitHub a echoue"
   } catch {
     if ($stashCreated) {
       Write-Warning "La sauvegarde Git stash est conservee. Ne supprime pas le depot."
