@@ -61,8 +61,10 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
     '<form id="pending-match-search-form"><label for="pending-match-query">'+
       e(fr?"Chercher une œuvre dans le catalogue":"Search the catalogue")+'</label>'+
       '<div class="search-bar"><input id="pending-match-query" name="query" maxlength="100" '+
-      'value="'+e(state.query||"")+'" placeholder="'+e(fr?"Titre du manga":"Manga title")+'"/>'+
-      '<button class="btn btn-soft" type="submit">'+e(fr?"Rechercher":"Search")+'</button></div></form>'+
+      'value="'+e(state.query||"")+'" placeholder="'+e(fr?"Titre du manga":"Manga title")+'"'+
+      (state.loading?' disabled':"")+'/>'+
+      '<button class="btn btn-soft" type="submit"'+(state.loading?' disabled':"")+'>'+
+      e(fr?"Rechercher":"Search")+'</button></div></form>'+
       (state.loading?'<p class="info">'+e(fr?"Recherche en cours…":"Searching…")+'</p>':"")+
       (state.message?'<p class="message" role="alert">'+e(state.message)+'</p>':"")+
       items+review+'</section>';
