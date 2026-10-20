@@ -32,7 +32,7 @@ class StabilisationSafetyTests(unittest.TestCase):
         self.assertIn('if "%CHOICE%"=="7" set "KEY=github-sync"',menu)
         self.assertIn('if /I "%~1"=="github-sync" set "PS_SCRIPT=github-sync.ps1"',menu)
         self.assertIn("cmd\\github-sync.ps1",control)
-        self.assertIn("--NonInteractive",control)
+        self.assertIn("-NonInteractive",control)
         self.assertIn("ls-files",sync)
         self.assertIn("ls-tree",sync)
         self.assertIn("Move-Item",sync)
