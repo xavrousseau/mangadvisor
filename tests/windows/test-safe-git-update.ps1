@@ -26,6 +26,12 @@ if ($LASTEXITCODE -ne 0) { throw "Clone failed" }
 & git -C $working config user.name "Mangadvisor CI"
 & git -C $working config core.autocrlf true
 
+# The full update now delegates safe untracked-collision handling to a
+# dedicated script. Install that script in this disposable clone as the
+# real repository would provide it, without modifying the remote fixture.
+New-Item -ItemType Directory -Force -Path (Join-Path $working "cmd") | Out-Null
+Copy-Item -LiteralPath (Join-Path $PWD "cmd/github-sync.ps1") -Destination (Join-Path $working "cmd/github-sync.ps1")
+
 # Remote update pending while local tracked README is different.
 [IO.File]::WriteAllText((Join-Path $seed "README.txt"),("v2"+[Environment]::NewLine),(New-Object Text.UTF8Encoding($false)))
 & git -C $seed add README.txt
