@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment")]
+  [ValidateSet("Environment","Database","Catalogue","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment","TitleAliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -304,6 +304,29 @@ function Enrich-My-Library {
   Compose $argsList
   Write-Host "Bilan ci-dessus : consulte les fiches mangas et les candidats ISBN."
 }
+function Index-Manga-Titles {
+  Say "Indexation multilingue des mangas (MAL, Wikidata, MangaDex confirme par MAL)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $useMangaDex=Confirm "Interroger aussi MangaDex pour les mangas de ma bibliotheque ?" $true
+  $limit=15
+  if ($useMangaDex) {
+    $limit=Ask-Number "Nombre maximal de series a interroger sur MangaDex (1-30)" 15 30
+  }
+  Write-Host "Indexation des titres MAL deja charges pour tout le catalogue."
+  Write-Host "Les alias francais restent des titres communautaires non certifies par un editeur."
+  Write-Host "Chaque lien MangaDex doit contenir le meme identifiant MAL manga."
+  Write-Host "Aucun ISBN ni aucune edition ne seront modifies."
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.title_aliases","--catalog-limit","20000",
+              "--mangadex-limit",[string]$limit)
+  if (-not $useMangaDex) { $argsList+=@("--local-only") }
+  Compose $argsList
+  Write-Host "Termine. Les recherches FR/EN/JP seront disponibles sur les fiches et dans l'inventaire."
+}
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
   Ensure-Environment
@@ -536,6 +559,7 @@ try {
     "BnF"             { Enrich-BnF }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
+    "TitleAliases"    { Index-Manga-Titles }
     "Catalogue"       { Load-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
