@@ -2446,6 +2446,18 @@ def recommend_similar(
               WHERE skipped.user_id = %(user_id)s
                 AND skipped.manga_id = m.id
           )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_inventory_declaration owned_inventory
+                  WHERE owned_inventory.user_id = %(user_id)s
+                    AND owned_inventory.manga_id = m.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_volume owned_volume
+                  JOIN manga_fr_edition physical_book ON physical_book.id = owned_volume.edition_id
+                  WHERE owned_volume.user_id = %(user_id)s
+                    AND physical_book.manga_id = m.id
+                    AND (owned_volume.is_owned = TRUE OR owned_volume.is_read = TRUE)
+              )
           AND COALESCE(m.score, 0) >= 6.8
           AND (
                 COALESCE(cts.common_theme_count, 0) > 0
@@ -3305,6 +3317,18 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
                   SELECT 1 FROM user_manga_library skipped
                   WHERE skipped.user_id = %(user_id)s
                     AND skipped.manga_id = m.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_inventory_declaration owned_inventory
+                  WHERE owned_inventory.user_id = %(user_id)s
+                    AND owned_inventory.manga_id = m.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_volume owned_volume
+                  JOIN manga_fr_edition physical_book ON physical_book.id = owned_volume.edition_id
+                  WHERE owned_volume.user_id = %(user_id)s
+                    AND physical_book.manga_id = m.id
+                    AND (owned_volume.is_owned = TRUE OR owned_volume.is_read = TRUE)
               )
               AND COALESCE(m.score, 0) >= %(min_score)s
               AND m.manga_type IN ('Manga', 'Manhwa', 'Manhua', 'One-shot')
