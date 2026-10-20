@@ -531,7 +531,15 @@ def inventory_router(connection_factory: Callable[..., Any], user_id: int = 1) -
         with connection_factory() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT d.manga_id,m.title AS work_title,d.entry_title,
+                    SELECT d.manga_id,
+                           COALESCE((
+                             SELECT a.alias FROM manga_title_alias a
+                             WHERE a.manga_id=m.id AND a.source_mal_id=m.source_mal_id
+                               AND a.language_code='fr'
+                             ORDER BY CASE a.source_name WHEN 'MANGADEX_MAL_LINK'
+                                   THEN 0 WHEN 'WIKIDATA_P4087' THEN 1 ELSE 2 END
+                             LIMIT 1
+                           ),m.title_english,m.title) AS work_title,d.entry_title,
                            d.edition_declared,d.format_hint,d.main_volumes,
                            d.duplicate_copies,d.other_editions_unknown,
                            d.source_reference,d.imported_at::text AS imported_at
