@@ -61,7 +61,7 @@ class RecommendationIngestionHealthTests(unittest.TestCase):
         self.assertIn('Join-Path $root "private-data\\mangatheque.csv"', script)
         self.assertIn('cmd\\benchmark-mangatheque.ps1', script)
         self.assertIn("Benchmark facultatif non abouti", wizard)
-        self.assertIn("Relance l'option 20", wizard)
+        self.assertIn("Relance le benchmark via le menu A", wizard)
 
 
 if __name__ == "__main__":

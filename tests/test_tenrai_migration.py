@@ -1,6 +1,7 @@
 """Contract tests for Tenrai's Jikan-compatible manga ingestion (offline fixtures)."""
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import tempfile
@@ -73,6 +74,63 @@ class TenraiMigrationTests(unittest.TestCase):
         self.assertEqual(upsert_jikan_manga_batch(db, rows), 1)
         self.assertIn("source_name = EXCLUDED.source_name", db.last_query)
         self.assertTrue(db.committed)
+
+    def test_old_jikan_cache_is_not_used_as_current_tenrai(self):
+        with tempfile.TemporaryDirectory() as directory:
+            raw = Path(directory)
+            cache = raw / "search" / "search_page_1.json"
+            cache.parent.mkdir(parents=True)
+            cache.write_text(json.dumps({
+                "data": [SAMPLE_MANGA], "mangadvisor_source": "jikan"
+            }), encoding="utf-8")
+            args = argparse.Namespace(
+                mode="search", force=False, no_legacy_search_copy=True,
+                timeout=5, max_retries=1, retry_delay_seconds=0
+            )
+            with patch.object(extract_jikan, "RAW_JIKAN_DIR", raw), patch.object(
+                extract_jikan, "JIKAN_BASE_URL", "https://api.tenrai.org/v1"
+            ), patch.object(extract_jikan, "build_search_params", return_value={"page": 1}), patch.object(
+                extract_jikan, "fetch_jikan_with_retry",
+                return_value={"data": [SAMPLE_MANGA]}
+            ) as fetch:
+                path, count = extract_jikan.extract_page(args, 1)
+                self.assertEqual(count, 1)
+                fetch.assert_called_once()
+                self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["mangadvisor_source"], "tenrai")
+                extract_jikan.extract_page(args, 1)
+                fetch.assert_called_once()  # Fresh Tenrai cache is reused safely.
+
+    def test_old_recommendation_cache_is_not_reused_as_tenrai(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            cache = directory_path / "manga_2_recommendations.json"
+            cache.write_text(json.dumps({
+                "data": [{"entry": {"mal_id": 3}}],
+                "mangadvisor_source": "jikan",
+            }), encoding="utf-8")
+            args = argparse.Namespace(
+                force=False, timeout=5, max_retries=1, retry_delay_seconds=0,
+            )
+            with patch.object(reco, "RAW_RECOMMENDATIONS_DIR", directory_path), patch.object(
+                reco, "JIKAN_BASE_URL", "https://api.tenrai.org/v1"
+            ), patch.object(reco, "fetch_jikan_with_retry", return_value={
+                "data": [{"entry": {"mal_id": 4}}],
+            }) as fetch:
+                updated, count = reco.extract_recommendations_for_manga(
+                    {"source_mal_id": 2, "title": "Berserk"}, args,
+                )
+                self.assertTrue(updated)
+                self.assertEqual(count, 1)
+                self.assertEqual(
+                    json.loads(cache.read_text(encoding="utf-8"))["mangadvisor_source"],
+                    "tenrai",
+                )
+                updated, count = reco.extract_recommendations_for_manga(
+                    {"source_mal_id": 2, "title": "Berserk"}, args,
+                )
+                self.assertFalse(updated)
+                self.assertEqual(count, 1)
+                fetch.assert_called_once()
 
     def test_legacy_json_remains_supported(self):
         with tempfile.TemporaryDirectory() as directory:

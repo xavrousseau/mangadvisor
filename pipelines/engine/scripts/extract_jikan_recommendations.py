@@ -218,12 +218,24 @@ def extract_recommendations_for_manga(
     output_file = output_path_for_manga(mal_id)
 
     if output_file.exists() and not args.force:
-        print(f"[recommendations] fichier déjà présent, ignoré : {output_file}")
-
-        with output_file.open("r", encoding="utf-8") as file:
-            payload = json.load(file)
-
-        return False, len(payload.get("data", []))
+        expected_source = (
+            "tenrai" if JIKAN_BASE_URL.startswith("https://api.tenrai.org/")
+            else "jikan"
+        )
+        try:
+            with output_file.open("r", encoding="utf-8") as file:
+                cached = json.load(file)
+            valid_cache = (
+                isinstance(cached, dict)
+                and cached.get("mangadvisor_source") == expected_source
+                and isinstance(cached.get("data"), list)
+            )
+        except (OSError, ValueError, TypeError):
+            valid_cache = False
+        if valid_cache:
+            print(f"[recommendations] cache {expected_source} valide : {output_file}")
+            return False, len(cached["data"])
+        print(f"[recommendations] cache ancien/invalide : nouvel appel pour {mal_id}")
 
     url = f"{JIKAN_BASE_URL}/manga/{mal_id}/recommendations"
 

@@ -23,7 +23,7 @@ from apps.api.app.advisor import make_advisor_router
 
 app = FastAPI(
     title="Mangadvisor API",
-    version="4.4.0",
+    version="4.7.0",
     description="API de recommandation manga pour Mangadvisor.",
 )
 
@@ -1143,76 +1143,31 @@ def find_manga_for_import(
     cur: Any,
     title: str,
 ) -> dict[str, Any] | None:
-    sql = """
-        WITH candidates AS (
-            SELECT
-                id,
-                source_mal_id,
-                title,
-                title_english,
-                title_japanese,
-                manga_type,
-                score::float AS score,
-                popularity,
+    """Never guess a manga from a partial/fuzzy CSV title.
 
-                CASE
-                    WHEN LOWER(title) = LOWER(%(title)s) THEN 0
-                    WHEN LOWER(COALESCE(title_english, '')) = LOWER(%(title)s) THEN 1
-                    WHEN LOWER(COALESCE(title_japanese, '')) = LOWER(%(title)s) THEN 2
-                    WHEN title ILIKE %(like_title)s THEN 3
-                    WHEN title_english ILIKE %(like_title)s THEN 4
-                    WHEN title_japanese ILIKE %(like_title)s THEN 5
-                    ELSE 9
-                END AS match_rank
-
-            FROM manga
-
-            WHERE LOWER(title) = LOWER(%(title)s)
-               OR LOWER(COALESCE(title_english, '')) = LOWER(%(title)s)
-               OR LOWER(COALESCE(title_japanese, '')) = LOWER(%(title)s)
-               OR title ILIKE %(like_title)s
-               OR title_english ILIKE %(like_title)s
-               OR title_japanese ILIKE %(like_title)s
-        )
-
-        SELECT
-            id,
-            source_mal_id,
-            title,
-            title_english,
-            title_japanese,
-            manga_type,
-            score,
-            popularity,
-            match_rank
-
-        FROM candidates
-
-        ORDER BY
-            match_rank ASC,
-            CASE
-                WHEN manga_type = 'Manga' THEN 0
-                WHEN manga_type IN ('Manhwa', 'Manhua') THEN 1
-                WHEN manga_type = 'One-shot' THEN 2
-                WHEN manga_type = 'Light Novel' THEN 5
-                ELSE 9
-            END,
-            popularity ASC NULLS LAST,
-            score DESC NULLS LAST,
-            id ASC
-
-        LIMIT 1;
+    The historical library importer is deliberately conservative, like the
+    physical-inventory importer: only one unambiguous exact title/alias can
+    be linked. Two different mangas sharing the same alias need human review.
     """
-
-    cur.execute(
-        sql,
-        {
-            "title": title,
-            "like_title": f"%{title}%",
-        },
-    )
-
-    return cur.fetchone()
+    sql = """
+        SELECT
+            id, source_mal_id, title, title_english, title_japanese,
+            manga_type, score::float AS score, popularity,
+            CASE
+                WHEN LOWER(title) = LOWER(%(title)s) THEN 0
+                WHEN LOWER(COALESCE(title_english, '')) = LOWER(%(title)s) THEN 1
+                ELSE 2
+            END AS match_rank
+        FROM manga
+        WHERE LOWER(title) = LOWER(%(title)s)
+           OR LOWER(COALESCE(title_english, '')) = LOWER(%(title)s)
+           OR LOWER(COALESCE(title_japanese, '')) = LOWER(%(title)s)
+        ORDER BY match_rank ASC, id ASC
+        LIMIT 2;
+    """
+    cur.execute(sql, {"title": title})
+    matches = cur.fetchall()
+    return matches[0] if len(matches) == 1 else None
 
 
 @app.post("/library/import/csv")
@@ -2491,6 +2446,18 @@ def recommend_similar(
               WHERE skipped.user_id = %(user_id)s
                 AND skipped.manga_id = m.id
           )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_inventory_declaration owned_inventory
+                  WHERE owned_inventory.user_id = %(user_id)s
+                    AND owned_inventory.manga_id = m.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_volume owned_volume
+                  JOIN manga_fr_edition physical_book ON physical_book.id = owned_volume.edition_id
+                  WHERE owned_volume.user_id = %(user_id)s
+                    AND physical_book.manga_id = m.id
+                    AND (owned_volume.is_owned = TRUE OR owned_volume.is_read = TRUE)
+              )
           AND COALESCE(m.score, 0) >= 6.8
           AND (
                 COALESCE(cts.common_theme_count, 0) > 0
@@ -3350,6 +3317,18 @@ def recommend_from_profile(payload: ProfileRecommendationRequest) -> dict[str, A
                   SELECT 1 FROM user_manga_library skipped
                   WHERE skipped.user_id = %(user_id)s
                     AND skipped.manga_id = m.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_inventory_declaration owned_inventory
+                  WHERE owned_inventory.user_id = %(user_id)s
+                    AND owned_inventory.manga_id = m.id
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_manga_volume owned_volume
+                  JOIN manga_fr_edition physical_book ON physical_book.id = owned_volume.edition_id
+                  WHERE owned_volume.user_id = %(user_id)s
+                    AND physical_book.manga_id = m.id
+                    AND (owned_volume.is_owned = TRUE OR owned_volume.is_read = TRUE)
               )
               AND COALESCE(m.score, 0) >= %(min_score)s
               AND m.manga_type IN ('Manga', 'Manhwa', 'Manhua', 'One-shot')

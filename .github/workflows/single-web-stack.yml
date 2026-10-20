@@ -106,6 +106,20 @@ jobs:
           test -f data/raw/ci_persistence_probe.txt
           sudo rm -f data/raw/ci_persistence_probe.txt
           echo "Data/raw partage de maniere persistante sans montage du code source complet."
+      - name: Tester les actions Demarrer et Arreter du centre de pilotage
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v pwsh
+          pwsh -NoProfile -File cmd/control-center.ps1 -Action Start
+          curl --fail --silent http://127.0.0.1:8501/api/health | grep -F '"status":"ok"'
+          pwsh -NoProfile -File cmd/control-center.ps1 -Action Stop
+          BASE="docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.local.yml"
+          if [ -n "$($BASE ps --status running --services)" ]; then
+            echo "Arret incomplet : des services Mangadvisor sont toujours actifs"
+            exit 1
+          fi
+
       - name: Diagnostic uniquement si echec
         if: failure()
         shell: bash

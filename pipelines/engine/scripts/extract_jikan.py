@@ -408,14 +408,26 @@ def extract_page(args: argparse.Namespace, page: int) -> tuple[Path, int]:
     output_file = output_path_for_mode(args.mode, page)
 
     if output_file.exists() and not args.force:
-        print(
-            f"[extract_jikan] fichier déjà présent, extraction ignorée : {output_file}"
+        # A previous Jikan cache is not a valid substitute for the new Tenrai
+        # feed. Refresh it instead of claiming a successful current extraction.
+        expected_source = (
+            "tenrai" if JIKAN_BASE_URL.startswith("https://api.tenrai.org/")
+            else "jikan"
         )
-
-        with output_file.open("r", encoding="utf-8") as file:
-            existing_payload = json.load(file)
-
-        return output_file, len(existing_payload.get("data", []))
+        try:
+            with output_file.open("r", encoding="utf-8") as file:
+                existing_payload = json.load(file)
+            valid_cache = (
+                isinstance(existing_payload, dict)
+                and existing_payload.get("mangadvisor_source") == expected_source
+                and isinstance(existing_payload.get("data"), list)
+            )
+        except (OSError, ValueError, TypeError):
+            valid_cache = False
+        if valid_cache:
+            print(f"[extract_jikan] cache {expected_source} valide : {output_file}")
+            return output_file, len(existing_payload["data"])
+        print(f"[extract_jikan] cache ancien/invalide : nouvelle extraction de {output_file}")
 
     print(f"[extract_jikan] récupération page {page} via {endpoint}...")
     print(f"[extract_jikan] paramètres : {params}")

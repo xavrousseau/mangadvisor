@@ -1,162 +1,228 @@
 @echo off
-setlocal
-
+setlocal EnableExtensions DisableDelayedExpansion
 set "ROOT_DIR=%~dp0"
 
-if not "%~1"=="" goto run_command
+rem A single synchronous entry point: never spawn detached terminal windows.
+rem Everything destructive is deliberately absent from the everyday menu.
+if not "%~1"=="" goto :direct
 
 :menu
 cls
-echo ============================================================
-echo                        MANGADVISOR CLI
-echo ============================================================
+echo ==========================================================
+echo                       MANGADVISOR
+echo ==========================================================
 echo.
-echo   Stack Docker
-echo   ------------
-echo   1  - Verification de l'installation
-echo   2  - Build des images
-echo   3  - Build + demarrage
-echo   4  - Demarrage
-echo   5  - Etat des services
-echo   6  - Logs
-echo   7  - Stop
-echo   8  - Down
-echo   9  - Restart
-echo   10 - Clean
-echo   11 - Nuke
+echo    1 - Premiere installation (guidage complet)
+echo    2 - Demarrer et ouvrir Mangadvisor
+echo    3 - Mettre a jour sans perdre mes donnees
+echo    4 - Sauvegarder ma mangatheque
+echo    5 - Verifier que tout fonctionne
+echo    6 - Arreter Mangadvisor
 echo.
-echo   Extensions optionnelles
-echo   ----------------------
-echo   13 - Activer le scanner mobile HTTPS
-echo   14 - Arreter le scanner mobile HTTPS
-echo   15 - Installer et activer le conseiller IA local
-echo   16 - Arreter le conseiller IA local
+echo    A - Options avancees
+echo    0 - Quitter
 echo.
-echo   Sauvegarde de la mangatheque
-echo   ---------------------------
-echo   17 - Sauvegarder et verifier
-echo   18 - Verifier la derniere sauvegarde
-echo   19 - Restaurer (confirmation obligatoire)
-echo   20 - Tester ma mangatheque en lecture seule
-echo   21 - Importer ma mangatheque apres verification
-echo.
-echo.
-echo   Centre de pilotage - Installation et donnees
-echo   -----------------------------------------
-echo   22 - Installer de A a Z (base, donnees, appli, bibliotheque, tests)
-echo   23 - Creer / verifier la configuration .env
-echo   24 - Initialiser / reparer les tables SQL
-echo   25 - Telecharger et charger le catalogue manga (Tenrai)
-echo   26 - Telecharger et charger les recommandations
-echo   27 - Diagnostic final complet (lecture seule)
-echo   28 - Mise a jour securisee (sauvegarde + Git + Docker)
-echo   29 - Diagnostic reseau Docker / API manga
-echo   Q  - Quitter
-echo.
-echo ============================================================
-echo Exemples de commandes directes :
-echo   mangadvisor.cmd check
-echo   mangadvisor.cmd build
-echo   mangadvisor.cmd start
-echo   mangadvisor.cmd logs
-echo   mangadvisor.cmd catalogue
-echo ============================================================
-echo.
+echo ==========================================================
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" exit /b 0
+if /I "%CHOICE%"=="Q" exit /b 0
+if /I "%CHOICE%"=="A" goto :advanced
 
-set /p CHOICE=Votre choix : 
-
-if /I "%CHOICE%"=="1"  start "Mangadvisor - Verification" cmd /k call "%ROOT_DIR%cmd\install-check.cmd" & goto menu
-if /I "%CHOICE%"=="2"  start "Mangadvisor - Build"        cmd /k call "%ROOT_DIR%cmd\build.cmd" & goto menu
-if /I "%CHOICE%"=="3"  start "Mangadvisor - Up"           cmd /k call "%ROOT_DIR%cmd\up.cmd" & goto menu
-if /I "%CHOICE%"=="4"  start "Mangadvisor - Start"        cmd /k call "%ROOT_DIR%cmd\start.cmd" & goto menu
-if /I "%CHOICE%"=="5"  start "Mangadvisor - Status"       cmd /k call "%ROOT_DIR%cmd\status.cmd" & goto menu
-if /I "%CHOICE%"=="6"  start "Mangadvisor - Logs"         cmd /k call "%ROOT_DIR%cmd\logs.cmd" & goto menu
-if /I "%CHOICE%"=="7"  start "Mangadvisor - Stop"         cmd /k call "%ROOT_DIR%cmd\stop.cmd" & goto menu
-if /I "%CHOICE%"=="8"  start "Mangadvisor - Down"         cmd /k call "%ROOT_DIR%cmd\down.cmd" & goto menu
-if /I "%CHOICE%"=="9"  start "Mangadvisor - Restart"      cmd /k call "%ROOT_DIR%cmd\restart.cmd" & goto menu
-if /I "%CHOICE%"=="10" start "Mangadvisor - Clean"        cmd /k call "%ROOT_DIR%cmd\clean.cmd" & goto menu
-if /I "%CHOICE%"=="11" start "Mangadvisor - Nuke"         cmd /k call "%ROOT_DIR%cmd\nuke.cmd" & goto menu
-
-if /I "%CHOICE%"=="13" start "Mangadvisor - Mobile HTTPS" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" & goto menu
-if /I "%CHOICE%"=="14" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto menu
-if /I "%CHOICE%"=="15" start "Mangadvisor - IA locale" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" & goto menu
-if /I "%CHOICE%"=="16" start "Mangadvisor - Arreter IA" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" -Stop & goto menu
-
-if /I "%CHOICE%"=="17" start "Mangadvisor - Sauvegarde" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Backup & goto menu
-if /I "%CHOICE%"=="18" start "Mangadvisor - Verification sauvegarde" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Verify & goto menu
-if /I "%CHOICE%"=="19" start "Mangadvisor - Restauration securisee" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\library-backup.ps1" -Action Restore & goto menu
-if /I "%CHOICE%"=="20" start "Mangadvisor - Benchmark prive" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\benchmark-mangatheque.ps1" & goto menu
-if /I "%CHOICE%"=="21" start "Mangadvisor - Import inventaire" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\import-private-inventory.ps1" & goto menu
-
-if /I "%CHOICE%"=="22" start "Mangadvisor - Installation complete" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Wizard & goto menu
-if /I "%CHOICE%"=="23" start "Mangadvisor - Configuration" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Environment & goto menu
-if /I "%CHOICE%"=="24" start "Mangadvisor - Initialisation SQL" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Database & goto menu
-if /I "%CHOICE%"=="25" start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto menu
-if /I "%CHOICE%"=="26" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto menu
-if /I "%CHOICE%"=="27" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto menu
-if /I "%CHOICE%"=="28" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto menu
-if /I "%CHOICE%"=="29" start "Mangadvisor - Diagnostic reseau" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Network & goto menu
-
-REM Ancien choix 12 : raccourci de compatibilite vers l'option 25.
-if /I "%CHOICE%"=="12" start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue & goto menu
-
-if /I "%CHOICE%"=="Q" goto :eof
-
-echo.
-echo Choix invalide.
-pause
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=install"
+if "%CHOICE%"=="2" set "KEY=start"
+if "%CHOICE%"=="3" set "KEY=update"
+if "%CHOICE%"=="4" set "KEY=backup"
+if "%CHOICE%"=="5" set "KEY=diagnostic"
+if "%CHOICE%"=="6" set "KEY=stop"
+if not defined KEY (
+    echo Choix inconnu. Utilise 0, 1 a 6 ou A.
+    pause
+    goto menu
+)
+call :dispatch "%KEY%"
+call :result
 goto menu
 
-:run_command
-if /I "%~1"=="wizard" start "Mangadvisor - Installation complete" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Wizard & goto :eof
-if /I "%~1"=="environment" start "Mangadvisor - Configuration" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Environment & goto :eof
-if /I "%~1"=="database" start "Mangadvisor - Initialisation SQL" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Database & goto :eof
-if /I "%~1"=="recommendations" start "Mangadvisor - Relations mangas" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Recommendations & goto :eof
-if /I "%~1"=="diagnostic" start "Mangadvisor - Diagnostic" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Diagnostic & goto :eof
-if /I "%~1"=="update" start "Mangadvisor - Mise a jour" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Update & goto :eof
-if /I "%~1"=="network" start "Mangadvisor - Diagnostic reseau" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Network & goto :eof
-
-if /I "%~1"=="check"   start "Mangadvisor - Verification" cmd /k call "%ROOT_DIR%cmd\install-check.cmd" & goto :eof
-if /I "%~1"=="build"   start "Mangadvisor - Build"        cmd /k call "%ROOT_DIR%cmd\build.cmd" & goto :eof
-if /I "%~1"=="up"      start "Mangadvisor - Up"           cmd /k call "%ROOT_DIR%cmd\up.cmd" & goto :eof
-if /I "%~1"=="start"   start "Mangadvisor - Start"        cmd /k call "%ROOT_DIR%cmd\start.cmd" & goto :eof
-if /I "%~1"=="status"  start "Mangadvisor - Status"       cmd /k call "%ROOT_DIR%cmd\status.cmd" & goto :eof
-if /I "%~1"=="logs"    start "Mangadvisor - Logs"         cmd /k call "%ROOT_DIR%cmd\logs.cmd" & goto :eof
-if /I "%~1"=="stop"    start "Mangadvisor - Stop"         cmd /k call "%ROOT_DIR%cmd\stop.cmd" & goto :eof
-if /I "%~1"=="down"    start "Mangadvisor - Down"         cmd /k call "%ROOT_DIR%cmd\down.cmd" & goto :eof
-if /I "%~1"=="restart" start "Mangadvisor - Restart"      cmd /k call "%ROOT_DIR%cmd\restart.cmd" & goto :eof
-if /I "%~1"=="clean"   start "Mangadvisor - Clean"        cmd /k call "%ROOT_DIR%cmd\clean.cmd" & goto :eof
-if /I "%~1"=="nuke"    start "Mangadvisor - Nuke"         cmd /k call "%ROOT_DIR%cmd\nuke.cmd" & goto :eof
-
-if /I "%~1"=="mobile" start "Mangadvisor - Mobile HTTPS" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" & goto :eof
-if /I "%~1"=="ai" start "Mangadvisor - IA locale" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" & goto :eof
-if /I "%~1"=="ai-stop" start "Mangadvisor - Arreter IA" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\ai-setup.ps1" -Stop & goto :eof
-if /I "%~1"=="mobile-stop" start "Mangadvisor - Stop Mobile" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\mobile-setup.ps1" -Stop & goto :eof
-
-REM Entree catalogue unique + aliases historiques non destructifs.
-if /I "%~1"=="catalogue" (
-    start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue
-    goto :eof
-)
-if /I "%~1"=="jikan" (
-    start "Mangadvisor - Catalogue Tenrai" cmd /k powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action Catalogue
-    goto :eof
-)
-if /I "%~1"=="jikan-reset" (
-    echo Ancienne option destructive desactivee. Utilise l'option 25.
-    exit /b 1
-)
-if /I "%~1"=="jikan-pages" (
-    echo Ancienne commande remplacee. Utilise l'option 25 pour les pages.
-    exit /b 1
-)
-
-echo Commande inconnue : %~1
+:advanced
+cls
+echo ==========================================================
+echo                  OUTILS AVANCES
+echo ==========================================================
 echo.
-echo Commandes disponibles :
-echo   check ^| build ^| up ^| start ^| status ^| logs ^| stop ^| down ^| restart ^| clean ^| nuke
-echo   catalogue ^| jikan (alias historique) ^| network ^| diagnostic
-echo   mobile ^| mobile-stop
+echo    1 - Actualiser le catalogue de mangas
+echo    2 - Actualiser les recommandations communautaires
+echo    3 - Importer ma mangatheque depuis le CSV
+echo    4 - Tester ma mangatheque sans la modifier
+echo    5 - Activer le scanner mobile HTTPS
+echo    6 - Arreter le scanner mobile HTTPS
+echo    7 - Activer le conseiller IA local
+echo    8 - Arreter le conseiller IA local
+echo    9 - Consulter les journaux Docker
+echo.
+echo    S - Entretien, configuration et restauration
+echo    0 - Retour
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto menu
+if /I "%CHOICE%"=="S" goto :maintenance
+
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=catalogue"
+if "%CHOICE%"=="2" set "KEY=recommendations"
+if "%CHOICE%"=="3" set "KEY=import"
+if "%CHOICE%"=="4" set "KEY=benchmark"
+if "%CHOICE%"=="5" set "KEY=mobile"
+if "%CHOICE%"=="6" set "KEY=mobile-stop"
+if "%CHOICE%"=="7" set "KEY=ai"
+if "%CHOICE%"=="8" set "KEY=ai-stop"
+if "%CHOICE%"=="9" set "KEY=logs"
+if not defined KEY (
+    echo Choix inconnu.
+    pause
+    goto advanced
+)
+call :dispatch "%KEY%"
+call :result
+goto advanced
+
+:maintenance
+cls
+echo ==========================================================
+echo                 ENTRETIEN ET SECOURS
+echo ==========================================================
+echo.
+echo    1 - Etat des services Docker
+echo    2 - Configurer ou verifier les variables .env
+echo    3 - Initialiser ou reparer les tables SQL
+echo    4 - Verifier la derniere sauvegarde
+echo    5 - Restaurer une sauvegarde (confirmation requise)
+echo    6 - Tester l'acces reseau au fournisseur manga
+echo.
+echo    0 - Retour
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto advanced
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=status"
+if "%CHOICE%"=="2" set "KEY=environment"
+if "%CHOICE%"=="3" set "KEY=database"
+if "%CHOICE%"=="4" set "KEY=verify-backup"
+if "%CHOICE%"=="5" set "KEY=restore"
+if "%CHOICE%"=="6" set "KEY=network"
+if not defined KEY (
+    echo Choix inconnu.
+    pause
+    goto maintenance
+)
+call :dispatch "%KEY%"
+call :result
+goto maintenance
+
+:result
+set "RC=%ERRORLEVEL%"
+echo.
+if "%RC%"=="0" (
+    echo Operation terminee.
+) else (
+    echo ECHEC (code %RC%). Lis le message ci-dessus.
+    echo Aucune suppression automatique des donnees n'a ete lancee.
+)
+echo.
+pause
+exit /b 0
+
+:direct
+call :dispatch "%~1"
+exit /b %ERRORLEVEL%
+
+:dispatch
+rem Command aliases remain available to scripts and to experienced users.
+set "ACTION="
+set "PS_SCRIPT="
+set "PS_ARGS="
+set "CMD_SCRIPT="
+if /I "%~1"=="install" set "ACTION=Wizard"
+if /I "%~1"=="wizard" set "ACTION=Wizard"
+if /I "%~1"=="start" set "ACTION=Start"
+if /I "%~1"=="update" set "ACTION=Update"
+if /I "%~1"=="backup" set "PS_SCRIPT=library-backup.ps1"
+if /I "%~1"=="backup" set "PS_ARGS=-Action Backup"
+if /I "%~1"=="diagnostic" set "ACTION=Diagnostic"
+if /I "%~1"=="stop" set "ACTION=Stop"
+if /I "%~1"=="catalogue" set "ACTION=Catalogue"
+if /I "%~1"=="jikan" set "ACTION=Catalogue"
+if /I "%~1"=="recommendations" set "ACTION=Recommendations"
+if /I "%~1"=="import" set "PS_SCRIPT=import-private-inventory.ps1"
+if /I "%~1"=="benchmark" set "PS_SCRIPT=benchmark-mangatheque.ps1"
+if /I "%~1"=="mobile" set "PS_SCRIPT=mobile-setup.ps1"
+if /I "%~1"=="mobile-stop" set "PS_SCRIPT=mobile-setup.ps1"
+if /I "%~1"=="mobile-stop" set "PS_ARGS=-Stop"
+if /I "%~1"=="ai" set "PS_SCRIPT=ai-setup.ps1"
+if /I "%~1"=="ai-stop" set "PS_SCRIPT=ai-setup.ps1"
+if /I "%~1"=="ai-stop" set "PS_ARGS=-Stop"
+if /I "%~1"=="logs" set "CMD_SCRIPT=logs.cmd"
+if /I "%~1"=="status" set "CMD_SCRIPT=status.cmd"
+if /I "%~1"=="environment" set "ACTION=Environment"
+if /I "%~1"=="database" set "ACTION=Database"
+if /I "%~1"=="verify-backup" set "PS_SCRIPT=library-backup.ps1"
+if /I "%~1"=="verify-backup" set "PS_ARGS=-Action Verify"
+if /I "%~1"=="restore" set "PS_SCRIPT=library-backup.ps1"
+if /I "%~1"=="restore" set "PS_ARGS=-Action Restore"
+if /I "%~1"=="network" set "ACTION=Network"
+
+rem A few safe aliases for existing launch instructions.
+if /I "%~1"=="up" set "ACTION=Start"
+if /I "%~1"=="check" set "CMD_SCRIPT=install-check.cmd"
+if /I "%~1"=="build" set "CMD_SCRIPT=build.cmd"
+if /I "%~1"=="down" set "CMD_SCRIPT=down.cmd"
+if /I "%~1"=="restart" set "CMD_SCRIPT=restart.cmd"
+
+if /I "%~1"=="help" goto :help
+if /I "%~1"=="-h" goto :help
+if /I "%~1"=="--help" goto :help
+if /I "%~1"=="nuke" goto :blocked
+if /I "%~1"=="clean" goto :blocked
+if /I "%~1"=="jikan-reset" goto :blocked
+if defined ACTION goto :execute_control
+if defined PS_SCRIPT goto :execute_powershell
+if defined CMD_SCRIPT goto :execute_command
+echo Commande inconnue : %~1
+echo Utilise mangadvisor.cmd help pour afficher les commandes.
 exit /b 1
 
-endlocal
+:execute_control
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\control-center.ps1" -Action "%ACTION%"
+exit /b %ERRORLEVEL%
+
+:execute_powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\%PS_SCRIPT%" %PS_ARGS%
+exit /b %ERRORLEVEL%
+
+:execute_command
+call "%ROOT_DIR%cmd\%CMD_SCRIPT%"
+exit /b %ERRORLEVEL%
+
+:blocked
+echo Commande dangereuse ou obsolete non disponible dans ce lanceur.
+echo Aucune donnees Docker ou personnelle n'a ete supprimee.
+exit /b 1
+
+:help
+echo Mangadvisor : ouvre mangadvisor.cmd sans argument pour le menu.
+echo.
+echo   install          Premiere installation guidee
+echo   start            Demarrer et ouvrir le site
+echo   update           Sauvegarder, mettre a jour et verifier
+echo   backup           Sauvegarder et tester la restauration
+echo   diagnostic       Verifier l'application
+echo   stop             Arreter sans supprimer les volumes
+echo.
+echo Autres : catalogue, recommendations, import, benchmark,
+echo          mobile, mobile-stop, ai, ai-stop, status, logs,
+echo          environment, database, network, verify-backup, restore.
+echo La suppression des volumes n'est jamais proposee.
+exit /b 0

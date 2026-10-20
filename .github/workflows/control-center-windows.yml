@@ -36,18 +36,54 @@ jobs:
             Write-Host "OK : $($script.Name)"
           }
 
-      - name: Verifier le menu Windows
+      - name: Verifier les actions du menu simplifie
         shell: powershell
         run: |
           $menu = [IO.File]::ReadAllText((Join-Path $PWD "mangadvisor.cmd"))
-          foreach ($number in @(22,23,24,25,26,27,28,29)) {
-            $fragment = ('if /I "%CHOICE%"=="' + $number + '"')
-            if (-not $menu.Contains($fragment)) {
-              throw "Option $number absente du menu."
+          foreach ($number in 1..6) {
+            $fragment = ('if "%CHOICE%"=="' + $number + '" set "KEY=')
+            if (-not $menu.Contains($fragment)) { throw "Action $number absente du menu." }
+          }
+          foreach ($name in @("install","start","update","backup","diagnostic","stop")) {
+            if (-not $menu.Contains(('if /I "%~1"=="' + $name + '"'))) {
+              throw "Commande directe manquante : $name"
             }
           }
+          if ($menu -notmatch ':advanced' -or $menu -notmatch ':maintenance') {
+            throw "Les operations avancees ne sont pas protegees dans un sous-menu."
+          }
+          if ($menu -match 'start "Mangadvisor') {
+            throw "Le lanceur ne doit plus creer de fenetres CMD detachees."
+          }
           if (-not $menu.Contains("cmd\control-center.ps1")) {
-            throw "L'orchestrateur n'est pas branche au menu."
+            throw "Le centre de pilotage n'est pas branche au menu."
+          }
+
+      - name: Executer le nouveau lanceur batch sous Windows
+        shell: powershell
+        run: |
+          $helpText = (& cmd.exe /d /c 'mangadvisor.cmd help' 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $helpText -notmatch 'install' -or $helpText -notmatch 'backup') {
+            throw "Aide du lanceur invalide : $helpText"
+          }
+          $output = (& cmd.exe /d /c 'mangadvisor.cmd commande-inconnue' 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 1 -or $output -notmatch 'Commande inconnue') {
+            throw "Le lanceur n'a pas refuse une commande invalide : $output"
+          }
+          $blocked = (& cmd.exe /d /c 'mangadvisor.cmd nuke' 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 1 -or $blocked -notmatch 'non disponible') {
+            throw "Une commande destructive a ete exposee : $blocked"
+          }
+          $global:LASTEXITCODE = 0
+          foreach ($sample in @("0`r`n","A`r`n0`r`n0`r`n","A`r`nS`r`n0`r`n0`r`n0`r`n")) {
+            $inputFile = Join-Path $env:RUNNER_TEMP "ma_menu_input.txt"
+            $outputFile = Join-Path $env:RUNNER_TEMP "ma_menu_output.txt"
+            [IO.File]::WriteAllText($inputFile, $sample)
+            $process = Start-Process -FilePath "cmd.exe" -ArgumentList @("/d","/c","mangadvisor.cmd") -WorkingDirectory $PWD -RedirectStandardInput $inputFile -RedirectStandardOutput $outputFile -PassThru
+            if (-not $process.WaitForExit(10000)) {
+              Stop-Process -Id $process.Id -Force
+              throw "La navigation menu / sous-menus ne se termine pas."
+            }
           }
 
       - name: Verifier la configuration initiale sans Docker

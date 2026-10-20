@@ -43,7 +43,7 @@ class RepositorySafetyTests(unittest.TestCase):
 
     def test_windows_catalog_menu_uses_safe_central_orchestrator(self):
         script=(ROOT/"mangadvisor.cmd").read_text(encoding="utf-8")
-        self.assertIn('-Action Catalogue', script)
+        self.assertIn('set "ACTION=Catalogue"', script)
         self.assertNotIn('--reset-db', script)
         self.assertNotIn('cmd\\run-jikan-pipeline.cmd', script)
 
