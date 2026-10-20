@@ -83,6 +83,18 @@ L'option principale **4** réalise un `pg_dump` avec manifeste SHA256, suivi d'u
 
 **Nouveauté — alias multilingues :** les recherches de mangas et le rapprochement peuvent utiliser les titres alternatifs Wikidata (P4087) et les synonymes déjà présents dans les données Tenrai/MyAnimeList, sans télécharger de nouveau catalogue. **A → 13** enrichit des alias supplémentaires FR/EN/JA par lots depuis Wikidata avec vérification de l'ID MAL. Dans l'atelier, un bouton facultatif lance une **recherche MangaDex** (usage personnel non commercial) et ne présente que les résultats qui indiquent explicitement le MAL manga ID du catalogue. Aucune association ni édition n'est automatique. [Guide multilingue](docs/04_product/multilingual_aliases_4_4.md).
 
+## Élargir le catalogue mondial (nouveau, expérimental)
+
+Depuis **mangadvisor.cmd → A → 14**, lancer une **extraction progressive Tenrai** :
+- sélectionner un plafond de pages Manga (600 par défaut, 2000 maximum, 25 notices/page) ; ce plafond **n'est pas** un nombre garanti de mangas ;
+- choisir éventuellement d'inclure les **one-shots** (plafond séparé de 200 pages) ;
+- réutiliser les pages Tenrai déjà téléchargées ou demander expressément de les rafraîchir ;
+- le parcours s'arrête sur `pagination.has_next_page=false` ou sur une page vide, sinon au plafond choisi ;
+- les pages sont sauvegardées avec leurs paramètres source, séparément par catégorie, et une interruption ne supprime ni pages déjà téléchargées ni données PostgreSQL ;
+- une **sauvegarde vérifiée** précède la synchronisation additive vers les tables du catalogue ; le bilan indique le total avant/après et sa variation.
+
+**Important :** ce menu ne récupère **pas encore** un catalogue exhaustif des éditions françaises. Les titres français et ISBN continuent à relever des enrichissements Wikidata/BnF existants. La prochaine étape sera un import **spécifique au format UNIMARC/ISO 2709 des fichiers BnF**, avec contrôle des critères manga et association ISBN→œuvre sans attribution automatique à ta collection. Il n'existe aucune garantie que toutes les pages Tenrai soient disponibles ou que toute œuvre soit un manga français. Pour les fichiers BnF, conserver provenance, date de récupération et licence ouverte.
+
 ## Architecture et contrôle qualité
 
 | Composant | Emplacement |
