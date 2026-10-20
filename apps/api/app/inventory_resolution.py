@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, Query
 
+from apps.api.app.mangadex_discovery import search_verified_mangadex
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
 )
@@ -188,6 +189,29 @@ def create_pending_resolution_router(
             "items":matches,
             "automatic_association":False,
             "notice":"Suggestions de recherche, jamais un rapprochement automatique.",
+        }
+
+    @router.get("/pending/external-candidates")
+    def external_candidates(
+        source_key: str = Query(...,min_length=1,max_length=120),
+        q: str = Query(...,min_length=2,max_length=100),
+    ) -> dict[str,Any]:
+        # External lookups are opt-in, bounded and read only. Validate a
+        # pending row belongs to this user's own inventory before calling out.
+        with connection_factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute(PENDING_SQL, {"user_id":user_id,"source_key":source_key})
+                row=cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404,detail="Ligne en attente introuvable.")
+                matches=search_verified_mangadex(cur,q)
+        return {
+            "items":matches,"query":q,"source_name":"MANGADEX",
+            "source_url":"https://mangadex.org",
+            "automatic_association":False,
+            "notice":"MangaDex (non commercial, attribution). "
+                     "Seuls les identifiants manga MyAnimeList explicitement "
+                     "liés sont présentés ; confirme l'œuvre et l'édition.",
         }
 
     @router.post("/pending/resolve/preview")
