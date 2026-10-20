@@ -1143,76 +1143,31 @@ def find_manga_for_import(
     cur: Any,
     title: str,
 ) -> dict[str, Any] | None:
-    sql = """
-        WITH candidates AS (
-            SELECT
-                id,
-                source_mal_id,
-                title,
-                title_english,
-                title_japanese,
-                manga_type,
-                score::float AS score,
-                popularity,
+    """Never guess a manga from a partial/fuzzy CSV title.
 
-                CASE
-                    WHEN LOWER(title) = LOWER(%(title)s) THEN 0
-                    WHEN LOWER(COALESCE(title_english, '')) = LOWER(%(title)s) THEN 1
-                    WHEN LOWER(COALESCE(title_japanese, '')) = LOWER(%(title)s) THEN 2
-                    WHEN title ILIKE %(like_title)s THEN 3
-                    WHEN title_english ILIKE %(like_title)s THEN 4
-                    WHEN title_japanese ILIKE %(like_title)s THEN 5
-                    ELSE 9
-                END AS match_rank
-
-            FROM manga
-
-            WHERE LOWER(title) = LOWER(%(title)s)
-               OR LOWER(COALESCE(title_english, '')) = LOWER(%(title)s)
-               OR LOWER(COALESCE(title_japanese, '')) = LOWER(%(title)s)
-               OR title ILIKE %(like_title)s
-               OR title_english ILIKE %(like_title)s
-               OR title_japanese ILIKE %(like_title)s
-        )
-
-        SELECT
-            id,
-            source_mal_id,
-            title,
-            title_english,
-            title_japanese,
-            manga_type,
-            score,
-            popularity,
-            match_rank
-
-        FROM candidates
-
-        ORDER BY
-            match_rank ASC,
-            CASE
-                WHEN manga_type = 'Manga' THEN 0
-                WHEN manga_type IN ('Manhwa', 'Manhua') THEN 1
-                WHEN manga_type = 'One-shot' THEN 2
-                WHEN manga_type = 'Light Novel' THEN 5
-                ELSE 9
-            END,
-            popularity ASC NULLS LAST,
-            score DESC NULLS LAST,
-            id ASC
-
-        LIMIT 1;
+    The historical library importer is deliberately conservative, like the
+    physical-inventory importer: only one unambiguous exact title/alias can
+    be linked. Two different mangas sharing the same alias need human review.
     """
-
-    cur.execute(
-        sql,
-        {
-            "title": title,
-            "like_title": f"%{title}%",
-        },
-    )
-
-    return cur.fetchone()
+    sql = """
+        SELECT
+            id, source_mal_id, title, title_english, title_japanese,
+            manga_type, score::float AS score, popularity,
+            CASE
+                WHEN LOWER(title) = LOWER(%(title)s) THEN 0
+                WHEN LOWER(COALESCE(title_english, '')) = LOWER(%(title)s) THEN 1
+                ELSE 2
+            END AS match_rank
+        FROM manga
+        WHERE LOWER(title) = LOWER(%(title)s)
+           OR LOWER(COALESCE(title_english, '')) = LOWER(%(title)s)
+           OR LOWER(COALESCE(title_japanese, '')) = LOWER(%(title)s)
+        ORDER BY match_rank ASC, id ASC
+        LIMIT 2;
+    """
+    cur.execute(sql, {"title": title})
+    matches = cur.fetchall()
+    return matches[0] if len(matches) == 1 else None
 
 
 @app.post("/library/import/csv")
