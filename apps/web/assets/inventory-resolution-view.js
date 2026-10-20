@@ -17,16 +17,28 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
     items='<div class="inventory-match-candidates">'+state.items.slice(0,12).map(manga=>{
       const id=Number(manga.id);
       if(!Number.isSafeInteger(id)||id<=0)return "";
+      const prior=Array.isArray(manga.known_editions)?manga.known_editions:[];
+      const display=(fr&&manga.title_fr)||manga.title_english||manga.title;
       return '<article class="inventory-match-candidate">'+
-        '<strong>'+e(manga.title)+'</strong>'+
+        '<strong>'+e(display)+'</strong>'+
+        (display!==manga.title?'<span class="muted tiny"> · '+e(manga.title)+'</span>':"")+
         (manga.title_english&&manga.title_english!==manga.title?
           '<span class="muted tiny"> · '+e(manga.title_english)+'</span>':"")+
         '<p class="muted tiny">MAL '+e(manga.source_mal_id||"—")+
         ' · '+e(manga.manga_type||"—")+
         (manga.volumes!==null&&manga.volumes!==undefined?
           ' · '+e(manga.volumes)+' '+(fr?"tomes":"volumes"):"")+
-        (manga.suggestion_kind==="EXACT_TITLE"?
-          ' · '+(fr?"Titre exact":"Exact title"):"")+'</p>'+
+        (manga.suggestion_kind==="EXACT_ALIAS"?
+          ' · '+(fr?"Correspondance de titre":"Title alias match"):"")+'</p>'+
+        (manga.matched_alias?
+          '<p class="muted tiny">'+e(fr?"Nom retrouvé : ":"Matched name: ")+e(manga.matched_alias)+
+          ' · '+e(manga.alias_source||"MAL")+'</p>':"")+
+        (prior.length?'<p class="collection-caveat">'+e(fr?
+          "Déjà présent dans ta collection : ":"Already in your collection: ")+
+          prior.map(p=>(p.edition||(fr?"édition non précisée":"unspecified"))+
+            " · "+p.main_volumes+" "+(fr?"tomes":"volumes")+
+            (p.other_editions_unknown?" + "+p.other_editions_unknown+" autre(s)":"")).map(e).join(" / ")+
+          ' · '+e(fr?"Vérifier avant tout ajout.":"Review before adding.")+'</p>':"")+
         '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-select" data-id="'+e(id)+'">'+
           (fr?"Examiner cette œuvre":"Review this work")+'</button></article>';
     }).join("")+'</div>';
@@ -38,12 +50,37 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
     (fr?"tomes principaux":"main volumes")+" · "+Number(original.duplicate_copies||0)+" "+
     (fr?"doublons":"duplicates")+" · "+Number(original.other_editions_unknown||0)+" "+
     (fr?"autres éditions à identifier":"other editions to identify");
+  const prior=Array.isArray(selection?.existing_declarations)?selection.existing_declarations:[];
+  const modes=Array.isArray(selection?.allowed_actions)?selection.allowed_actions:["CREATE_DECLARATION"];
+  const clash=prior.length>0;
+  const modeValue=state.reviewMode||(clash?"":"CREATE_DECLARATION");
+  const modeOptions=(clash
+    ?'<label for="pending-match-mode">'+e(fr?"Action sur cette déclaration :":"Action on this record:")+'</label>'+
+     '<select id="pending-match-mode" class="select">'+
+     '<option value="">'+e(fr?"Choisis après comparaison":"Choose after checking")+'</option>'+
+     (modes.includes("CREATE_DECLARATION")?
+       '<option value="CREATE_DECLARATION"'+(modeValue==="CREATE_DECLARATION"?' selected':"")+'>'+
+       e(fr?"Nouvelle édition distincte : ajouter la déclaration":"Distinct new edition: add record")+'</option>':"")+
+     '<option value="MARK_DUPLICATE"'+(modeValue==="MARK_DUPLICATE"?' selected':"")+'>'+
+       e(fr?"Ligne déjà comptée : archiver sans ajouter de tomes":"Already counted: archive without adding volumes")+
+     '</option></select>'
+    :"");
+  const priorMarkup=clash?'<div class="collection-caveat"><strong>'+
+    e(fr?"Attention : cette œuvre figure déjà dans ta mangathèque.":"Attention: this work is already in your collection.")+
+    '</strong><p>'+
+    prior.map(p=>e((p.edition_declared||(fr?"Édition non précisée":"Unspecified edition"))+
+      " : "+p.main_volumes+" "+(fr?"tomes principaux":"main volumes")+
+      ", "+p.duplicate_copies+" "+(fr?"doublons":"duplicates")+
+      ", "+p.other_editions_unknown+" "+(fr?"autres éditions":"other editions"))).join(" · ")+
+    '</p><p>'+e(fr?"Compare les livres : une ligne de 35 exemplaires peut déjà correspondre à 34 tomes et 1 autre édition déclarés. Ne double pas les quantités.":
+      "Compare the books: 35 copies could already include 34 volumes plus 1 other edition. Do not double count.")+'</p></div>':"";
   const review=selection?'<section class="inventory-match-review">'+
     '<h4>'+e(fr?"Vérification avant association":"Review before matching")+'</h4>'+
     '<p><strong>'+e(original.entry_title)+'</strong> → <strong>'+e(selected?.title)+'</strong></p>'+
     '<p>'+e(fr?"Édition déclarée : ":"Declared edition: ")+
       e(original.edition_declared||(fr?"non précisée":"unspecified"))+'</p>'+
     '<p class="muted tiny">'+e(quantities)+'</p>'+
+    priorMarkup+modeOptions+
     '<p class="collection-caveat">'+e(fr?
       "Je confirme l'œuvre choisie et cette édition. Cela n'ajoute ni ISBN, ni statut Lu, ni détails de tomes.":
       "I confirm this work and edition. No ISBN, read status or individual volumes will be added.")+'</p>'+
