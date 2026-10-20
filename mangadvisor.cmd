@@ -18,6 +18,7 @@ echo    3 - Mettre a jour sans perdre mes donnees
 echo    4 - Sauvegarder ma mangatheque
 echo    5 - Verifier que tout fonctionne
 echo    6 - Arreter Mangadvisor
+echo    7 - Recuperer la derniere version depuis GitHub (code uniquement)
 echo.
 echo    A - Options avancees
 echo    0 - Quitter
@@ -36,8 +37,9 @@ if "%CHOICE%"=="3" set "KEY=update"
 if "%CHOICE%"=="4" set "KEY=backup"
 if "%CHOICE%"=="5" set "KEY=diagnostic"
 if "%CHOICE%"=="6" set "KEY=stop"
+if "%CHOICE%"=="7" set "KEY=github-sync"
 if not defined KEY (
-    echo Choix inconnu. Utilise 0, 1 a 6 ou A.
+    echo Choix inconnu. Utilise 0, 1 a 7 ou A.
     pause
     goto menu
 )
@@ -151,6 +153,7 @@ if /I "%~1"=="install" set "ACTION=Wizard"
 if /I "%~1"=="wizard" set "ACTION=Wizard"
 if /I "%~1"=="start" set "ACTION=Start"
 if /I "%~1"=="update" set "ACTION=Update"
+if /I "%~1"=="github-sync" set "PS_SCRIPT=github-sync.ps1"
 if /I "%~1"=="backup" set "PS_SCRIPT=library-backup.ps1"
 if /I "%~1"=="backup" set "PS_ARGS=-Action Backup"
 if /I "%~1"=="diagnostic" set "ACTION=Diagnostic"
@@ -219,7 +222,8 @@ echo Mangadvisor : ouvre mangadvisor.cmd sans argument pour le menu.
 echo.
 echo   install          Premiere installation guidee
 echo   start            Demarrer et ouvrir le site
-echo   update           Sauvegarder, mettre a jour et verifier
+echo   update           Sauvegarder, recuperer GitHub, reconstruire et verifier
+echo   github-sync      Recuperer uniquement le code GitHub, archives en securite
 echo   backup           Sauvegarder et tester la restauration
 echo   diagnostic       Verifier l'application
 echo   stop             Arreter sans supprimer les volumes
