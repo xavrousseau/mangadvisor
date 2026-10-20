@@ -45,6 +45,29 @@ test("manga details show the physical owner inventory without merging it with bo
  assert.match(html,/physicalScopeNote/);
 });
 
+test("read-only French match hints flag already-owned works and never preselect them",()=>{
+ const withPending={...declared,pending:{
+  count:2,declared_physical_volumes:36,items:[
+   {source_key:"ci-a",entry_title:"L'Attaque des Titans",main_volumes:35,
+    duplicate_copies:0,other_editions_unknown:0,review_status:"REVIEW_MISSING",
+    match_suggestion:{
+      state:"ALREADY_IN_COLLECTION",catalog_title:"Shingeki no Kyojin",
+      source_name:"BNF_AUTHORITY_WORK",already_in_inventory:true}},
+   {source_key:"ci-b",entry_title:"<svg onload=alert(1)>",main_volumes:1,
+    duplicate_copies:0,other_editions_unknown:0,review_status:"REVIEW_AMBIGUOUS",
+    match_suggestion:{state:"AMBIGUOUS"}}
+  ]
+ }};
+ const html=physicalInventoryMarkup(withPending,"fr",t,escape);
+ assert.match(html,/Œuvre déjà dans la collection/);
+ assert.match(html,/BNF_AUTHORITY_WORK/);
+ assert.match(html,/choix manuel indispensable/);
+ assert.match(html,/&lt;svg/);
+ assert.doesNotMatch(html,/<svg/);
+ assert.match(html,/data-action="pending-match-start"/);
+ assert.doesNotMatch(html,/data-action="pending-match-confirm"/);
+ assert.doesNotMatch(html,/data-action="edition-confirm"/);
+});
 test("source titles and declared labels are escaped rather than executed",()=>{
  const payload=structuredClone(declared);
  payload.items[0].edition_declared='<img src=x onerror="alert(1)">';
