@@ -43,21 +43,7 @@ class RepositoryHygieneTests(unittest.TestCase):
         menu = (ROOT / "mangadvisor.cmd").read_text(encoding="utf-8")
         self.assertNotRegex(
             menu,
-            r'(?im)^if /I "(?:%CHOICE%|%~1)"=="[^"]+"[^\\n]*& goto (?:menu|:eof)\\s*
-        gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
-        for item in (".env", "private-data/", "backups/", ".env.mobile", "mobile-local/"):
-            self.assertIn(item, gitignore)
-
-    def test_recommendation_profile_has_only_one_output(self):
-        report = (ROOT / "pipelines/engine/scripts/run_recommendation_profile_tests.py").read_text(encoding="utf-8")
-        self.assertIn('recommendation_profile_tests_latest.md', report)
-        self.assertNotIn('LEGACY_REPORT_PATH', report)
-        self.assertNotIn('recommendation_profile_tests_v0_7_4.md', report)
-
-
-if __name__ == "__main__":
-    unittest.main()
-,
+            r'(?im)^if /I "(?:%CHOICE%|%~1)"=="[^"]+"[^\r\n]*& goto (?:menu|:eof)\s*$',
         )
 
     def test_private_data_remain_gitignored(self):
