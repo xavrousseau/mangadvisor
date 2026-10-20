@@ -19,3 +19,5 @@ services:
   engine:
     volumes:
       - ../../data/raw:/workspace/data/raw
+      # Source benchmark reports are local and excluded from Git.
+      - ../../data/logs:/workspace/data/logs
