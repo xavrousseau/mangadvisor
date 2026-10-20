@@ -40,7 +40,7 @@ RAW_JIKAN_DIR = PROJECT_ROOT / "data" / "raw" / "jikan"
 JIKAN_BASE_URL = os.getenv("MANGA_API_BASE_URL", "https://api.tenrai.org/v1").rstrip("/")
 
 
-def save_json(data: dict[str, Any], output_path: Path) -> None:
+def save_json(data: dict[str, Any], output_path: Path, params: dict[str, Any] | None = None) -> None:
     """
     Enregistre un dictionnaire Python en JSON formaté.
     """
@@ -49,7 +49,11 @@ def save_json(data: dict[str, Any], output_path: Path) -> None:
     with output_path.open("w", encoding="utf-8") as file:
         # Historical file paths preserve compatibility; record the actual API provider.
         source = "tenrai" if JIKAN_BASE_URL.startswith("https://api.tenrai.org/") else "jikan"
-        json.dump({**data, "mangadvisor_source": source}, file, ensure_ascii=False, indent=2)
+        payload = {**data, "mangadvisor_source": source}
+        if params is not None:
+            # Cache provenance: the same page can be requested with different filters.
+            payload["mangadvisor_query"] = params
+        json.dump(payload, file, ensure_ascii=False, indent=2)
 
 
 def clean_params(params: dict[str, Any]) -> dict[str, Any]:
@@ -173,12 +177,16 @@ def build_top_params(args: argparse.Namespace, page: int) -> dict[str, Any]:
     )
 
 
-def output_path_for_mode(mode: str, page: int) -> Path:
+def output_path_for_mode(mode: str, page: int, manga_type: str | None = None) -> Path:
     """
     Retourne le chemin de sortie principal selon le mode.
     """
     if mode == "search":
-        return RAW_JIKAN_DIR / "search" / f"search_page_{page}.json"
+        folder = RAW_JIKAN_DIR / "search"
+        if manga_type:
+            # Keep category-specific pages separate from the legacy all-types crawl.
+            folder = folder / f"type_{manga_type}"
+        return folder / f"search_page_{page}.json"
 
     if mode == "top":
         return RAW_JIKAN_DIR / "top" / f"top_manga_page_{page}.json"
@@ -239,6 +247,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--manga-type",
+        choices=["manga", "oneshot", "manhwa", "manhua", "novel", "lightnovel", "doujin"],
         default=None,
         help="Type manga Jikan. Exemples : manga, novel, lightnovel, oneshot, doujin, manhwa, manhua.",
     )
@@ -303,6 +312,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--until-end",
+        action="store_true",
+        help="Arrête automatiquement le parcours sur la dernière page Tenrai (end-page reste un plafond).",
+    )
+
+    parser.add_argument(
         "--top-filter",
         default=None,
         help="Filtre pour le mode top. Exemple : publishing, upcoming, bypopularity, favorite.",
@@ -361,6 +376,8 @@ def validate_args(args: argparse.Namespace) -> None:
     if args.end_page < args.start_page:
         raise ValueError("end-page doit être >= start-page")
 
+    if args.end_page > 2000:
+        raise ValueError("end-page doit rester <= 2000 pour borner l'extraction")
     if args.limit < 1:
         raise ValueError("limit doit être >= 1")
 
@@ -405,7 +422,7 @@ def extract_page(args: argparse.Namespace, page: int) -> tuple[Path, int]:
     else:
         raise ValueError(f"Mode non supporté : {args.mode}")
 
-    output_file = output_path_for_mode(args.mode, page)
+    output_file = output_path_for_mode(args.mode, page, getattr(args, "manga_type", None))
 
     if output_file.exists() and not args.force:
         # A previous Jikan cache is not a valid substitute for the new Tenrai
@@ -421,6 +438,16 @@ def extract_page(args: argparse.Namespace, page: int) -> tuple[Path, int]:
                 isinstance(existing_payload, dict)
                 and existing_payload.get("mangadvisor_source") == expected_source
                 and isinstance(existing_payload.get("data"), list)
+                and (
+                    existing_payload.get("mangadvisor_query") == params
+                    # Legacy cache without search parameters is supported for
+                    # regular runs; until-end must refresh it once for reliable paging.
+                    or (
+                        "mangadvisor_query" not in existing_payload
+                        and not getattr(args, "until_end", False)
+                        and not getattr(args, "manga_type", None)
+                    )
+                )
             )
         except (OSError, ValueError, TypeError):
             valid_cache = False
@@ -440,9 +467,9 @@ def extract_page(args: argparse.Namespace, page: int) -> tuple[Path, int]:
         retry_delay_seconds=args.retry_delay_seconds,
     )
 
-    save_json(payload, output_file)
+    save_json(payload, output_file, params)
 
-    if args.mode == "search" and not args.no_legacy_search_copy:
+    if args.mode == "search" and not args.no_legacy_search_copy and not getattr(args, "manga_type", None):
         legacy_file = legacy_search_output_path(page)
         save_json(payload, legacy_file)
         print(f"[extract_jikan] copie legacy sauvegardée : {legacy_file}")
@@ -475,16 +502,28 @@ def main() -> int:
     print(f"Limit               : {args.limit}")
     print(f"Sleep seconds       : {args.sleep_seconds}")
     print(f"Force               : {'oui' if args.force else 'non'}")
+    print(f"Parcours auto        : {'oui' if args.until_end else 'non'}")
+    print(f"Catégorie            : {args.manga_type or 'toutes'}")
     print()
 
     total_pages = 0
     total_items = 0
 
+    stopped_at_end = False
     for page in range(args.start_page, args.end_page + 1):
-        _output_file, nb_items = extract_page(args, page)
+        output_file, nb_items = extract_page(args, page)
 
         total_pages += 1
         total_items += nb_items
+
+        if args.until_end:
+            with output_file.open("r", encoding="utf-8") as f:
+                page_payload = json.load(f)
+            pagination = page_payload.get("pagination") or {}
+            if nb_items == 0 or pagination.get("has_next_page") is False:
+                stopped_at_end = True
+                print(f"[extract_jikan] dernière page détectée : {page}")
+                break
 
         if page < args.end_page:
             time.sleep(args.sleep_seconds)
@@ -494,6 +533,8 @@ def main() -> int:
     print(f"Mode                   : {args.mode}")
     print(f"Nombre de pages traitées : {total_pages}")
     print(f"Nombre total d'items      : {total_items}")
+    if args.until_end:
+        print("Fin pagination atteinte    : " + ("oui" if stopped_at_end else "non (plafond de pages atteint)"))
     print("==================================================")
 
     return 0
