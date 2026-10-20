@@ -85,7 +85,9 @@ def main():
     assert second["context"]["french"]=="PREFER",second
     assert second["status"]=="results",second
     # The one synthetic registered French ISBN should rank high when preferred.
-    assert second["recommendations"][0]["title"]=="Demo CI 08",second
+    assert second["recommendations"][0]["id"]==8,second
+    assert second["recommendations"][0]["title"]=="Test title 8",second
+    assert second["recommendations"][0]["title_original"]=="Demo CI 08",second
     assert second["recommendations"][0]["french_recorded"] is True,second
     snapshot=second["recommendations"][0]["french_editions"]
     assert snapshot["scope"]=="registered_isbns_only",snapshot
@@ -112,24 +114,24 @@ def main():
     assert diversified["context"]["french"]=="PREFER",diversified
     assert diversified["context"]["length"]=="LONG",diversified
     assert diversified["status"]=="results",diversified
-    assert diversified["recommendations"][0]["title"]=="Demo CI 08",diversified
+    assert diversified["recommendations"][0]["id"]==8,diversified
     assert all("variety_evidence" in m for m in diversified["recommendations"]),diversified
 
     close=request("Je veux une sélection très proche de mes goûts",diversified["context"])
     assert close["context"]["recommendation_balance"]=="CLOSE",close
     assert close["context"]["french"]=="PREFER",close
-    assert close["recommendations"][0]["title"]=="Demo CI 08",close
+    assert close["recommendations"][0]["id"]==8,close
 
     soft_format=request("Je préfère une édition Deluxe",second["context"])
     assert soft_format["context"]["preferred_edition_kind"]=="DELUXE",soft_format
     assert soft_format["context"]["require_edition_kind"] is False,soft_format
-    assert soft_format["recommendations"][0]["title"]=="Demo CI 08",soft_format
+    assert soft_format["recommendations"][0]["id"]==8,soft_format
     assert soft_format["recommendations"][0]["preferred_format_recorded"],soft_format
 
     required_format=request("Édition Deluxe obligatoire",soft_format["context"])
     assert required_format["context"]["require_edition_kind"] is True,required_format
     assert required_format["count"]==1,required_format
-    assert required_format["recommendations"][0]["title"]=="Demo CI 08",required_format
+    assert required_format["recommendations"][0]["id"]==8,required_format
 
     strict_perfect=request("En édition Perfect uniquement",required_format["context"])
     assert strict_perfect["context"]["preferred_edition_kind"]=="PERFECT",strict_perfect
@@ -151,8 +153,8 @@ def main():
     assert narrative["count"]>0,narrative
     assert all("Horror" not in m["genres"] and "Gore" not in m["themes"]
                for m in narrative["recommendations"]),narrative
-    assert all(m["title"]!="Demo CI 28" for m in narrative["recommendations"]),narrative
-    assert narrative["recommendations"][0]["title"]=="Demo CI 08",narrative
+    assert all(m["id"]!=28 for m in narrative["recommendations"]),narrative
+    assert narrative["recommendations"][0]["id"]==8,narrative
     matched=narrative["recommendations"][0]["narrative_matches"]
     assert {x["concept"] for x in matched}=={"PSYCHOLOGICAL","INVESTIGATION"},matched
     assert {x["source"] for x in matched}=={"catalog_tag","synopsis_word"},matched
@@ -165,7 +167,7 @@ def main():
     strict=request("Français obligatoire",second["context"])
     assert strict["context"]["french"]=="REQUIRE",strict
     assert strict["count"]==1,strict
-    assert strict["recommendations"][0]["title"]=="Demo CI 08",strict
+    assert strict["recommendations"][0]["id"]==8,strict
 
     next_page=request("Montre-moi d'autres titres",second["context"],
                       [m["id"] for m in second["recommendations"]])
