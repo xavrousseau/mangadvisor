@@ -14,7 +14,7 @@ export function wikidataFactsMarkup(data, {escape, lang="fr"}) {
       ERROR: fr ? "Service indisponible : recherche à relancer depuis le menu." : "Service unavailable; retry from the menu.",
     }[data.status];
     if (!status) return "";
-    return '<section class="fr-notices wikidata-evidence"><div class="fr-notices-heading"><strong>' +
+    return '<section class="wikidata-evidence"><div class="fr-notices-heading"><strong>' +
       e(heading) + '</strong></div><p class="fr-notices-caveat">' + e(status) + '</p></section>';
   }
   const url = /^https:\/\/www\.wikidata\.org\/wiki\/Q[1-9][0-9]{0,11}$/.test(String(data.source_url || ""))
@@ -27,7 +27,7 @@ export function wikidataFactsMarkup(data, {escape, lang="fr"}) {
   const line=(title,value) => value
     ? '<div class="fr-notice-line"><strong>'+e(title)+'</strong><span>'+e(value)+'</span></div>'
     : "";
-  return '<section class="fr-notices wikidata-evidence">' +
+  return '<section class="wikidata-evidence">' +
     '<div class="fr-notices-heading"><strong>✦ '+e(heading)+'</strong>' +
     '<a href="'+e(url)+'" target="_blank" rel="noopener noreferrer">Wikidata ↗</a></div>' +
     '<p class="fr-notices-caveat">'+e(intro)+'</p>' +
