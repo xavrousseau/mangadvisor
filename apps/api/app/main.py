@@ -3705,6 +3705,26 @@ def prepare_fr_collection() -> None:
                 ON CONFLICT (manga_id,source_name,language_code,alias_key)
                 DO NOTHING
             """)
+            # Reuse the synonyms ALREADY downloaded in Tenrai/Jikan raw JSON.
+            # Some are international titles not classified by language, hence
+            # 'und' (undetermined), never an invented official French title.
+            cur.execute("""
+                INSERT INTO manga_title_alias
+                  (manga_id,source_name,source_id,language_code,alias,alias_key,source_url)
+                SELECT m.id,'TENRAI_MAL',m.source_mal_id::text,'und',
+                       LEFT(BTRIM(a.alias),200),
+                       LEFT(LOWER(BTRIM(a.alias)),200),
+                       'https://myanimelist.net/manga/'||m.source_mal_id
+                FROM manga m
+                JOIN jikan_manga_source src ON src.mal_id=m.source_mal_id
+                CROSS JOIN LATERAL jsonb_array_elements_text(
+                  CASE WHEN jsonb_typeof(src.raw_json->'title_synonyms')='array'
+                       THEN src.raw_json->'title_synonyms' ELSE '[]'::jsonb END
+                ) AS a(alias)
+                WHERE LENGTH(BTRIM(a.alias)) BETWEEN 2 AND 200
+                ON CONFLICT (manga_id,source_name,language_code,alias_key)
+                DO NOTHING
+            """)
         conn.commit()
 
 
