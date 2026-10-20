@@ -53,6 +53,17 @@ test("pending manga titles and source labels are HTML escaped",()=>{
  assert.doesNotMatch(markup,/<img /);
  assert.doesNotMatch(markup,/<script>/);
 });
+test("initial asynchronous search cannot race with owner typing",()=>{
+ const html=inventoryResolverMarkup({...base,loading:true,items:[]},{
+  escape,lang:"fr"
+ });
+ assert.match(html,/id="pending-match-query"[^>]*disabled/);
+ assert.match(html,/type="submit" disabled/);
+ const ready=inventoryResolverMarkup({...base,loading:false},{
+  escape,lang:"fr"
+ });
+ assert.doesNotMatch(ready,/id="pending-match-query"[^>]*disabled/);
+});
 test("empty draft adds no fake selected manga",()=>{
  assert.equal(inventoryResolverMarkup(null,{escape}),"");
  const html=inventoryResolverMarkup({
