@@ -2,6 +2,7 @@ import { t, tag, publication, libraryStatus, GENRES } from "./i18n.js";
 import { collectionPanel, editionPreview } from "./collection-view.js";
 import { physicalInventoryMarkup } from "./physical-inventory-view.js";
 import { inventoryResolverMarkup } from "./inventory-resolution-view.js";
+import { titleAliasesMarkup } from "./title-aliases-view.js";
 import { createIsbnScanner } from "./isbn-scanner.js";
 import { moodFormMarkup, moodResultsMarkup, MOOD_OPTIONS } from "./mood-view.js";
 import {advisorChatMarkup,advisorResultsMarkup,ADVISOR_PROMPTS,ADVISOR_BALANCE_PROMPTS} from "./advisor-view.js";
@@ -515,7 +516,7 @@ async function renderDetail(token,id){
  try{
   const manga=state.detailCache[id]||await request("/mangas/"+id);
   state.detailCache[id]=manga;state.currentDetail=manga;
-  const [urls,libraryItem,translation,frCollection,physicalInventory,bnfCache,wikidataCache]=await Promise.all([
+  const [urls,libraryItem,translation,frCollection,physicalInventory,bnfCache,wikidataCache,titleAliases]=await Promise.all([
     covers([manga]),readLibraryItem(manga),
     state.lang==="fr"&&manga.synopsis?request("/localization/synopsis",{
       method:"POST",data:{manga_id:id,lang:"fr"}
@@ -523,7 +524,8 @@ async function renderDetail(token,id){
     request("/collection/mangas/"+id+"/editions").catch(()=>null),
     request("/inventory/declarations?manga_id="+id).catch(()=>null),
     request("/collection/mangas/"+id+"/bnf-candidates").catch(()=>null),
-    request("/enrichment/mangas/"+id+"/wikidata").catch(()=>null)
+    request("/enrichment/mangas/"+id+"/wikidata").catch(()=>null),
+    request("/mangas/"+id+"/title-aliases").catch(()=>null)
   ]);
   if(token!==renderToken)return;
   state.libraryDetail=libraryItem;state.frenchCollection=frCollection;state.bnfCache=bnfCache;state.wikidataCache=wikidataCache;state.editionPreview=null;
@@ -558,6 +560,7 @@ async function renderDetail(token,id){
    '<div class="section-header"><h2 class="section-title">'+L("genres")+' & '+L("themes")+'</h2></div>'+
    '<div class="tag-row">'+badges([...(manga.genres||[]),...(manga.themes||[])],30)+'</div>'+
    wikidataFactsMarkup(wikidataCache,{escape:escapeHtml,lang:state.lang})+
+   titleAliasesMarkup(titleAliases,{escape:escapeHtml,lang:state.lang})+
    '<div class="section-header" id="save-section"><h2 class="section-title">'+L("library")+'</h2></div>'+
    '<form class="library-editor" id="library-editor">'+
     '<div class="form-grid"><div class="field"><label for="edit-status">'+L("readingStatus")+'</label><select class="select" id="edit-status" name="status">'+
