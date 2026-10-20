@@ -162,6 +162,43 @@ class ConversationalAdvisorTests(unittest.TestCase):
         self.assertEqual(recs[1]["narrative_unverified"],["INVESTIGATION","PSYCHOLOGICAL"])
         self.assertNotIn("synopsis",recs[0])
 
+    def test_wikidata_genres_are_negative_safety_evidence_not_positive_tastes(self):
+        normal = dict(id=5,title="Safe",genres=["Mystery"],themes=[],
+                      score=8.3,popularity=1)
+        wiki_horror = dict(id=6,title="Wikidata Horror",genres=["Mystery"],themes=[],
+                           score=9.0,popularity=2,wikidata_id="Q1234",
+                           wikidata_genres_fr=["Horreur", "Mystère"])
+        unlinked = dict(id=7,title="Unmatched source",genres=["Mystery"],themes=[],
+                        score=8.0,popularity=3,wikidata_genres_fr=["horreur"])
+        result=score_candidates(
+            [normal,wiki_horror,unlinked],
+            AdvisorContext(mood="MYSTERY",avoid_horror=True),
+            {"genres":set(),"themes":set()},10,
+        )
+        self.assertEqual({r["id"] for r in result},{5,7})
+        # A Wikidata genre alone is not enough to claim a mood match.
+        unsupported=dict(id=9,title="Only Wikidata",genres=["Romance"],themes=[],
+                         wikidata_id="Q7654",wikidata_genres_fr=["Mystère"],
+                         score=9.6,popularity=1)
+        self.assertEqual(score_candidates(
+            [unsupported],AdvisorContext(mood="MYSTERY"),
+            {"genres":set(),"themes":set()},10),[])
+
+    def test_wikidata_romance_and_gore_exclusions(self):
+        candidates=[
+            dict(id=8,genres=["Mystery"],themes=[],score=9,popularity=1,
+                 wikidata_id="Q9",wikidata_genres_fr=["Romance"]),
+            dict(id=9,genres=["Mystery"],themes=[],score=8,popularity=2,
+                 wikidata_id="Q10",wikidata_genres_fr=["Gore"]),
+            dict(id=10,genres=["Mystery"],themes=[],score=7,popularity=3,
+                 wikidata_id="Q11",wikidata_genres_fr=["Psychologique"]),
+        ]
+        recs=score_candidates(
+            candidates,AdvisorContext(mood="MYSTERY",avoid_romance=True,avoid_gore=True),
+            {"genres":set(),"themes":set()},10,
+        )
+        self.assertEqual([r["id"] for r in recs],[10])
+
     def test_excludes_horror_and_gore_from_both_tag_types(self):
         rows=[
             dict(id=1,genres=["Mystery","Horror"],themes=[],score=9.0,popularity=1),
