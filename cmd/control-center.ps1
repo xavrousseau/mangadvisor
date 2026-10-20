@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -289,6 +289,365 @@ function Load-Extended-Catalogue {
   Write-Host ("Catalogue avant : {0} / apres : {1} / variation nette : {2}" -f $before,$after,($after-$before))
   Write-Host ("Notices distinctes en provenance fournisseur : {0}" -f $sourceCount)
   Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
+}
+function Import-BnF-Bulk {
+  Say "Importer des lots bibliographiques officiels BnF (zone de candidats)"
+  Ensure-Environment
+  Check-Docker
+  $dir=Join-Path $root "data\raw\bnf\imports"
+  if (!(Test-Path -LiteralPath $dir)) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  }
+  Write-Host "Source officielle : https://api.bnf.fr/index.php/fr/produits_bibliographiques_mensuels"
+  Write-Host "Telecharge uniquement les LIVRES au format UNIMARC UTF8 (ISO 2709)."
+  Write-Host "Depose les archives ou fichiers .not/.mrc/.iso/.marc/.gz/.zip dans : $dir"
+  $files=@(Get-ChildItem -LiteralPath $dir -File | Where-Object {
+    $_.Name -match '\.(not|mrc|iso|marc|gz|zip)
+  Say "Enrichissement progressif depuis le catalogue BnF"
+  Ensure-Environment
+  Check-Docker
+  # Ensure the API startup creates the additive, candidate-only staging tables.
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $limit=Ask-Number "Nombre de mangas a rechercher dans la BnF (max 25)" 10 25
+  $refresh=Confirm "Relancer aussi des recherches deja faites recemment ?" $false
+  Write-Host "Les resultats BnF seront des CANDIDATS, jamais des editions confirmees."
+  Write-Host "Aucune association de manga, ISBN ou tome n'est effectuee automatiquement."
+  # Consistent verified recovery point before any staged metadata write.
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.bnf_batch","--limit",[string]$limit)
+  if ($refresh) { $argsList+=@("--refresh") }
+  Compose $argsList
+  Write-Host "Recherche terminee : ouvre une fiche manga pour voir les candidats BnF."
+}
+function Enrich-Wikidata {
+  Say "Enrichissement Wikidata des mangas (libelles FR et genres documentes)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $limit=Ask-Number "Nombre de mangas a interroger via Wikidata (max 15)" 8 15
+  $refresh=Confirm "Actualiser les informations deja interrogees ?" $false
+  Write-Host "Source CC0 Wikidata : association uniquement par identifiant MAL manga P4087."
+  Write-Host "Une etiquette en francais ne certifie pas une edition francaise."
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.wikidata_enrichment","--limit",[string]$limit)
+  if ($refresh) { $argsList+=@("--refresh") }
+  Compose $argsList
+  Write-Host "Enrichissement Wikidata termine. Consulte les fiches mangas."
+}
+function Enrich-Multilingual-Aliases {
+  Say "Titres alternatifs fiables FR / EN / JA (Wikidata)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $limit=Ask-Number "Nombre de mangas Wikidata deja lies a enrichir (max 20)" 12 20
+  $refresh=Confirm "Reprendre meme les mangas deja enrichis recemment ?" $false
+  Write-Host "Les alias sont relies aux manga par MAL ID P4087, reverifie cote Wikidata."
+  Write-Host "Aucune edition francaise ou possession ne sera attribuee automatiquement."
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.multilingual_aliases","--limit",[string]$limit)
+  if ($refresh) { $argsList+=@("--refresh") }
+  Compose $argsList
+  Write-Host "Recherche catalogue / inventaire actualisee via les titres alternatifs verifies."
+}
+function Enrich-My-Library {
+  Say "Enrichir toute ma mangatheque reconnue depuis Wikidata et la BnF"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $maxWorks=Ask-Number "Maximum de series de ma mangatheque liees au catalogue (max 250)" 80 250
+  $useBnf=Confirm "Rechercher aussi les notices BnF (plus lent, ISBN a verifier) ?" $true
+  $bnfLabel=if ($useBnf) { "OUI" } else { "NON" }
+  Write-Host "Sources selectionnees : Wikidata = OUI ; BnF = $bnfLabel"
+  Write-Host "Une seule sauvegarde verifiee est creee avant les recherches."
+  Write-Host "Les lignes d'inventaire sans manga identifie resteront en attente."
+  Write-Host "Aucune edition, aucun tome et aucun ISBN ne sont attribues automatiquement."
+  Backup
+  $argsList=@("run","--rm","--no-deps","api","python","-m",
+              "apps.api.app.library_enrichment","--max-works",[string]$maxWorks)
+  if (-not $useBnf) { $argsList+=@("--skip-bnf") }
+  Compose $argsList
+  Write-Host "Bilan ci-dessus : consulte les fiches mangas et les candidats ISBN."
+}
+function Load-Recommendations {
+  Say "Recommandations communautaires (Tenrai)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  if ((Get-Count "manga") -eq 0) { throw "Catalogue vide. Lance d'abord l'installation (1) ou actualise le catalogue (options avancees)." }
+  Network
+  $limit=Ask-Number "Nombre de mangas a enrichir" 50 2000
+  $force=Confirm "Retelecharger les relations deja extraites ?" $false
+  $argsList=@("pipelines/engine/scripts/extract_jikan_recommendations.py",
+          "--limit-items",[string]$limit,"--sleep-seconds","1")
+  if ($force) { $argsList+=@("--force") }
+  Engine $argsList
+  Engine @("pipelines/engine/scripts/load_jikan_recommendations_to_postgres.py")
+  $count=Get-Count "manga_recommendation_edge"
+  Write-Host "Relations enregistrees : $count"
+  if ($count -eq 0) {
+    Write-Warning "Aucune relation en base : voir les logs d'extraction (le fournisseur peut renvoyer 0 resultat)."
+  }
+}
+function Wait-Health {
+  $uri="http://127.0.0.1:$(Config 'API_PORT')/health"
+  for ($i=1;$i -le 20;$i++) {
+    try {
+      $data=Invoke-RestMethod -Uri $uri -TimeoutSec 5
+      if ($data.status -eq "ok") { return $data }
+    } catch {}
+    Start-Sleep -Seconds 2
+  }
+  throw "API indisponible : $uri. Consulte les logs depuis le menu."
+}
+function Diagnostic {
+  Say "Diagnostic de Mangadvisor"
+  Ensure-Environment
+  Check-Docker
+  Wait-Postgres
+  $health=Wait-Health
+  Write-Host "API et PostgreSQL : OK ($($health.database))"
+  $required=@("jikan_manga_source","manga","genre","manga_genre",
+              "theme","manga_theme","demographic","manga_demographic",
+              "manga_recommendation_edge","user_manga_library",
+              "user_manga_inventory_declaration","manga_fr_edition")
+  $counts=@{}
+  foreach ($table in $required) {
+    $counts[$table]=Get-Count $table
+    Write-Host ("  {0,-36} {1,8}" -f $table,$counts[$table])
+  }
+  if ($counts["manga"] -eq 0) { throw "Catalogue vide : lance l'installation (1) ou actualise le catalogue (options avancees)." }
+  if ($counts["manga_recommendation_edge"] -eq 0) {
+    Write-Warning "Aucune recommandation communautaire : menu A puis option 2 (actualiser les recommandations)."
+  }
+  $url="http://127.0.0.1:$(Config 'API_PORT')/mangas?limit=1"
+  $result=Invoke-RestMethod -Uri $url -TimeoutSec 15
+  if ($null -eq $result) { throw "Recherche API vide/invalide." }
+  $webUrl="http://127.0.0.1:$(Config 'UI_PORT')/"
+  $web=Invoke-WebRequest -Uri $webUrl -UseBasicParsing -TimeoutSec 15
+  if ([int]$web.StatusCode -ne 200) { throw "Interface web inaccessible : $webUrl" }
+  # Validate the real browser network path, not merely static index.html.
+  $proxyUrl="http://127.0.0.1:$(Config 'UI_PORT')/api/health"
+  try {
+    $proxy=Invoke-RestMethod -Uri $proxyUrl -TimeoutSec 15
+    if ($proxy.status -ne "ok") { throw "Reponse inattendue du proxy." }
+  } catch {
+    throw "Le site est disponible, mais le proxy API ne fonctionne pas : $proxyUrl. Verifie les logs Docker web/api. Detail: $($_.Exception.Message)"
+  }
+  $libraryUrl="http://127.0.0.1:$(Config 'UI_PORT')/api/library?limit=1"
+  try {
+    $library=Invoke-RestMethod -Uri $libraryUrl -TimeoutSec 15
+    if ($null -eq $library.items) { throw "JSON bibliotheque incomplet." }
+  } catch {
+    throw "La bibliotheque du site ne repond pas : $libraryUrl. Detail: $($_.Exception.Message)"
+  }
+  Write-Host "API directe, proxy Web et bibliotheque : OK ($webUrl)"
+  Write-Host "Controle manuel restant : fiches, editions, recommandations et conseiller."
+  Write-Host "Un diagnostic reussi ne garantit pas la pertinence des correspondances de la mangatheque."
+}
+function Backup {
+  Say "Sauvegarde PostgreSQL et restauration de verification"
+  $path=Join-Path $root "cmd\library-backup.ps1"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -Action Backup
+  Assert-Exit "Echec de sauvegarde : aucune operation sensible ne doit continuer"
+}
+function Inventory {
+  $path=Join-Path $root "private-data\mangatheque.csv"
+  if (!(Test-Path -LiteralPath $path)) {
+    Write-Host "CSV non trouve : $path"
+    Write-Host "Copie ton fichier ici, puis menu A : tester (4) et importer (3)."
+    return
+  }
+  Say "Inventaire personnel (apercu obligatoire)"
+  $scriptFile=Join-Path $root "cmd\import-private-inventory.ps1"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptFile -PreviewOnly
+  Assert-Exit "Echec de l'apercu de la mangatheque"
+  if (Confirm "Executer maintenant l'import securise (confirmation supplementaire dans le script) ?" $false) {
+    # Every user-initiated import must have a verified recovery point.
+    # The preview above never writes to PostgreSQL; no backup is required
+    # unless the user explicitly chooses the write path.
+    Backup
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptFile
+    Assert-Exit "Echec de l'import de la mangatheque"
+  }
+}
+function Benchmark-Inventory {
+  $csv=Join-Path $root "private-data\mangatheque.csv"
+  if (!(Test-Path -LiteralPath $csv -PathType Leaf)) {
+    Write-Host "Benchmark personnel ignore : pas de CSV local."
+    return
+  }
+  Say "Benchmark de la mangatheque et du conseiller (lecture seule)"
+  $scriptFile=Join-Path $root "cmd\benchmark-mangatheque.ps1"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptFile -CsvFile $csv
+  Assert-Exit "Benchmark personnel impossible. Menu A puis option 4 apres diagnostic"
+}
+function Update {
+  Say "Mise a jour sans suppression des donnees"
+  Ensure-Environment
+  Check-Docker
+  if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+    throw "Git absent : installe Git pour Windows (ou utilise une installation ZIP manuelle)."
+  }
+  if (!(Test-Path (Join-Path $root ".git"))) {
+    throw "Ce dossier n'est pas un clone Git : impossible de faire git pull automatiquement."
+  }
+  $branchName=@(& git -C $root branch --show-current)
+  Assert-Exit "Impossible de connaitre la branche Git active"
+  if ($branchName.Count -ne 1 -or ([string]$branchName[0]).Trim() -cne "main") {
+    throw "Mise a jour reservee a la branche main. Branche actuelle : $($branchName -join ', ')"
+  }
+
+  # A CRLF warning alone is harmless. Unlike 'git diff --quiet', porcelain
+  # reports precisely which tracked files Git considers modified, including
+  # staged changes. Ignored secrets and private data are never stashed.
+  $trackedChanges=@(& git -C $root status --porcelain=v1 --untracked-files=no)
+  Assert-Exit "Impossible de lire l'etat du depot Git"
+  $needsStash=$trackedChanges.Count -gt 0
+  if ($needsStash) {
+    Say "Modifications locales detectees par Git"
+    Write-Host ("Git signale {0} chemin(s) modifies. Les avertissements LF/CRLF ne suffisent pas a expliquer ces changements." -f $trackedChanges.Count)
+    $trackedChanges | Select-Object -First 30 | ForEach-Object { Write-Host ("  " + $_) }
+    if ($trackedChanges.Count -gt 30) { Write-Host "  ... autres fichiers modifies non affiches." }
+    Write-Host "Ces modifications seront GARDEES dans une sauvegarde Git locale (stash)."
+    Write-Host "Elles ne seront pas remises automatiquement dans le code mis a jour."
+    Write-Host "Les fichiers ignores (.env, private-data, backups) et les volumes Docker ne sont pas inclus."
+    if (!(Confirm "Sauvegarder ces modifications suivies dans Git puis poursuivre ?" $false)) {
+      throw "Mise a jour annulee : aucun changement Git effectue."
+    }
+  }
+
+  # Validate a consistent database backup BEFORE changing any tracked file.
+  Backup
+  $stashCreated=$false
+  if ($needsStash) {
+    $label="mangadvisor-avant-maj-$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+    Run "git" @("-C",$root,"stash","push","-m",$label) "Impossible de sauvegarder les modifications locales"
+    $remaining=@(& git -C $root status --porcelain=v1 --untracked-files=no)
+    Assert-Exit "Impossible de confirmer la sauvegarde Git locale"
+    if ($remaining.Count -gt 0) {
+      throw "Certains fichiers suivis sont encore modifies apres stash : mise a jour annulee."
+    }
+    $stashCreated=$true
+    Write-Host "Modifications locales sauvegardees sous le nom : $label"
+    Write-Host "Pour les retrouver plus tard : git stash list"
+  }
+  try {
+    # The shared Git synchronizer detects untracked files which now exist
+    # upstream and archives ONLY those conflicts outside this repository.
+    # Tracked edits have already been backed up into Git stash above.
+    $syncScript=Join-Path $root "cmd\github-sync.ps1"
+    if (!(Test-Path -LiteralPath $syncScript -PathType Leaf)) {
+      throw "Synchronisation GitHub indisponible : cmd\github-sync.ps1 manque."
+    }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -Root $root -NonInteractive
+    Assert-Exit "La synchronisation GitHub a echoue"
+  } catch {
+    if ($stashCreated) {
+      Write-Warning "La sauvegarde Git stash est conservee. Ne supprime pas le depot."
+      Write-Host "Voir la sauvegarde des modifications : git stash list"
+    }
+    throw
+  }
+  Initialize-Database
+  Start-Application
+  Diagnostic
+  Write-Host "Mise a jour terminee. Fichiers personnels et volumes conserves."
+}
+function Wizard {
+  Say "ASSISTANT COMPLET - Premiere installation ou reprise"
+  Write-Host "Pre-requis : Docker Desktop installe, code telecharge (Git ou ZIP)."
+  Write-Host "L'assistant ne lance JAMAIS Nuke, ne supprime PAS de volume."
+  Write-Host "Le catalogue exige Internet pour joindre Tenrai. Les traitements sont relancables."
+  if (!(Confirm "Demarrer l'installation guidee ?" $true)) { return }
+  Ensure-Environment
+  Initialize-Database
+  Start-Application
+  Load-Catalogue
+  Load-Recommendations
+  Diagnostic
+  Backup
+  Say "Import facultatif de ta mangatheque"
+  $csv=Join-Path $root "private-data\mangatheque.csv"
+  if (!(Test-Path -LiteralPath $csv)) {
+    Write-Host "Copie maintenant ta collection CSV dans : $csv"
+    $null=Read-Host "Appuie sur Entree quand la copie est faite (ou pour ignorer)"
+  }
+  Inventory
+  # Protect any newly imported ownership claims before diagnostic/quality calls.
+  Backup
+  Diagnostic
+  # The audit never writes SQL and its report stays under private-data.
+  # An unavailable benchmark must not undo or invalidate a safe installation.
+  try {
+    Benchmark-Inventory
+  } catch {
+    Write-Warning ("Benchmark facultatif non abouti : " + $_.Exception.Message)
+    Write-Host "Relance le benchmark via le menu A, option 4."
+  }
+  Say "Fin de l'assistant"
+  Write-Host ("Ouvre http://localhost:" + (Config "UI_PORT"))
+  Write-Host "Mobile HTTPS et IA locale : menu A (options avancees)."
+  Write-Host "Sauvegarde finale terminee et verifiee. Copie les fichiers du dossier backups sur un deuxieme support."
+}
+try {
+  switch ($Action) {
+    "Environment"     { Ensure-Environment }
+    "Start"           { Open-Application }
+    "Stop"            { Stop-Application }
+    "Database"        { Initialize-Database }
+    "Inventory"       { Inventory }
+    "BnF"             { Enrich-BnF }
+    "BnFBulk"         { Import-BnF-Bulk }
+    "Wikidata"        { Enrich-Wikidata }
+    "LibraryEnrichment" { Enrich-My-Library }
+    "Aliases"         { Enrich-Multilingual-Aliases }
+    "Catalogue"       { Load-Catalogue }
+    "CatalogueExtended" { Load-Extended-Catalogue }
+    "Recommendations" { Load-Recommendations }
+    "Network"         { Network }
+    "Diagnostic"      { Diagnostic }
+    "Update"          { Update }
+    "Wizard"          { Wizard }
+  }
+  Write-Host ""
+  Write-Host "Operation terminee."
+} catch {
+  Write-Host ""
+  Write-Host ("ERREUR : " + $_.Exception.Message) -ForegroundColor Red
+  Write-Host "Aucune suppression automatique des volumes n'a ete lancee."
+  exit 1
+}
+
+  })
+  if ($files.Count -eq 0) {
+    Write-Host "Aucun fichier BnF local. Aucun traitement lance."
+    return
+  }
+  Write-Host ("Fichiers detectes : " + $files.Count)
+  if ($files.Count -gt 20) {
+    throw "Plus de 20 fichiers BnF ; traiter des lots plus petits pour une reprise sure."
+  }
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  Say "Apercu sans modification"
+  Engine @("pipelines/engine/scripts/bnf_bulk_import.py","--preview")
+  Write-Host "Les notices retenues restent des candidates independantes."
+  Write-Host "Aucun ISBN ne sera rattache automatiquement a une oeuvre ou a ta collection."
+  if (!(Confirm "Sauvegarder puis importer le lot dans la zone BnF ?" $false)) {
+    Write-Host "Import annule. Les fichiers et donnees existants sont conserves."
+    return
+  }
+  Backup
+  Engine @("pipelines/engine/scripts/bnf_bulk_import.py")
+  Write-Host "Notices BnF candidates importees ; edition et tome non confirmes."
 }
 function Enrich-BnF {
   Say "Enrichissement progressif depuis le catalogue BnF"
