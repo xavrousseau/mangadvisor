@@ -43,8 +43,6 @@ if not defined KEY (
 )
 call :dispatch "%KEY%"
 call :result
-
-:result
 goto menu
 
 :advanced
