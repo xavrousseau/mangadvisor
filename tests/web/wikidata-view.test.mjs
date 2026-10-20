@@ -23,7 +23,7 @@ test("exact MAL linked French label has visible evidence and caveats",()=>{
   assert.match(html,/L&#39;Attaque des Titans/);
   assert.match(html,/Wikidata/);
   assert.match(html,/P4087/);
-  assert.match(html,/pas un synopsis complet/);
+  assert.match(html,/ni un synopsis complet/);
   assert.match(html,/action · mystère/);
   assert.match(html,/href="https:\/\/www.wikidata.org\/wiki\/Q12345"/);
   assert.doesNotMatch(html,/data-action="edition-confirm"/);
