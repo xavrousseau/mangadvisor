@@ -51,6 +51,10 @@ SELECT m.id,m.source_mal_id,m.title,m.title_english,m.title_japanese,
        CASE WHEN w.wikidata_id IS NOT NULL
              AND wa.status='MATCHED'
              AND w.source_mal_id=m.source_mal_id
+            THEN w.alternate_titles END AS wikidata_alternate_titles,
+       CASE WHEN w.wikidata_id IS NOT NULL
+             AND wa.status='MATCHED'
+             AND w.source_mal_id=m.source_mal_id
             THEN w.wikidata_id END AS wikidata_id
 FROM manga m
 LEFT JOIN jikan_manga_source j ON j.mal_id=m.source_mal_id
@@ -118,8 +122,15 @@ def aliases_from_source(row: dict[str,Any]) -> list[dict[str,str | None]]:
             include(name,"und","MAL_SYNONYM",malurl)
     wiki=row.get("wikidata_id")
     if isinstance(wiki,str) and re.fullmatch(r"Q[1-9]\d{0,11}",wiki):
+        source_url=f"https://www.wikidata.org/wiki/{wiki}"
         include(row.get("wikidata_label_fr"),"fr","WIKIDATA_P4087",
-                f"https://www.wikidata.org/wiki/{wiki}")
+                source_url)
+        raw_titles=row.get("wikidata_alternate_titles")
+        if isinstance(raw_titles,list):
+            for item in raw_titles[:40]:
+                if isinstance(item,dict) and item.get("lang") in ("fr","en","ja"):
+                    include(item.get("title"),item["lang"],
+                            "WIKIDATA_P4087",source_url)
     for verified_mal,title,lang,source,url in REVIEWED_WORK_ALIASES:
         if mal==verified_mal:
             include(title,lang,source,url)
