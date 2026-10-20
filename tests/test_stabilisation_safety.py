@@ -56,6 +56,15 @@ class StabilisationSafetyTests(unittest.TestCase):
         self.assertNotIn("UPDATE user_manga_library",source)
         self.assertNotIn("INSERT INTO manga_fr_edition",source)
 
+    def test_multilingual_titles_index_menu_is_backed_up_before_database_writes(self):
+        menu=(ROOT/"mangadvisor.cmd").read_text("utf-8")
+        control=(ROOT/"cmd/control-center.ps1").read_text("utf-8")
+        self.assertIn('if "%CHOICE%"=="13" set "KEY=title-index"',menu)
+        self.assertIn('if /I "%~1"=="title-index" set "ACTION=TitleIndex"',menu)
+        block=control.split("function Refresh-Title-Index {")[1].split("function Load-Recommendations {")[0]
+        self.assertLess(block.index("  Backup"),block.index("  Compose $argsList"))
+        self.assertIn("apps.api.app.title_aliases",block)
+
     def test_backup_restore_does_not_revive_legacy_streamlit(self):
         source=(ROOT/"cmd/library-backup.ps1").read_text("utf-8")
         self.assertIn("user_manga_inventory_pending",source)
