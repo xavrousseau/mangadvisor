@@ -156,7 +156,7 @@ def create_pending_resolution_router(
                         .replace("%","\\%").replace("_","\\_")) + "%"
                     exact = term.casefold()
                     alias_key = title_key(term)
-                    alias_pattern = "%" + alias_key + "%"
+                    alias_pattern = "%" + (alias_key or "nomatchaliaskey") + "%"
                     cur.execute("""
                         SELECT m.id,m.title,m.title_english,m.title_japanese,
                                m.source_mal_id,m.volumes,m.manga_type,
