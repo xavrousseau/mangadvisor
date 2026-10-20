@@ -136,7 +136,7 @@ class WikidataEnrichmentTests(unittest.TestCase):
         req,timeout=calls[0]
         self.assertEqual(timeout,25)
         self.assertEqual(urlsplit(req.full_url).hostname,"query.wikidata.org")
-        self.assertIn("wikidata.org",req.get_header("User-agent").lower())
+        self.assertIn("github.com/xavrousseau/mangadvisor",req.get_header("User-agent").lower())
         sparql=parse_qs(urlsplit(req.full_url).query)["query"][0]
         self.assertIn("wdt:P4087",sparql)
 
