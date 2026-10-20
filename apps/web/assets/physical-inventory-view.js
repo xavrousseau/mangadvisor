@@ -71,8 +71,13 @@ export function physicalInventoryMarkup(data, lang, translate, escape, {compact=
       return '<article class="physical-work"><div class="physical-work-header"><h3>'+
         e(item.entry_title)+'</h3><span class="pill">'+e(status)+'</span></div>'+
         '<p class="muted tiny">'+n+(lang==="fr"?" exemplaires declares":" declared copies")+
-        '</p></article>';
-    }).join("")+'</div></section>':"";
+        '</p>'+
+        '<p class="muted tiny">'+e(item.edition_declared||
+          (lang==="fr"?"Édition non précisée":"Unspecified edition"))+'</p>'+
+        '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-start" data-key="'+
+          e(item.source_key)+'">'+(lang==="fr"?"Rapprocher cette ligne":"Match this entry")+
+        '</button></article>';
+    }).join("")+'</div><div id="inventory-match-slot"></div></section>':"";
   return summary+
     '<p class="collection-caveat">'+L("physicalScopeNote")+'</p>'+
     '<div class="physical-work-grid">'+cards+'</div>'+pendingMarkup+
