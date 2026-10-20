@@ -43,7 +43,7 @@ function Check-Menu([string]$Name, [string]$InputText,
     if ($occurrences -lt 2) {
         throw "$Name : le menu ne revient PAS apres le traitement ($occurrences affichage(s)). $output"
     }
-    if ($ExpectFailure -and !$output.Contains("ECHEC (code 37)")) {
+    if ($ExpectFailure -and !$output.Contains("ECHEC - code 37.")) {
         throw "$Name : le code de retour 37 doit etre affiche sans fermer la console. $output"
     }
     if (!$ExpectFailure -and !$output.Contains("Operation terminee.")) {
