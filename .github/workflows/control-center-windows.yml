@@ -86,6 +86,14 @@ jobs:
             }
           }
 
+      - name: Tester le retour au menu apres chaque action (vrai CMD Windows)
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-menu-return.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Une operation ferme le menu avant le retour attendu."
+          }
+
       - name: Verifier la configuration initiale sans Docker
         shell: powershell
         run: |
