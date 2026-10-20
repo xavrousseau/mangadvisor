@@ -522,7 +522,7 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 
 
 /* V1.2 — livre français vérifié vs œuvre originale ; regroupements par type. */
-.fr-notices{background:var(--surface2);border:1px solid var(--border);
+.fr-notices,.wikidata-evidence{background:var(--surface2);border:1px solid var(--border);
  border-left:3px solid var(--accent);border-radius:12px;
  padding:17px 19px;margin:17px 0}
 .fr-notices-heading{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
@@ -544,7 +544,7 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 .edition-source{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
 .edition-source a{font-weight:750}
 @media(max-width:740px){
- .fr-notices{padding:13px}
+ .fr-notices,.wikidata-evidence{padding:13px}
  .fr-notices-heading>span{margin-left:0}
  .fr-notice-line{grid-template-columns:1fr;gap:3px}
  .edition-group-head h3{font-size:17px}

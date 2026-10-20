@@ -604,6 +604,8 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
         sql = """
             SELECT m.id,m.title,m.title_english,m.status,m.volumes,m.chapters,m.synopsis,m.score::float AS score,
                 m.popularity,m.manga_type,
+                w.label_fr AS wikidata_label_fr,
+                w.wikidata_id AS wikidata_id,
                 ARRAY(SELECT g.name FROM manga_genre mg JOIN genre g ON g.id=mg.genre_id
                       WHERE mg.manga_id=m.id ORDER BY g.name) AS genres,
                 ARRAY(SELECT t.name FROM manga_theme mt JOIN theme t ON t.id=mt.theme_id
@@ -613,7 +615,12 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
                 (SELECT COUNT(*)::int FROM manga_fr_edition fkind
                     WHERE fkind.manga_id=m.id AND
                           fkind.edition_kind=%(preferred_kind)s) AS preferred_format_record_count
-            FROM manga m WHERE """+" AND ".join(conditions)+"""
+            FROM manga m
+            LEFT JOIN manga_wikidata_attempt wa
+                ON wa.manga_id=m.id AND wa.status='MATCHED'
+            LEFT JOIN manga_wikidata_fact w
+                ON w.manga_id=wa.manga_id AND w.source_mal_id=m.source_mal_id
+            WHERE """+" AND ".join(conditions)+"""
             ORDER BY m.score DESC NULLS LAST,m.popularity ASC NULLS LAST,m.id ASC
             LIMIT 500
         """
@@ -721,6 +728,11 @@ def make_advisor_router(connection_factory:Callable[...,Any],user_id:int=1)->API
             displayed_title = choose_display_title(
                 original_title, row.get("title_english")
             )
+            wiki_label = row.get("wikidata_label_fr")
+            if is_fr and isinstance(wiki_label, str) and wiki_label.strip():
+                displayed_title = wiki_label.strip()
+                if row.get("wikidata_id"):
+                    row["title_source"] = "WIKIDATA_P4087"
             if displayed_title != original_title:
                 row["title_original"] = original_title
                 row["title"] = displayed_title
