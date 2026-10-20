@@ -46,6 +46,9 @@ def main():
             expect(page.locator(".inventory-match-review")).to_contain_text("Inconnu de CI")
             expect(page.locator(".inventory-match-review")).to_contain_text("Demo CI 16")
             expect(page.locator('[data-action="pending-match-confirm"]')).to_be_disabled()
+            mode=page.locator("#pending-match-mode")
+            if mode.count():
+                mode.select_option("MARK_DUPLICATE")
             page.locator("#pending-match-ack").check()
             expect(page.locator('[data-action="pending-match-confirm"]')).to_be_enabled()
             # Do not confirm in this browser smoke: original pending claims
