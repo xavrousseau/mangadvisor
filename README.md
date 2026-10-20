@@ -8,46 +8,46 @@ Mangadvisor est une application locale, avec une interface Web accessible depuis
 
 **Prérequis** : [Docker Desktop](https://www.docker.com/products/docker-desktop/) démarré et dossier de Mangadvisor téléchargé depuis ce GitHub. Git pour Windows est nécessaire uniquement pour la mise à jour automatique (commande 3). Pas besoin d'installer Python ni PostgreSQL sur le PC.
 
-**Double-clique sur \`mangadvisor.cmd\`** (à la racine du dépôt) puis choisis :
+**Double-clique sur `mangadvisor.cmd`** (à la racine du dépôt) puis choisis :
 
 | Choix | Action | À quoi ça sert |
 | --- | --- | --- |
 | **1** | **Première installation** | Crée la configuration privée, initialise PostgreSQL, construit les images, récupère le catalogue Tenrai et les relations de recommandation, lance le site, vérifie l'installation et propose l'import de la collection. |
 | **2** | **Démarrer Mangadvisor** | Lance les conteneurs existants en arrière-plan, vérifie l'API et ouvre le site. **Ne retélécharge pas le catalogue** et **n'efface rien**. |
-| **3** | **Mettre à jour** | Vérifie la sauvegarde de la base, récupère \`main\` via Git, applique les évolutions non destructrices, reconstruit les images et lance le diagnostic. |
+| **3** | **Mettre à jour** | Vérifie la sauvegarde de la base, récupère `main` via Git, applique les évolutions non destructrices, reconstruit les images et lance le diagnostic. |
 | **4** | **Sauvegarder la mangathèque** | Enregistre une archive PostgreSQL privée et teste sa restauration dans une base isolée. |
 | **5** | **Vérifier le fonctionnement** | Contrôle PostgreSQL, API directe, Nginx, bibliothèque et principaux volumes de données. |
 | **6** | **Arrêter Mangadvisor** | Arrête Docker Compose sans supprimer les données. |
 | **A** | **Options avancées** | Catalogue, recommandations, imports, scanner mobile, IA locale, journaux, configuration et restauration. |
 | **0** | **Quitter le menu** | Ne stoppe pas une application déjà démarrée. |
 
-Le site est ensuite disponible par défaut sur **http://localhost:8501**. Le port exact vient du fichier privé \`.env\`, créé à la première installation. Chaque action s'exécute **dans la même fenêtre de commandes** et affiche clairement son succès ou son échec. Il n'est pas nécessaire de lancer des commandes Docker manuelles pour utiliser l'application.
+Le site est ensuite disponible par défaut sur **http://localhost:8501**. Le port exact vient du fichier privé `.env`, créé à la première installation. Chaque action s'exécute **dans la même fenêtre de commandes** et affiche clairement son succès ou son échec. Il n'est pas nécessaire de lancer des commandes Docker manuelles pour utiliser l'application.
 
 ### Première installation complète
 
 1. Télécharge le dépôt (clone Git ou ZIP) et démarre Docker Desktop.
-2. Double-clique sur **\`mangadvisor.cmd\`**, puis appuie sur **1**.
+2. Double-clique sur **`mangadvisor.cmd`**, puis appuie sur **1**.
 3. Suis l'assistant pour construire les images, créer les tables, récupérer les notices Tenrai et les relations manga. Une connexion Internet est nécessaire.
-4. Pour importer ta collection personnelle, dépose le CSV dans **\`private-data/mangatheque.csv\`**. Le format attendu est décrit dans [Import de l'inventaire physique](docs/04_product/safe_inventory_import_3_8.md) ; il contient notamment les colonnes \`serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier\`.
+4. Pour importer ta collection personnelle, dépose le CSV dans **`private-data/mangatheque.csv`**. Le format attendu est décrit dans [Import de l'inventaire physique](docs/04_product/safe_inventory_import_3_8.md) ; il contient notamment les colonnes `serie;tomes_principaux;doublons_identiques;autres_editions_a_identifier`.
 5. L'assistant affiche un **aperçu** avant toute écriture ; il ne confirme jamais automatiquement les associations incertaines. Les éditions distinctes d'une même œuvre restent distinctes. La sauvegarde est vérifiée après l'import.
 
-Les dossiers \`private-data/\`, \`backups/\` et le fichier \`.env\` sont exclus de Git. **Ne les publie pas sur GitHub**. Les fichiers Excel doivent être exportés ou convertis au format CSV attendu avant l'import physique, sans attribuer automatiquement d'ISBN, de notes ou de tomes lus.
+Les dossiers `private-data/`, `backups/` et le fichier `.env` sont exclus de Git. **Ne les publie pas sur GitHub**. Les fichiers Excel doivent être exportés ou convertis au format CSV attendu avant l'import physique, sans attribuer automatiquement d'ISBN, de notes ou de tomes lus.
 
 ### Les jours suivants
 
-Démarre Docker Desktop, lance \`mangadvisor.cmd\` puis **2**. La page doit s'ouvrir dans le navigateur. Lorsque tu souhaites arrêter les services, utilise **6**. En cas de problème, choisis **5** pour obtenir les contrôles et les messages d'erreur, puis ouvre les journaux dans **A**.
+Démarre Docker Desktop, lance `mangadvisor.cmd` puis **2**. La page doit s'ouvrir dans le navigateur. Lorsque tu souhaites arrêter les services, utilise **6**. En cas de problème, choisis **5** pour obtenir les contrôles et les messages d'erreur, puis ouvre les journaux dans **A**.
 
 ### Mettre à jour sans perdre les données
 
-Choisis **3** si le dossier Mangadvisor a été cloné via Git et que tu es sur la branche \`main\`. Une sauvegarde PostgreSQL avec restauration de vérification précède le \`git pull --ff-only\`. Les fichiers locaux suivis et modifiés sont conservés dans un stash Git uniquement après confirmation. Le programme ne supprime ni volume PostgreSQL ni fichiers privés.
+Choisis **3** si le dossier Mangadvisor a été cloné via Git et que tu es sur la branche `main`. Une sauvegarde PostgreSQL avec restauration de vérification précède le `git pull --ff-only`. Les fichiers locaux suivis et modifiés sont conservés dans un stash Git uniquement après confirmation. Le programme ne supprime ni volume PostgreSQL ni fichiers privés.
 
-Si tu as utilisé un **ZIP**, la mise à jour Git automatique n'est pas disponible. Conserve impérativement tes dossiers \`private-data/\`, \`backups/\` et \`.env\` avant de remplacer les fichiers du projet.
+Si tu as utilisé un **ZIP**, la mise à jour Git automatique n'est pas disponible. Conserve impérativement tes dossiers `private-data/`, `backups/` et `.env` avant de remplacer les fichiers du projet.
 
 ### Sauvegarde et restauration
 
-L'option principale **4** réalise un \`pg_dump\` avec manifeste SHA256, suivi d'une **restauration de vérification dans une base temporaire**. La restauration réelle n'est pas automatique : elle se trouve sous **A → S → 5** et demande une confirmation explicite ; une nouvelle sauvegarde de sécurité est créée avant le basculement. [Procédure détaillée](docs/04_product/library_backup_recovery_3_2.md).
+L'option principale **4** réalise un `pg_dump` avec manifeste SHA256, suivi d'une **restauration de vérification dans une base temporaire**. La restauration réelle n'est pas automatique : elle se trouve sous **A → S → 5** et demande une confirmation explicite ; une nouvelle sauvegarde de sécurité est créée avant le basculement. [Procédure détaillée](docs/04_product/library_backup_recovery_3_2.md).
 
-**Copie tes archives de \`backups/\` sur un deuxième support.** Un disque dur défaillant pourrait détruire à la fois la base et les sauvegardes conservées uniquement sur le même PC.
+**Copie tes archives de `backups/` sur un deuxième support.** Un disque dur défaillant pourrait détruire à la fois la base et les sauvegardes conservées uniquement sur le même PC.
 
 ## Ce qui est dans Mangadvisor
 
@@ -64,12 +64,12 @@ L'option principale **4** réalise un \`pg_dump\` avec manifeste SHA256, suivi d
 
 | Composant | Emplacement |
 | --- | --- |
-| Menu Windows et orchestration | \`mangadvisor.cmd\`, \`cmd/control-center.ps1\` |
-| Front Web | \`apps/web/\` |
-| API FastAPI, bibliothèque, conseiller | \`apps/api/\` |
-| Extracteurs Tenrai et chargements SQL | \`pipelines/engine/\` et \`sql/schema/\` |
-| Docker stable (sans Streamlit) | \`infra/compose/docker-compose.yml\` + \`docker-compose.local.yml\` |
-| Tests unitaires et intégration | \`tests/\`, \`.github/workflows/\` |
+| Menu Windows et orchestration | `mangadvisor.cmd`, `cmd/control-center.ps1` |
+| Front Web | `apps/web/` |
+| API FastAPI, bibliothèque, conseiller | `apps/api/` |
+| Extracteurs Tenrai et chargements SQL | `pipelines/engine/` et `sql/schema/` |
+| Docker stable (sans Streamlit) | `infra/compose/docker-compose.yml` + `docker-compose.local.yml` |
+| Tests unitaires et intégration | `tests/`, `.github/workflows/` |
 
 L'ancien prototype Streamlit est encore présent uniquement pour les tests et la transition technique ; **il ne fait pas partie de l'interface normale**. Les scripts de données historiquement nommés Jikan restent utilisables mais l'API source normale est Tenrai. Aucun historique de nommage ne justifie une suppression des volumes.
 
