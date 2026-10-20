@@ -3687,6 +3687,24 @@ def prepare_fr_collection() -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(ALIAS_SCHEMA)
+            # Already verified P4087 labels are immediately searchable in French,
+            # even before the user launches the full FR/EN/JA alias collector.
+            cur.execute("""
+                INSERT INTO manga_title_alias
+                  (manga_id,source_name,source_id,language_code,alias,alias_key,source_url)
+                SELECT m.id,'WIKIDATA_P4087',f.wikidata_id,'fr',
+                       LEFT(BTRIM(f.label_fr),200),
+                       LEFT(LOWER(BTRIM(f.label_fr)),200),
+                       'https://www.wikidata.org/wiki/'||f.wikidata_id
+                FROM manga m
+                JOIN manga_wikidata_attempt a
+                     ON a.manga_id=m.id AND a.status='MATCHED'
+                JOIN manga_wikidata_fact f
+                     ON f.manga_id=m.id AND f.source_mal_id=m.source_mal_id
+                WHERE f.label_fr IS NOT NULL AND LENGTH(BTRIM(f.label_fr)) BETWEEN 2 AND 200
+                ON CONFLICT (manga_id,source_name,language_code,alias_key)
+                DO NOTHING
+            """)
         conn.commit()
 
 
