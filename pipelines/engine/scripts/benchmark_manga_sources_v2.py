@@ -324,7 +324,13 @@ class RateLimitedClient:
     def call(self, provider: str, kind: str, *, query=None, identifier=None) -> dict:
         if provider in self.disabled:
             return {"status": "SKIPPED_PROVIDER_UNAVAILABLE"}
-        key = hashlib.sha256(json.dumps([provider, kind, query, identifier],
+        # Scrinis search responses were cached in V2 *after parsing*, with
+        # hub_id discarded. Bump Scrinis only so the corrected parser sees
+        # fresh supplier JSON; reuse MangaUpdates caches unchanged.
+        cache_key = [provider, kind, query, identifier]
+        if provider == "scrinis":
+            cache_key.append("hub_id_reader_v2")
+        key = hashlib.sha256(json.dumps(cache_key,
                                         ensure_ascii=False).encode("utf-8")).hexdigest()
         path = self.cache_dir / f"{key}.json"
         if path.is_file():
