@@ -56,7 +56,7 @@ $local = Join-Path $root "infra/compose/docker-compose.local.yml"
 $sandbox = Join-Path $root "infra/compose/docker-compose.sandbox.yml"
 $composeArgs = @("compose", "--env-file", $target, "-f", $base,
                  "-f", $local, "-f", $sandbox)
-$resolved = & docker @($composeArgs + @("config", "--format", "json"))
+$resolved = & docker @($composeArgs + @("--profile", "automation", "--profile", "ai", "config", "--format", "json"))
 if ($LASTEXITCODE -ne 0) { throw "Sandbox Compose config failed." }
 $config = (($resolved -join [Environment]::NewLine) | ConvertFrom-Json)
 if ($config.name -ne "mangadvisor_sandbox") { throw "Wrong Compose project name." }
@@ -64,7 +64,8 @@ foreach ($name in @("postgres", "meilisearch", "api", "web",
                    "engine", "catalog-sync", "ollama")) {
   $expected = "mangadvisor_sandbox_" + ($name -replace "-", "_")
   if ($name -eq "catalog-sync") { $expected = "mangadvisor_sandbox_catalog_sync" }
-  if ($config.services.$name.container_name -ne $expected) {
+  $service = $config.services.PSObject.Properties[$name]
+  if ($null -eq $service -or $service.Value.container_name -ne $expected) {
     throw "Unsafe container name for $name"
   }
 }
