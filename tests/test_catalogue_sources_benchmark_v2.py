@@ -171,6 +171,21 @@ class BenchmarkV2Tests(unittest.TestCase):
             self.assertGreaterEqual(sleep.call_args.args[0], 0)
             self.assertLessEqual(client.counts["scrinis"], 2)
 
+    def test_scrinis_cache_v1_parsed_null_id_is_invalidated(self):
+        import hashlib
+        sess = FakeSession()
+        sess.get.return_value.status_code = 200
+        sess.get.return_value.content = b'{"items":[{"hub_id":3014,"title":"One Piece"}]}'
+        old_key = hashlib.sha256(json.dumps(["scrinis", "search", "One Piece", None],
+                                            ensure_ascii=False).encode()).hexdigest()
+        with tempfile.TemporaryDirectory() as d:
+            stale = Path(d) / (old_key + ".json")
+            stale.write_text('{"status":"OK","candidates":[{"id":null}]}')
+            client = v2.RateLimitedClient(session=sess, cache_dir=Path(d))
+            refreshed = client.call("scrinis", "search", query="One Piece")
+            self.assertEqual(refreshed["candidates"][0]["id"], "3014")
+            self.assertEqual(sess.get.call_count, 1)
+
     def test_quota_one_provider_stops_without_modifying_other(self):
         class FakeClient:
             def __init__(self):
