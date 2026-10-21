@@ -238,19 +238,21 @@ def health() -> dict[str, Any]:
 PUBLIC_METADATA_SELECT = """
             (SELECT a.alias FROM manga_title_alias a
              WHERE a.manga_id=m.id AND a.language_code='fr'
-               AND a.source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087')
-             ORDER BY CASE a.source_name WHEN 'TENRAI_MAL_TYPED' THEN 0 ELSE 1 END,
+               AND a.source_name IN ('SCRINIS_FR_PRINT','TENRAI_MAL_TYPED','WIKIDATA_P4087')
+             ORDER BY CASE a.source_name WHEN 'SCRINIS_FR_PRINT' THEN 0
+                       WHEN 'TENRAI_MAL_TYPED' THEN 1 ELSE 2 END,
                       a.alias_key
              LIMIT 1) AS title_fr,
             EXISTS (
                 SELECT 1 FROM manga_title_alias a
                 WHERE a.manga_id=m.id AND a.language_code='fr'
-                  AND a.source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087')
+                  AND a.source_name IN ('SCRINIS_FR_PRINT','TENRAI_MAL_TYPED','WIKIDATA_P4087')
             ) AS title_fr_verified,
             (SELECT a.source_name FROM manga_title_alias a
              WHERE a.manga_id=m.id AND a.language_code='fr'
-               AND a.source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087')
-             ORDER BY CASE a.source_name WHEN 'TENRAI_MAL_TYPED' THEN 0 ELSE 1 END,
+               AND a.source_name IN ('SCRINIS_FR_PRINT','TENRAI_MAL_TYPED','WIKIDATA_P4087')
+             ORDER BY CASE a.source_name WHEN 'SCRINIS_FR_PRINT' THEN 0
+                       WHEN 'TENRAI_MAL_TYPED' THEN 1 ELSE 2 END,
                       a.alias_key
              LIMIT 1) AS title_fr_source,
             FALSE AS title_fr_publication_verified,
@@ -445,8 +447,17 @@ def catalogue_coverage() -> dict[str, Any]:
             AS explicit_french_mal_labels,
           (SELECT COUNT(DISTINCT manga_id) FROM manga_title_alias
            WHERE language_code='fr'
-             AND source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087'))
+             AND source_name IN ('SCRINIS_FR_PRINT','TENRAI_MAL_TYPED','WIKIDATA_P4087'))
             AS works_with_french_label,
+          (SELECT COUNT(*) FROM manga_title_alias
+           WHERE source_name='SCRINIS_FR_PRINT' AND language_code='fr')
+            AS scrinis_french_print_work_matches,
+          (SELECT COUNT(*) FROM manga_title_alias
+           WHERE source_name='SCRINIS_FR_PRINT' AND language_code='fr')
+            AS scrinis_french_titles_added,
+          (SELECT COUNT(*) FROM manga_title_alias
+           WHERE source_name='SCRINIS_FR_PRINT' AND language_code='fr')
+            AS scrinis_work_labels_with_evidence,
           (SELECT COUNT(*) FROM jikan_manga_source j
            WHERE jsonb_typeof(j.authors_json)='array'
              AND jsonb_array_length(j.authors_json)>0) AS source_works_with_authors,
@@ -461,7 +472,7 @@ def catalogue_coverage() -> dict[str, Any]:
         **counts,
         "french_label_is_licensed_edition": False,
         "catalogue_identity": "MyAnimeList mal_id",
-        "enrichment_source": "Jikan/Tenrai raw_json + verified Wikidata P4087",
+        "enrichment_source": "Jikan/Tenrai raw_json + Wikidata P4087 + Scrinis French print evidence",
     }
 
 
