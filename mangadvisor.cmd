@@ -74,6 +74,7 @@ echo   18 - Preparer les fiches bibliographiques (sans modifier la mangatheque)
 echo   19 - Charger tout le catalogue MAL/Jikan via Tenrai (avec reprise)
 echo   20 - Enrichir les titres FR du catalogue via Scrinis (direct)
 echo   21 - Catalogue vivant : nouveautes et veille automatique
+echo   22 - Actualiser la recherche intelligente Meilisearch
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -105,6 +106,7 @@ if "%CHOICE%"=="18" set "KEY=bibliographic-staging"
 if "%CHOICE%"=="19" set "KEY=complete-mal-catalogue"
 if "%CHOICE%"=="20" set "KEY=catalogue-french-scrinis"
 if "%CHOICE%"=="21" set "KEY=catalogue-lifecycle"
+if "%CHOICE%"=="22" set "KEY=search-index"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -192,6 +194,7 @@ if /I "%~1"=="bibliographic-staging" set "ACTION=BibliographicStaging"
 if /I "%~1"=="complete-mal-catalogue" set "ACTION=CompleteMALCatalogue"
 if /I "%~1"=="catalogue-french-scrinis" set "ACTION=CatalogueFrenchScrinis"
 if /I "%~1"=="catalogue-lifecycle" set "ACTION=CatalogueLifecycle"
+if /I "%~1"=="search-index" set "ACTION=SearchIndex"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
 if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"
 if /I "%~1"=="multilingual-aliases" set "ACTION=Aliases"
@@ -255,7 +258,7 @@ echo.
 echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark,
 echo          bnf-enrich, bnf-bulk, sources-benchmark, sources-benchmark-v2,
 echo          bibliographic-staging, complete-mal-catalogue,
-echo          catalogue-french-scrinis, catalogue-lifecycle,
+echo          catalogue-french-scrinis, catalogue-lifecycle, search-index,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
