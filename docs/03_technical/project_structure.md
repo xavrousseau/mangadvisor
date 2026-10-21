@@ -1,67 +1,94 @@
-# Structure actuelle de Mangadvisor (4.x)
+# Architecture actuelle de Mangadvisor
 
-> Ce document décrit les fichiers exécutés **aujourd'hui**, et non le plan d'architecture V1. Voir aussi [l'audit transversal 4.4](audit_transversal_4_4.md) pour l'inventaire fichier par fichier et les limites des tests.
+**État :** 21 octobre 2026 — audit du dépôt Git, après retrait des
+prototypes Streamlit, anciens rapports et anciens assistants de benchmark.
 
-## Point d'entrée Windows
+## Un seul point d'entrée et une seule interface
 
-Double-cliquer sur **mangadvisor.cmd** : c'est l'unique menu utilisateur.
-- **22** : assistant complet de première installation (config, SQL, Docker, catalogue, recommandations, sauvegardes, inventaire, contrôles).
-- **25** : extraction puis synchronisation du catalogue manga depuis **Tenrai v1**.
-- **26** : extraction et chargement des recommandations communautaires.
-- **27** : diagnostic complet.
-- **29** : diagnostic de l'accès réseau et de la réponse API manga.
-- **17–21** : sauvegarde, vérification/restauration, benchmark et import contrôlé de bibliothèque.
-- **11** : seule option destructive de volumes ; confirmation explicite requise.
+- **`mangadvisor.cmd`** est le menu Windows utilisateur.
+- **`cmd/control-center.ps1`** orchestre Docker, PostgreSQL, sauvegardes,
+  catalogue, imports et mises à jour.
+- **`apps/web/`** est l'unique interface : JavaScript/CSS/HTML derrière Nginx.
+- **`apps/api/app/main.py`** est l'API FastAPI. Les modules de domaine
+  restent séparés dans `apps/api/app/`.
+- L'ancien Streamlit `apps/ui/` a été supprimé de la branche active.
+  Son code reste récupérable par l'historique Git, mais certaines anciennes
+  fonctions CSV/XLSX historiques ne sont pas toutes représentées à
+  l'identique dans le Web : ne pas prétendre à une équivalence parfaite.
 
-L'ancien sous-menu **12** n'est plus proposé. Le numéro 12 reste un alias temporaire vers 25 pour les anciennes habitudes. Les raccourcis jikan-reset et jikan-pages sont refusés, au profit du parcours sécurisé 25.
+## Données et synchronisation
 
-## Arborescence utile
+1. **Tenrai (compatibilité Jikan) / MAL** : `sync_full_mal_catalogue.py`
+   conserve les JSON du référentiel initial sous `data/raw/jikan/`,
+   crée des entrées `jikan_manga_source` et consolide `manga`.
+2. **`catalogue_lifecycle.py`** : après audit du chargement initial,
+   relève les nouvelles œuvres et certaines corrections de notices,
+   seulement sur des fenêtres bornées ; conteneur `catalog-sync`
+   opt-in dans Docker Compose.
+3. **`enrich_catalogue_scrinis_fr.py`** : rattache un titre FR sourcé à
+   un ID MAL après vérification stricte de l'œuvre ; les ISBN référencés
+   ne deviennent pas des volumes possédés.
+4. **`catalogue_mangaupdates.py`**, `bnf_batch.py`,
+   `bnf_bulk_import.py`, `wikidata_enrichment.py` : éléments de preuve,
+   enrichissement international et bibliographie française.
+5. **`apps/api/app/inventory_import.py`**, `collection.py` et
+   `inventory_resolution.py` : mangathèque et inventaire privé,
+   séparés des informations bibliographiques publiques.
 
-| Dossier / fichier | Utilité effective |
-|---|---|
-| mangadvisor.cmd | Menu principal pour tous les utilisateurs Windows |
-| cmd/control-center.ps1 | Enchaînement installation, alimentation, mises à jour et diagnostics |
-| cmd/*.cmd (maintenance active) | Petits lanceurs Docker ; certains outils PowerShell concernent la bibliothèque, l'IA et le mobile |
-| infra/compose/ | `docker-compose.yml` définit les services communs, `docker-compose.local.yml` fournit la configuration stable par défaut, `docker-compose.dev.yml` la configuration de développement et l'ancien Streamlit de test |
-| infra/docker/ | Images Docker des services actifs |
-| apps/web/ | **Interface principale** HTML/CSS/JS sur port UI_PORT (8501 par défaut) |
-| apps/api/ | API FastAPI, catalogue, recommandations, ISBN et bibliothèque |
-| apps/ui/ | Code historique Streamlit conservé provisoirement pour contrôler la migration fonctionnelle ; service défini uniquement dans `docker-compose.dev.yml` sous profil `legacy` |
-| pipelines/engine/scripts/ | Extraction du catalogue, chargement SQL, enrichissement communautaire, vérifications |
-| pipelines/engine/src/load/ | Écriture PostgreSQL depuis les JSON |
-| sql/schema/001…007 | Tables et mises à jour additives (les scripts 003/005 construisent le catalogue) |
-| tests/ | Tests unitaires Python, JS Web, fumée Docker/PC/mobile |
-| .github/workflows/ | Validation Windows/PowerShell, Python/JS, intégration Docker |
-| docs/04_product/control_center_4_0.md | Instructions pratiques pour utiliser le logiciel |
-| docs/03_technical/ | Architecture courante et historique de conception |
-| data/modele_bibliotheque_mangadvisor.* | **Modèles publics vides** d'import CSV/Excel |
+**Tables distinctes** : `manga` = référentiel canonique ;
+`jikan_manga_source` = cache normalisé MAL ;
+`manga_title_alias` = titres alternatifs sourcés ;
+`user_manga_*` = états privés de la collection.
+Les éditions françaises et ISBN sont des entités documentaires à relier
+avec provenance, sans déduire la propriété.
 
-## Flux de données effectivement exécuté
+## Infrastructure
 
-1. Le centre de pilotage vérifie Docker Desktop, initialise les tables SQL et les conteneurs.
-2. Les scripts historiques appelés extract_jikan.py et extract_jikan_recommendations.py interrogent **Tenrai v1** (base configurable via MANGA_API_BASE_URL).
-3. Le système sauvegarde les réponses JSON sous data/raw/jikan/ (nom historique conservé pour compatibilité).
-4. Le chargeur écrit jikan_manga_source et le catalogue manga canonique **sans modifier les identifiants des œuvres existantes**. Les tags genre/thème/démographie sont synchronisés de manière additive.
-5. Le graphe de recommandations communautaires est chargé dans manga_recommendation_edge sans effacement préalable.
-6. Les éditions françaises sont proposées à partir de données BnF après vérification ; **aucune importation exhaustive automatique d'ISBN n'est assurée**.
-7. L'inventaire privé est importé uniquement après aperçu et validation explicite. Les correspondances incertaines restent à résoudre.
+- `infra/compose/docker-compose.yml` : PostgreSQL, API, Web, moteur de
+  collecte et services optionnels Meilisearch, Ollama, `catalog-sync`.
+- `infra/compose/docker-compose.local.yml` : profil stable local Windows,
+  ports en boucle locale et montage des données brutes du PC.
+- `infra/compose/docker-compose.dev.yml` : rechargement à chaud **sans
+  ancien service Streamlit**.
+- `infra/compose/docker-compose.mobile.yml` : HTTPS mobile opt-in.
+- `infra/docker/` : images `api`, `engine`, `web`.
+- `sql/schema/001…007` : création et consolidations non destructrices.
 
-### Ce qui existe mais ne doit pas être annoncé comme entièrement opérationnel
+Le volume nommé `mangadvisor_pgdata` dans Docker garde le contenu
+PostgreSQL ; les JSON `data/raw/jikan` sont des fichiers sources, pas
+la base SQL elle-même. Les dossiers privés ignorés par Git et les
+volumes Docker ne doivent **jamais** être effacés pour nettoyer le dépôt.
 
-Les services pgvector et Meilisearch sont prévus dans l'infrastructure ; cela **ne signifie pas** que les embeddings ou l'indexation Meilisearch complète sont systématiquement calculés et alimentés. AniList, MangaNews et le pipeline multi-sources complet décrit dans les documents V1 restent des pistes de développement, pas des étapes garanties.
+## Contrats de qualité maintenus
 
-Une seule interface utilisateur existe dans la configuration stable : **Web sur 8501**. Le Compose principal n'a aucun service `ui` et le menu retire au premier démarrage un éventuel ancien conteneur Streamlit. Le prototype Python est limité à l'overlay dev/test tant que ses fonctions spécifiques (import Excel, profil de lecture avancé) n'ont pas d'équivalent vérifié dans WEB. Le proxy Web valide l'API par le DNS interne Docker (127.0.0.11) après changement d'IP du conteneur.
+- `tests/test_*.py` : contrôles Python unitaires, SQL de sécurité,
+  rapprochement strict des éditions, refus des homonymes.
+- `tests/web/*.test.mjs` : interface Web et interactions.
+- `tests/smoke/` et `tests/integration/` : FastAPI, PostgreSQL, Nginx
+  et parcours de collection sous environnement CI.
+- `tests/windows/` : menu et PowerShell Windows.
+- `.github/workflows/` : tests Python, Windows, Docker et intégration.
+- `tools/audit_repository.py` : inventaire de fichiers suivis, syntaxe et
+  références de fichiers explicites.
 
-## Ce que le nettoyage 4.1 a retiré
+Les rapports de QA générés vont désormais sous
+`data/logs/quality_reports/`, **hors de Git**, mais les programmes
+de tests restent conservés. Le document
+[inventaire complet](inventaire_complet_git_2026_10_21.md) donne la
+décision fichier par fichier.
 
-Les arborescences _archive/ et legacy/ n'étaient jamais lancées par Docker, les menus ou les tests modernes. Elles ont été retirées de la **version courante du dépôt**, tout en restant consultables dans **l'historique Git**. Les scripts Windows historiques isolés nécessitant un Python hôte ont également été retirés lorsqu'ils reproduisaient les commandes du menu central. Voir [le relevé précis du nettoyage](cleanup_4_1.md).
+## Dette technique non masquée
 
-## Fichiers privés : ne jamais les supprimer automatiquement
-
-Les dossiers ignorés .env, private-data/, backups/, mobile-local/, .env.mobile et les données dans les **volumes Docker PostgreSQL/Meilisearch** sont **hors du nettoyage Git**. Pour les préserver, faire une sauvegarde vérifiée via le menu 17, puis en conserver une copie hors du PC.
-
-Une commande git pull supprime de l'arborescence suivie les fichiers retirés du dépôt, mais **ne supprime pas ces fichiers privés ignorés ou les volumes Docker**.
-
-## Documents de conception V1
-
-Les fichiers data_pipeline_v1.md, data_model_v1.md et mangadvisor_architecture_v1.md portent désormais un avertissement : leurs diagrammes et promesses décrivent le plan initial, pas nécessairement les fonctionnalités branchées.
+- **`apps/api/app/main.py` et `apps/web/assets/app.js`** restent
+  volumineux ; le découpage nécessite des tests de parité fonctionnelle.
+- **`benchmark_manga_sources.py` et `benchmark_manga_sources_v2.py`**
+  ne sont plus proposés dans le menu normal, mais servent toujours
+  d'adaptateurs de source aux collecteurs actifs. Les supprimer
+  immédiatement casserait l'enrichissement Scrinis/MangaUpdates.
+- Meilisearch demeure dans Compose ; son exploitation par un index
+  applicatif est à confirmer avant de retirer son service ou son volume.
+- L'enrichissement de toutes les œuvres MAL par MangaUpdates/BnF n'est
+  pas garanti à la fin de la synchronisation initiale : c'est une file
+  progressive, avec des vérifications conservatrices.
+- Les documents historiques restent disponibles dans l'historique Git,
+  mais **ne polluent plus le checkout**.
