@@ -1,0 +1,25 @@
+# Disposable local sandbox: NEVER use the normal mangadvisor.cmd for this clone.
+# Compose merges this LAST, after docker-compose.yml and docker-compose.local.yml.
+# Separate project => separate named volumes. Fixed container/network names
+# are replaced, so the user's existing production stack is not reused.
+name: mangadvisor_sandbox
+
+services:
+  postgres:
+    container_name: mangadvisor_sandbox_postgres
+  meilisearch:
+    container_name: mangadvisor_sandbox_meilisearch
+  api:
+    container_name: mangadvisor_sandbox_api
+  web:
+    container_name: mangadvisor_sandbox_web
+  engine:
+    container_name: mangadvisor_sandbox_engine
+  catalog-sync:
+    container_name: mangadvisor_sandbox_catalog_sync
+  ollama:
+    container_name: mangadvisor_sandbox_ollama
+
+networks:
+  mangadvisor_network:
+    name: mangadvisor_sandbox_network
