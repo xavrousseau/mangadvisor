@@ -92,6 +92,19 @@ class RepositoryHygieneTests(unittest.TestCase):
         for item in (".env", "private-data/", "backups/", ".env.mobile", "mobile-local/"):
             self.assertIn(item, gitignore)
 
+    def test_docker_build_context_excludes_private_local_data(self):
+        dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+        entries = {line.strip() for line in dockerignore.splitlines()
+                   if line.strip() and not line.lstrip().startswith("#")}
+        for required in (".git", ".env", ".env.*", "private-data/",
+                         "private-evaluations/", "backups/", "mobile-local/",
+                         "data/raw/", "data/logs/", "data/staging/"):
+            with self.subTest(path=required):
+                self.assertIn(required, entries)
+        for required in ("apps/api", "apps/web", "pipelines/engine"):
+            self.assertNotIn(required, entries)
+            self.assertNotIn(required + "/", entries)
+
     def test_recommendation_profile_has_only_one_output(self):
         report = (ROOT / "pipelines/engine/scripts/run_recommendation_profile_tests.py").read_text(encoding="utf-8")
         self.assertIn('recommendation_profile_tests_latest.md', report)
