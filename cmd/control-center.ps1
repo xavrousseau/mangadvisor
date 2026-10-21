@@ -378,6 +378,9 @@ function Load-Complete-MAL-Catalogue {
     }
     if ($complete) {
       Write-Host "Catalogue MAL complet deja valide : aucune reinitialisation."
+      try { Reindex-Manga-Search } catch {
+        Write-Warning ("Recherche SQL disponible ; index Meilisearch non actualise : " + $_.Exception.Message)
+      }
       return
     }
     if (!(Confirm "Installer le catalogue public MAL complet (premiere installation) ?" $true)) {
