@@ -65,6 +65,8 @@ class FakeCursor:
                     "max_mal_id":200000,"orphan_source":0}
         raise AssertionError(self.sql)
     def fetchall(self):
+        if "SELECT id FROM manga" in self.sql:
+            return [{"id":123},{"id":456}]
         if "SELECT mal_id,raw_json" in self.sql:
             params=self.db.sql[-1][1][0]
             return [{"mal_id":id,"raw_json":self.db.existing[id]}
@@ -212,6 +214,30 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(result["mangaupdates"]["selected"],5)
         self.assertEqual(json.loads((self.logs/"last_cycle.json")
                       .read_text())["status"],"SUCCESS")
+
+    def test_new_mal_works_receive_priority_across_three_sources(self):
+        db=FakeDB()
+        traces=[]
+        def provider(name):
+            def invoke(**kw):
+                traces.append((name,kw))
+                return {"selected":1,"provider_errors":0,"errors":0,
+                        "sru":{"error":0}}
+            return invoke
+        with patch.object(life,"synchronize",return_value={
+                "new_mal_ids":2,"ids_changed":[7,8]}):
+            result=life.run_cycle(factory=lambda:db,
+                scrinis_runner=provider("scrinis"),
+                mu_runner=provider("mu"),
+                bnf_runner=provider("bnf"))
+        self.assertEqual(result["status"],"SUCCESS")
+        self.assertEqual(result["recent_canonical_ids"],2)
+        self.assertEqual([x[0] for x in traces],
+                         ["scrinis","mu","bnf","scrinis","mu","bnf"])
+        for name,kwargs in traces[:3]:
+            self.assertEqual(kwargs["target_ids"],[123,456])
+        for name,kwargs in traces[3:]:
+            self.assertNotIn("target_ids",kwargs)
 
     def test_partial_provider_outage_not_reported_as_full_success(self):
         db=FakeDB()
