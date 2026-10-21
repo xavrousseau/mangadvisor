@@ -170,7 +170,6 @@ rem Command aliases remain available to scripts and to experienced users.
 set "ACTION="
 set "PS_SCRIPT="
 set "PS_ARGS="
-set "CMD_SCRIPT="
 if /I "%~1"=="install" set "ACTION=Wizard"
 if /I "%~1"=="wizard" set "ACTION=Wizard"
 if /I "%~1"=="start" set "ACTION=Start"
@@ -203,8 +202,8 @@ if /I "%~1"=="mobile-stop" set "PS_ARGS=-Stop"
 if /I "%~1"=="ai" set "PS_SCRIPT=ai-setup.ps1"
 if /I "%~1"=="ai-stop" set "PS_SCRIPT=ai-setup.ps1"
 if /I "%~1"=="ai-stop" set "PS_ARGS=-Stop"
-if /I "%~1"=="logs" set "CMD_SCRIPT=logs.cmd"
-if /I "%~1"=="status" set "CMD_SCRIPT=status.cmd"
+if /I "%~1"=="logs" set "ACTION=Logs"
+if /I "%~1"=="status" set "ACTION=Status"
 if /I "%~1"=="environment" set "ACTION=Environment"
 if /I "%~1"=="database" set "ACTION=Database"
 if /I "%~1"=="verify-backup" set "PS_SCRIPT=library-backup.ps1"
@@ -215,10 +214,7 @@ if /I "%~1"=="network" set "ACTION=Network"
 
 rem A few safe aliases for existing launch instructions.
 if /I "%~1"=="up" set "ACTION=Start"
-if /I "%~1"=="check" set "CMD_SCRIPT=install-check.cmd"
-if /I "%~1"=="build" set "CMD_SCRIPT=build.cmd"
-if /I "%~1"=="down" set "CMD_SCRIPT=down.cmd"
-if /I "%~1"=="restart" set "CMD_SCRIPT=restart.cmd"
+rem Legacy Docker aliases are deliberately retired: use update/start/stop/status.
 
 if /I "%~1"=="help" goto :help
 if /I "%~1"=="-h" goto :help
@@ -228,7 +224,6 @@ if /I "%~1"=="clean" goto :blocked
 if /I "%~1"=="jikan-reset" goto :blocked
 if defined ACTION goto :execute_control
 if defined PS_SCRIPT goto :execute_powershell
-if defined CMD_SCRIPT goto :execute_command
 echo Commande inconnue : %~1
 echo Utilise mangadvisor.cmd help pour afficher les commandes.
 exit /b 1
@@ -239,10 +234,6 @@ exit /b %ERRORLEVEL%
 
 :execute_powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT_DIR%cmd\%PS_SCRIPT%" %PS_ARGS%
-exit /b %ERRORLEVEL%
-
-:execute_command
-call "%ROOT_DIR%cmd\%CMD_SCRIPT%"
 exit /b %ERRORLEVEL%
 
 :blocked

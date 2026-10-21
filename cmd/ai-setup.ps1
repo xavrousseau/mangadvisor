@@ -1,5 +1,5 @@
 # Mangadvisor optional LOCAL AI installation for Windows / Docker Desktop.
-# No cloud key or paid service. Model download only after explicit menu choice 15.
+# No cloud key or paid service. Model download only after explicit advanced-menu choice A -> 7.
 param([switch]$Stop)
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"

@@ -158,10 +158,21 @@ $restoredDb=$null
 $oldDb="ma_before_$(Token)"
 $renamedOld=$false
 $swapped=$false
+$catalogWorkerWasRunning=$false
 try {
   # Verify an independent safety copy of the CURRENT database before switching.
   $null=Create-Backup
   $restoredDb=Restore-Test $archive -KeepDatabase
+  # The opt-in daily worker writes the same PostgreSQL database. Suspend it
+  # BEFORE swapping the live DB name, otherwise it may reconnect mid-restore.
+  $workerState=@(& docker inspect --format "{{.State.Running}}" mangadvisor_catalog_sync 2>$null)
+  if ($LASTEXITCODE -eq 0 -and $workerState.Count -gt 0 -and
+      ([string]$workerState[0]).Trim() -eq "true") {
+    & docker compose @compose --profile automation stop catalog-sync
+    Assert-Ok "Impossible de suspendre le catalogue automatique : restauration annulee"
+    $catalogWorkerWasRunning=$true
+    Write-Host "Synchronisation automatique arretee pour securiser la restauration."
+  }
   & docker compose @compose stop api web engine
   Assert-Ok "Impossible d'arreter les services applicatifs"
   $null=Admin-Sql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$pgDb' AND pid<>pg_backend_pid();"
@@ -184,6 +195,17 @@ finally {
   if ($restoredDb) { Drop-Verification $restoredDb }
   # Restart only the single supported Web site at 8501.
   & docker compose @compose up -d api web
-  if ($LASTEXITCODE -ne 0) { Write-Warning "Relancer mangadvisor.cmd option 3 pour les services Web." }
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Relancer mangadvisor.cmd option 3 pour les services Web."
+  } elseif ($swapped -and $catalogWorkerWasRunning) {
+    & docker compose @compose --profile automation up -d --no-deps catalog-sync
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "Veille arretee : reactiver depuis mangadvisor.cmd, A puis 21."
+    } else {
+      Write-Host "Synchronisation du catalogue relancee apres restauration validee."
+    }
+  } elseif ($catalogWorkerWasRunning) {
+    Write-Warning "Restauration interrompue : veille maintenue arretee par securite."
+  }
 }
 Write-Host "Restauration reussie. Ancienne base toujours disponible sous le nom: $oldDb"

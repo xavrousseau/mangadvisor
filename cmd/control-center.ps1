@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -169,8 +169,16 @@ function Stop-Application {
   Say "Arret de Mangadvisor (donnees conservees)"
   Ensure-Environment
   Check-Docker
+  # The optional automation profile must be stopped explicitly.
+  # Leaving it running would keep writing PostgreSQL while the app is off.
+  $state=@(& docker inspect --format "{{.State.Running}}" mangadvisor_catalog_sync 2>$null)
+  if ($LASTEXITCODE -eq 0 -and $state.Count -gt 0 -and
+      ([string]$state[0]).Trim() -eq "true") {
+    Compose @("--profile","automation","stop","catalog-sync")
+    Write-Host "Veille quotidienne arretee avant les autres services."
+  }
   Compose @("stop")
-  Write-Host "Services arretes. Volumes PostgreSQL et fichiers prives conserves."
+  Write-Host "Services et veille arretes. Volumes PostgreSQL et fichiers prives conserves."
 }
 function Ask-Number([string]$Question,[int]$Default,[int]$Max) {
   $value=Read-Host "$Question [$Default]"
@@ -189,6 +197,18 @@ function Confirm([string]$Question,[bool]$Default=$false) {
 }
 function Engine([string[]]$Arguments) {
   Compose (@("run","--rm","engine","python")+$Arguments)
+}
+function Show-Service-Status {
+  Say "Etat des conteneurs Mangadvisor"
+  Ensure-Environment
+  Check-Docker
+  Compose @("--profile","automation","ps","--all")
+}
+function Show-Docker-Logs {
+  Say "Journaux Docker Mangadvisor (CTRL+C pour quitter)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("--profile","automation","logs","--tail","120","-f")
 }
 function Network {
   Say "Diagnostic HTTPS Docker : fournisseur manga et acces Internet"
@@ -326,6 +346,7 @@ function Manage-Catalogue-Lifecycle {
 }
 
 function Load-Complete-MAL-Catalogue {
+  param([switch]$InitialSetup)
   Say "Catalogue MAL/Jikan complet via Tenrai : base du projet"
   Ensure-Environment
   Check-Docker
@@ -345,14 +366,34 @@ function Load-Complete-MAL-Catalogue {
   Write-Host "Derniere synchronisation et emplacement des vrais JSON :"
   Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--status")
   Write-Host "Si la derniere synchronisation est complete, tu as deja les donnees : pas besoin de les telecharger."
-  if (!(Confirm "Faire une NOUVELLE synchronisation du catalogue public MAL ?" $false)) {
-    Write-Host ("Fichiers existants conserves dans " + $jikanDirectory)
-    Write-Host "La base PostgreSQL et la mangatheque n'ont pas ete modifiees."
-    return
+  if ($InitialSetup) {
+    # A new installation MUST not stop after a filtered sample catalogue.
+    # Reuse an audited complete local base rather than download it again.
+    $complete=$false
+    try {
+      Engine @("pipelines/engine/scripts/catalogue_lifecycle.py","--audit")
+      $complete=$true
+    } catch {
+      Write-Host "Aucune base MAL complete et auditee : premier chargement requis."
+    }
+    if ($complete) {
+      Write-Host "Catalogue MAL complet deja valide : aucune reinitialisation."
+      return
+    }
+    if (!(Confirm "Installer le catalogue public MAL complet (premiere installation) ?" $true)) {
+      throw "Installation incomplete : socle MAL absent. L'application ne sera pas declaree prete."
+    }
+  } else {
+    if (!(Confirm "Faire une NOUVELLE synchronisation du catalogue public MAL ?" $false)) {
+      Write-Host ("Fichiers existants conserves dans " + $jikanDirectory)
+      Write-Host "La base PostgreSQL et la mangatheque n'ont pas ete modifiees."
+      return
+    }
   }
   Network
   Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--plan")
-  if (!(Confirm "Confirmer les appels API et la consolidation des notices ?" $false)) {
+  if (!(Confirm "Confirmer les appels API et la consolidation des notices ?" $InitialSetup)) {
+    if ($InitialSetup) { throw "Installation incomplete : chargement MAL non confirme." }
     Write-Host "La migration des fichiers existants est terminee ; pas de nouvelle synchronisation."
     return
   }
@@ -370,6 +411,9 @@ function Load-Complete-MAL-Catalogue {
     Sql-File $sql
   }
   Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--finalize")
+  if ($InitialSetup) {
+    Engine @("pipelines/engine/scripts/catalogue_lifecycle.py","--audit")
+  }
   $after=Get-Count "manga"
   $source=Get-Count "jikan_manga_source"
   Write-Host ("Mangas canonises avant : {0} ; apres : {1} ; progression nette : {2}" -f
@@ -802,8 +846,11 @@ function Wizard {
   if (!(Confirm "Demarrer l'installation guidee ?" $true)) { return }
   Ensure-Environment
   Initialize-Database
+  # The Web API initializes optional application schemas needed by the
+  # backup verifier; the catalogue is then fully loaded, NOT the old
+  # 40-page popularity/SFW sample.
   Start-Application
-  Load-Catalogue
+  Load-Complete-MAL-Catalogue -InitialSetup
   Load-Recommendations
   Diagnostic
   Backup
@@ -835,6 +882,8 @@ try {
     "Environment"     { Ensure-Environment }
     "Start"           { Open-Application }
     "Stop"            { Stop-Application }
+    "Status"          { Show-Service-Status }
+    "Logs"            { Show-Docker-Logs }
     "Database"        { Initialize-Database }
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
