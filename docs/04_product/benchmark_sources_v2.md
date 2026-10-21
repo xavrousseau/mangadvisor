@@ -67,6 +67,37 @@ mises en cache 24 heures **sur le PC uniquement**, hors Git.
 Le code utilise exclusivement des requêtes SELECT à PostgreSQL ; aucune
 insertion, suppression ou modification des tables catalogue ou utilisateur.
 
+## Retour d'expérience du 21 octobre 2026 et correctif
+
+Le second test réel de 50 œuvres a donné :
+- **Scrinis** : 35 titres exacts, 9 ambigus, 4 suggestions, 2 absences ;
+  55 appels HTTP, **aucun identifiant ni détail récupéré**.
+- **MangaUpdates** : 32 titres exacts, 18 suggestions, 20 fiches détaillées
+  récupérées après 74 appels ; **aucun ISBN/volume** exposé sur ces fiches.
+- **45/50** œuvres avaient au moins un titre exact sur l'un des deux services,
+  mais le type du titre peut contredire le manga réellement recherché.
+
+Deux dangers confirmés dans le rapport :
+1. **Wind Breaker** : le résultat intitulé exactement "Wind Breaker" est le
+   **manhwa sur le cyclisme** tandis que "Wind Breaker (NII Satoru)" est un
+   autre candidat **manga japonais**. Un titre identique ne suffit pas.
+2. **Demon Slayer/Fullmetal Alchemist** : un doujinshi pouvait apparaître au
+   premier rang malgré un véritable manga japonais également présent parmi
+   les candidats.
+
+La révision de la V2 corrige ces deux erreurs :
+- Les candidats manga dont le titre comporte un qualificatif d'auteur
+  \`(…)\` rendent le rapprochement **AMBIGUOUS** quand la recherche exacte
+  désigne potentiellement une œuvre distincte ; la fiche de ce candidat n'est
+  alors pas lue comme s'il avait été validé.
+- Un doujinshi, artbook ou roman passe derrière une œuvre de type manga
+  ordinaire **pour les simples suggestions non exactes**.
+- Le parseur essaie aussi le champ \`hub_id\` des résultats Scrinis si celui-ci
+  est un entier positif, et conserve le type des champs \`hub_id\`/\`ids\`
+  pour diagnostic. La correspondance avec le vrai endpoint de fiche reste à
+  vérifier sur une exécution réelle ; ne jamais prendre \`public_n\` pour
+  un identifiant d'œuvre.
+
 ## Limites honnêtes
 
 - **Aucun appel API réel V2 n'a été exécuté dans GitHub Actions**. Les tests

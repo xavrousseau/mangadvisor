@@ -55,7 +55,7 @@ def pick_id(*objects: dict) -> str | None:
     for obj in objects:
         if not isinstance(obj, dict):
             continue
-        for name in ("series_id", "id", "work_id"):
+        for name in ("series_id", "id", "work_id", "hub_id"):
             value = obj.get(name)
             if isinstance(value, int) and not isinstance(value, bool) and value > 0:
                 return str(value)
@@ -106,7 +106,7 @@ def parse_hits(payload: Any) -> tuple[list[dict] | None, dict]:
         alts = names_from(obj.get("associated")) + names_from(obj.get("aliases"))
         alts += names_from(obj.get("alternative_titles"))
         for key in ("title_fr", "title_en", "title_english", "title_japanese",
-                    "original_title", "titles", "original"):
+                    "original_title", "titles", "original", "title_localized"):
             alts += names_from(obj.get(key))
         series_id = pick_id(obj, hit)
         records.append({
@@ -120,6 +120,12 @@ def parse_hits(payload: Any) -> tuple[list[dict] | None, dict]:
         })
     diagnostic["parsed"] = len(records)
     diagnostic["with_id"] = sum(bool(x["id"]) for x in records)
+    # Log only types, never raw opaque supplier identifiers.
+    if hits and isinstance(hits[0], dict):
+        diagnostic["identity_field_types"] = {
+            key: type(hits[0][key]).__name__
+            for key in ("hub_id", "ids", "public_n") if key in hits[0]
+        }
     return records, diagnostic
 
 
@@ -142,7 +148,10 @@ def rank(sample: dict, matches: list[dict]) -> dict:
                                   re.search(r"doujin|artbook|novel", item["format"], re.I)
                                   else None)})
     order = {"SAME_MAL_ID": 2, "EXACT_TITLE": 1, "SUGGESTION_ONLY": 0}
-    rated.sort(key=lambda c: (order[c["evidence"]], c["score"]), reverse=True)
+    # When only a fuzzy name matches, prefer an ordinary work to a
+    # doujinshi/artbook/novel. Keep every candidate in the report.
+    rated.sort(key=lambda c: (
+        order[c["evidence"]], c["warning"] is None, c["score"]), reverse=True)
     # Deduplicate cross-query hits but never collapse distinct edition/work IDs.
     unique: list[dict] = []
     seen: set[tuple] = set()
@@ -159,11 +168,29 @@ def rank(sample: dict, matches: list[dict]) -> dict:
                   if order[c["evidence"]] == order[first["evidence"]]
                   and abs(c["score"] - first["score"]) < 0.05]
     status = "AMBIGUOUS" if contenders and order[first["evidence"]] > 0 else first["evidence"]
-    # IDs aren't final links; this is just an optional detail-fetch identifier.
+    reasons = ["EQUALLY_PLAUSIBLE_CANDIDATES"] if status == "AMBIGUOUS" else []
+    # Example: Wind Breaker (Manhwa) and Wind Breaker (NII Satoru)
+    # are separate works even though one has a perfectly matching title.
+    # Parenthesized qualifiers can denote different authors/editions.
+    if first["evidence"] == "EXACT_TITLE":
+        qualified = []
+        for candidate in unique[1:]:
+            match = re.fullmatch(r"(.+?)\s*\(([^)]{2,80})\)", candidate["title"])
+            if not match:
+                continue
+            prefix = v1.title_key(match.group(1))
+            if prefix and prefix in wanted and candidate.get("id") != first.get("id"):
+                qualified.append(candidate["title"])
+        if qualified:
+            status = "AMBIGUOUS"
+            reasons.append("SAME_TITLE_DIFFERENT_QUALIFIED_WORK")
+    # IDs aren't final links; this is only an optional detail-fetch identifier.
     return {"status": status, "selected_id": first.get("id"),
             "candidates": unique[:MAX_CANDIDATES],
             "candidate_count": len(unique),
-            "ambiguous_count": len(contenders) if status == "AMBIGUOUS" else 0}
+            "ambiguous_count": len(contenders) + (len(qualified) if "qualified" in locals() else 0)
+                if status == "AMBIGUOUS" else 0,
+            "disambiguation_reasons": reasons}
 
 
 def validate_id(source: str, value: Any) -> str | None:
@@ -297,7 +324,13 @@ class RateLimitedClient:
     def call(self, provider: str, kind: str, *, query=None, identifier=None) -> dict:
         if provider in self.disabled:
             return {"status": "SKIPPED_PROVIDER_UNAVAILABLE"}
-        key = hashlib.sha256(json.dumps([provider, kind, query, identifier],
+        # Scrinis search responses were cached in V2 *after parsing*, with
+        # hub_id discarded. Bump Scrinis only so the corrected parser sees
+        # fresh supplier JSON; reuse MangaUpdates caches unchanged.
+        cache_key = [provider, kind, query, identifier]
+        if provider == "scrinis":
+            cache_key.append("hub_id_reader_v2")
+        key = hashlib.sha256(json.dumps(cache_key,
                                         ensure_ascii=False).encode("utf-8")).hexdigest()
         path = self.cache_dir / f"{key}.json"
         if path.is_file():
@@ -373,8 +406,12 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
                     judged["alternate_search_status"] = "OK"
                     judged["search_queries"] = [row["title"], alias]
             judged["detail_status"] = "NOT_REQUESTED"
+            # Do not use one arbitrarily selected candidate's details when
+            # the title matches several different works.
+            if judged["status"] == "AMBIGUOUS":
+                judged["detail_status"] = "SKIPPED_AMBIGUOUS"
             if remaining_details and judged["selected_id"] and judged["status"] in (
-                    "EXACT_TITLE", "SAME_MAL_ID", "AMBIGUOUS"):
+                    "EXACT_TITLE", "SAME_MAL_ID"):
                 remaining_details -= 1
                 detail = client.call(provider, "detail", identifier=judged["selected_id"])
                 judged["detail_status"] = detail["status"]

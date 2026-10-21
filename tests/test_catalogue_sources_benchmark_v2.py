@@ -42,6 +42,59 @@ class BenchmarkV2Tests(unittest.TestCase):
         self.assertEqual(diag["with_id"], 2)
         self.assertEqual(diag["hit_key"], "results")
 
+    def test_scrinis_hub_id_and_localized_names(self):
+        payload = {"items": [{"hub_id": 3014,
+                               "ids": {"mal": 13},
+                               "title": "L'Attaque des Titans",
+                               "title_localized": {"en": "Attack on Titan"},
+                               "format": "manga"}]}
+        items, diagnostics = v2.parse_hits(payload)
+        self.assertEqual(items[0]["id"], "3014")
+        self.assertIn("Attack on Titan", items[0]["aliases"])
+        self.assertEqual(diagnostics["identity_field_types"]["hub_id"], "int")
+        self.assertEqual(diagnostics["identity_field_types"]["ids"], "dict")
+        self.assertNotIn("hub_id", v2.parse_hits({"items": []})[1].get("identity_field_types", {}))
+
+    def test_homonymous_wind_breaker_is_not_confirmed(self):
+        sample = work("Wind Breaker")
+        result = v2.rank(sample, [
+            hit("Wind Breaker", 101, format="Manhwa"),
+            hit("Wind Breaker (NII Satoru)", 102, format="Manga"),
+        ])
+        self.assertEqual(result["status"], "AMBIGUOUS")
+        self.assertIn("SAME_TITLE_DIFFERENT_QUALIFIED_WORK",
+                      result["disambiguation_reasons"])
+        self.assertEqual(result["ambiguous_count"], 1)
+        self.assertEqual(len(result["candidates"]), 2)
+
+    def test_doujinshi_does_not_beat_real_manga_on_fuzzy_name(self):
+        result = v2.rank(work("Demon Slayer"), [
+            hit("Demon Slayer dj - Fanbook", 51, format="Doujinshi"),
+            hit("Kimetsu no Yaiba", 52, format="Manga"),
+        ])
+        self.assertEqual(result["status"], "SUGGESTION_ONLY")
+        self.assertEqual(result["candidates"][0]["title"], "Kimetsu no Yaiba")
+
+    def test_ambiguous_does_not_fetch_one_arbitrary_detail(self):
+        class Client:
+            counts = {"scrinis": 0, "mangaupdates": 0}
+            def __init__(self):
+                self.kinds = []
+            def call(self, provider, kind, **kwargs):
+                self.kinds.append(kind)
+                if kind == "detail":
+                    raise AssertionError("Ambiguous choice must not fetch just one candidate")
+                return {"status": "OK", "schema": {}, "candidates": [
+                    hit("Wind Breaker", 101, format="Manhwa"),
+                    hit("Wind Breaker (NII Satoru)", 102, format="Manga"),
+                ]}
+        client = Client()
+        report = v2.evaluate([work("Wind Breaker")], client=client, providers=("scrinis",),
+                             detail_budget=20, alternate_budget=0)
+        self.assertEqual(client.kinds, ["search"])
+        self.assertEqual(report["entries"][0]["sources"]["scrinis"]["detail_status"],
+                         "SKIPPED_AMBIGUOUS")
+
     def test_mangaupdates_associated_titles(self):
         payload = {"results": [{"record": {
             "series_id": 123, "title": "Sayonara Eri",
@@ -117,6 +170,21 @@ class BenchmarkV2Tests(unittest.TestCase):
             self.assertEqual(sess.get.call_count, 2)
             self.assertGreaterEqual(sleep.call_args.args[0], 0)
             self.assertLessEqual(client.counts["scrinis"], 2)
+
+    def test_scrinis_cache_v1_parsed_null_id_is_invalidated(self):
+        import hashlib
+        sess = FakeSession()
+        sess.get.return_value.status_code = 200
+        sess.get.return_value.content = b'{"items":[{"hub_id":3014,"title":"One Piece"}]}'
+        old_key = hashlib.sha256(json.dumps(["scrinis", "search", "One Piece", None],
+                                            ensure_ascii=False).encode()).hexdigest()
+        with tempfile.TemporaryDirectory() as d:
+            stale = Path(d) / (old_key + ".json")
+            stale.write_text('{"status":"OK","candidates":[{"id":null}]}')
+            client = v2.RateLimitedClient(session=sess, cache_dir=Path(d))
+            refreshed = client.call("scrinis", "search", query="One Piece")
+            self.assertEqual(refreshed["candidates"][0]["id"], "3014")
+            self.assertEqual(sess.get.call_count, 1)
 
     def test_quota_one_provider_stops_without_modifying_other(self):
         class FakeClient:
