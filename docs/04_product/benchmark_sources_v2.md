@@ -174,6 +174,71 @@ Si l'on veut examiner ces cinq titres avec toutes les ambiguïtés, définir
 **10 fiches détaillées par fournisseur** dans A → 17, en gardant
 5 œuvres. La limite reste de 20 fiches/fournisseur.
 
+## Cible française en priorité pour la mangathèque (nouvelle version)
+
+**Hypothèse de travail explicite :** les déclarations de la mangathèque
+personnelle sont des **livres en français et sur papier** (\`FR_PRINT\`).
+Il s'agit d'une *cible de recherche bibliographique*, **pas d'une preuve**
+que chaque exemplaire est français, imprimé ou identifié par ISBN.
+
+L'échantillon est réparti en deux scopes :
+- \`pending\` (déclarations encore non rapprochées) et \`owned\` (œuvres
+  déclarées possédées) : \`market_target=FR_PRINT\`, langue \`fr\`,
+  support \`print\`, origine de l'hypothèse
+  \`USER_COLLECTION_DEFAULT_UNVERIFIED\`.
+- \`catalog\` : \`market_target=INTERNATIONAL\`, **aucune langue ni édition
+  française imposée**. Les champs d'œuvre japonaise restent pertinents
+  pour les recommandations.
+
+Pour les œuvres de la collection, le benchmark lit en **SELECT seulement** :
+- \`edition_declared\` (sans écraser deux versions comme **Dragon Ball Pastel
+  et Deluxe**) ;
+- \`format_hint\` (manga, manhwa, guide/artbook/roman s'il est précisé).
+
+Ces informations ne sont **jamais transmises aux API** : le client envoie
+uniquement un titre de recherche ou un identifiant public pour la fiche.
+Il ne récupère ni notes privées, ni quantités, ni références internes.
+
+### Deux évaluations séparées
+
+Le JSON V2 ajoute \`matching_review\` par œuvre/fournisseur :
+
+1. \`work.score\` et \`work.status\` : preuves d'identité de l'œuvre
+   (correspondance exacte de titre, MAL lorsqu'il existe, **cohérence du
+   type** avec un format déclaré). Les auteurs des fournisseurs sont lus,
+   mais **non comparés** faute d'auteur de référence dans l'échantillon.
+2. \`edition.score\` et \`edition.status\` : preuves de **publication française
+   papier** (\`editions[].lang=fr\` + \`medium=print\` ou références des
+   volumes, ISBN bibliographiques français présents, famille d'édition
+   lorsque déclarée). Pour un manga du catalogue général, le score
+   d'édition française est **non applicable** (null), et non zéro.
+3. \`competing_evidence\` : mêmes deux évaluations **pour chaque candidat
+   ambigu consulté séparément**, sans sélectionner un "vainqueur".
+
+Les deux scores sont des **indices heuristiques**, **PAS des probabilités** ;
+aucun score à 100 % ni ISBN de fournisseur ne confirme automatiquement
+une possession ou une édition exacte.
+
+Les familles \`Pastel\`, \`Deluxe\`, \`Perfect\`, \`Kanzenban\`,
+\`Intégrale\`, \`Collector\`, \`Prestige\`, \`Double\` et \`Standard\` sont
+différenciées. Une famille inconnue n'est **pas réinterprétée** comme
+\`Standard\`. Si Pastel et Deluxe sont déclarées pour une même œuvre,
+une fiche ne couvrant que Deluxe est marquée
+\`FR_PRINT_PARTIAL_EDITION_MATCH_REVIEW\`, jamais comme si les deux éditions
+avaient été trouvées.
+
+Les champs supplémentaires du CSV sont \`cible_marche\`,
+\`cible_langue\`, \`cible_support\`, \`editions_declarees\`,
+\`formats_declares\`, \`score_oeuvre_indicatif\`,
+\`score_edition_fr_indicatif\`, \`etat_oeuvre\`, \`etat_edition_fr\`,
+\`signaux_edition\` et \`isbn_fr_papier_candidats\`.
+
+**Limite assumée :** il s'agit encore d'un **diagnostic local**, sans
+liaison automatique ni import massif, ni contrôle de tous les volumes
+au-delà des références fournies. Une future étape distincte pourra
+proposer des rapprochements *staging / validation* à partir des ISBN
+et des éditeurs français, en préservant l'historique des éditions.
+
 ## Limites honnêtes
 
 - **GitHub Actions n'interroge pas les API en direct.** Les tests se basent
