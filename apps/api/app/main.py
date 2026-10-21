@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
+from apps.api.app.library_xlsx import xlsx_to_library_csv
 from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
 from apps.api.app.library_seed_selection import (
@@ -1265,6 +1266,16 @@ def find_manga_for_import(
     cur.execute(sql, {"title": title})
     matches = cur.fetchall()
     return matches[0] if len(matches) == 1 else None
+
+
+class LibraryXlsxConversionRequest(BaseModel):
+    content_base64: str = Field(..., min_length=8, max_length=700_000)
+
+
+@app.post("/library/import/xlsx/convert")
+def convert_reading_library_xlsx(payload: LibraryXlsxConversionRequest) -> dict[str, str]:
+    """Convert only; no DB access, edits or personal inventory mutations."""
+    return {"csv_content": xlsx_to_library_csv(payload.content_base64)}
 
 
 @app.post("/library/import/csv")
