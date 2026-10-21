@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -247,6 +247,30 @@ function Load-Catalogue {
   $catalogCount=Get-Count "manga"
   Write-Host "Notices fournisseur : $sourceCount ; mangas dans le catalogue : $catalogCount"
   if ($catalogCount -eq 0) { throw "Catalogue vide : chargement Tenrai invalide." }
+}
+function Enrich-Catalogue-French-Scrinis {
+  Say "Enrichir le catalogue MAL existant avec Scrinis FR (titres visibles)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $total=Get-Count "manga"
+  Write-Host ("Catalogue MAL existant : {0} oeuvres" -f $total)
+  Write-Host "Cette etape travaille SUR les oeuvres deja presentes dans PostgreSQL."
+  Write-Host "Elle interroge Scrinis par titre public, verifie les auteurs/identifiants."
+  Write-Host "Un titre francais n'est enregistre que si une publication FR papier avec ISBN est confirmee."
+  Write-Host "Les doublons, homonymes, derivations et auteurs contradictoires restent non lies."
+  Write-Host "AUCUNE mangatheque, edition ISBN, numero de tome ou progression n'est modifiee."
+  $limit=Ask-Number "Combien d'oeuvres MAL traiter dans ce lot (max 100) ?" 20 100
+  Write-Host "Une requete Scrinis attend environ 4,5 secondes entre appels (quota respecte)."
+  if (!(Confirm "Enrichir ces fiches du catalogue en preservant toutes les editions personnelles ?" $false)) {
+    Write-Host "Aucune modification."
+    return
+  }
+  Backup
+  Engine @("pipelines/engine/scripts/enrich_catalogue_scrinis_fr.py","--limit",[string]$limit)
+  Write-Host "Nouveaux titres FR et auteurs consultables directement dans Mangadvisor."
+  Write-Host "Pour les statistiques reelles : /catalogue/coverage sur ton API."
 }
 function Load-Complete-MAL-Catalogue {
   Say "Catalogue MAL/Jikan complet via Tenrai : base du projet"
@@ -771,6 +795,7 @@ try {
     "Catalogue"       { Load-Catalogue }
     "CatalogueExtended" { Load-Extended-Catalogue }
     "CompleteMALCatalogue" { Load-Complete-MAL-Catalogue }
+    "CatalogueFrenchScrinis" { Enrich-Catalogue-French-Scrinis }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
     "Diagnostic"      { Diagnostic }
