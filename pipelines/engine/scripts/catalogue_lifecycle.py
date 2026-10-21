@@ -195,6 +195,32 @@ def consolidate_changed(db: Any, ids: list[int]) -> None:
                   WHERE j.mal_id=ANY(%s)
                   ON CONFLICT DO NOTHING
                 """,(ids,))
+            # New MAL works should have searchable language-tagged titles
+            # immediately, without requiring an application restart.
+            cur.execute("SELECT to_regclass('public.manga_title_alias') AS tbl")
+            if cur.fetchone()["tbl"]:
+                cur.execute("""
+                  INSERT INTO manga_title_alias
+                    (manga_id,source_name,source_id,language_code,alias,alias_key,source_url)
+                  SELECT m.id,'TENRAI_MAL_TYPED',m.source_mal_id::text,
+                    CASE lower(btrim(t.item->>'type'))
+                      WHEN 'french' THEN 'fr'
+                      WHEN 'english' THEN 'en'
+                      WHEN 'japanese' THEN 'ja' END,
+                    LEFT(btrim(t.item->>'title'),200),
+                    LEFT(lower(btrim(t.item->>'title')),200),
+                    'https://myanimelist.net/manga/'||m.source_mal_id
+                  FROM jikan_manga_source j
+                  JOIN manga m ON m.source_mal_id=j.mal_id
+                  CROSS JOIN LATERAL jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(j.raw_json->'titles')='array'
+                         THEN j.raw_json->'titles' ELSE '[]'::jsonb END) t(item)
+                  WHERE j.mal_id=ANY(%s)
+                    AND lower(btrim(t.item->>'type')) IN ('french','english','japanese')
+                    AND length(btrim(t.item->>'title')) BETWEEN 2 AND 200
+                  ON CONFLICT(manga_id,source_name,language_code,alias_key)
+                  DO NOTHING
+                """,(ids,))
 
 
 def audit_base(db: Any, *, report_path: Path | None = None) -> dict:
@@ -343,9 +369,11 @@ def run_cycle(*, mal_client: Any = None,
             if enrich:
                 # Source outages do not erase existing data; failures are
                 # explicit rather than silently labeled as complete.
-                result["scrinis"]=scrinis_runner(factory=factory,limit=8)
-                result["mangaupdates"]=mu_runner(factory=factory,limit=5)
-                result["bnf"]=bnf_runner(limit=3)
+                # Daily catch-up budget: high enough for genuine progress,
+                # bounded by provider-specific rate limiters and API caps.
+                result["scrinis"]=scrinis_runner(factory=factory,limit=40)
+                result["mangaupdates"]=mu_runner(factory=factory,limit=15)
+                result["bnf"]=bnf_runner(limit=10)
             result["status"]="SUCCESS"
         except Exception as exc:
             # A PostgreSQL statement may have aborted the current
