@@ -87,6 +87,29 @@ class RepositoryHygieneTests(unittest.TestCase):
             r'(?im)^if /I "(?:%CHOICE%|%~1)"=="[^"]+"[^\r\n]*& goto (?:menu|:eof)\s*$',
         )
 
+    def test_active_launchers_never_call_retired_pipeline_scripts(self):
+        """Historic prose may mention removed scripts; executable launchers may not."""
+        old = (
+            "run_jikan_pipeline.py",
+            "run_library_goal_tests.py",
+            "run_library_import_robustness_tests.py",
+            "run_library_import_tests.py",
+            "run_library_recommendation_tests.py",
+            "run_library_status_tests.py",
+        )
+        candidates = [
+            ROOT / "mangadvisor.cmd",
+            *(ROOT / "cmd").glob("*.ps1"),
+            *(ROOT / ".github/workflows").glob("*.yml"),
+            *(ROOT / "tests/integration").glob("*.sh"),
+            *(ROOT / "tests/smoke").glob("*.py"),
+        ]
+        for source in candidates:
+            contents = source.read_text(encoding="utf-8")
+            for script in old:
+                with self.subTest(source=str(source.relative_to(ROOT)), script=script):
+                    self.assertNotIn(script, contents)
+
     def test_private_data_remain_gitignored(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for item in (".env", "private-data/", "backups/", ".env.mobile", "mobile-local/"):
