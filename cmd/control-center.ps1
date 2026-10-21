@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","SearchIndex","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -624,6 +624,17 @@ function Enrich-My-Library {
   Compose $argsList
   Write-Host "Bilan ci-dessus : consulte les fiches mangas et les candidats ISBN."
 }
+function Reindex-Manga-Search {
+  Say "Index de recherche multilingue Meilisearch"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  $null=Wait-Health
+  Write-Host "Index public : titres FR/EN/JA, alias verifies, genres. Aucune donnee personnelle."
+  Write-Host "PostgreSQL reste la source unique ; construction d'un index temporaire puis permutation."
+  Compose @("exec","-T","api","python","-m","apps.api.app.search_index")
+  Write-Host "Index Meilisearch actualise. En cas de panne, la recherche SQL reste disponible."
+}
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
   Ensure-Environment
@@ -807,6 +818,7 @@ function Update {
   }
   Initialize-Database
   Start-Application
+  Reindex-Manga-Search
   Diagnostic
   Write-Host "Mise a jour terminee. Fichiers personnels et volumes conserves."
 }
@@ -823,6 +835,7 @@ function Wizard {
   # 40-page popularity/SFW sample.
   Start-Application
   Load-Complete-MAL-Catalogue -InitialSetup
+  Reindex-Manga-Search
   Load-Recommendations
   Diagnostic
   Backup
@@ -872,6 +885,7 @@ try {
     "CatalogueFrenchScrinis" { Enrich-Catalogue-French-Scrinis }
     "CatalogueLifecycle" { Manage-Catalogue-Lifecycle }
     "Recommendations" { Load-Recommendations }
+    "SearchIndex"     { Reindex-Manga-Search }
     "Network"         { Network }
     "Diagnostic"      { Diagnostic }
     "Update"          { Update }
