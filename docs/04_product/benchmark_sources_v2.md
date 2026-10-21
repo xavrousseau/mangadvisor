@@ -239,6 +239,60 @@ au-delà des références fournies. Une future étape distincte pourra
 proposer des rapprochements *staging / validation* à partir des ISBN
 et des éditeurs français, en préservant l'historique des éditions.
 
+## Retour du 21 octobre, 12 h 44 (50 mangas) : priorité des éditions
+
+Le rapport personnel a effectivement appliqué \`market_target=FR_PRINT\` aux
+**25 œuvres en attente** et aux **14 séries déjà possédées**, et
+\`market_target=INTERNATIONAL\` aux 11 titres de contrôle.
+
+Constats :
+- Scrinis : 28 \`EXACT_TITLE\`, 16 \`AMBIGUOUS\`, 4 simples suggestions,
+  2 absences ; 48 entrées avec candidat. Il a pu lire 6 fiches non ambiguës
+  et 13 fiches candidates dans des comparaisons ambiguës (19 lectures OK).
+- MangaUpdates : 28 \`EXACT_TITLE\`, 4 \`AMBIGUOUS\`, 18 suggestions,
+  16 fiches directes et 4 candidates ambiguës ; 2 requêtes réseau, car
+  les autres données étaient servies depuis le cache.
+- **Seulement 1/39** entrées personnelles du rapport comporte une édition
+  déclarée exploitable : Dragon Ball = **Pastel + Deluxe**. L'absence d'édition
+  déclarée pour les 38 autres titres est un manque de précision *dans cette
+  exécution du rapprochement*, et non une preuve de publication standard.
+- Dans le précédent traitement, les lectures de détails commençaient sur
+  les mangas \`pending\` dans l'ordre d'échantillon. Le budget était épuisé
+  bien avant Dragon Ball, pourtant **seul cas d'édition multiple déclaré**.
+- Scrinis expose jusqu'à 66 volumes pour Tokyo Ghoul, 107 pour Wind Breaker,
+  116 pour Yu-Gi-Oh!, et plus encore pour d'autres séries. Le rapport
+  tronque volontairement à **100 volumes examinés et 20 ISBN affichés**.
+  Une liste incomplète **ne prouve donc jamais** que l'édition ou les
+  autres tomes sont absents du fournisseur.
+- Le cas Wind Breaker atteste que **deux œuvres distinctes possèdent
+  des éditions françaises papier** (Satoru Nii/Pika et Yong-seok Jo/WEBTOON).
+  L'éditeur, l'auteur et le type d'œuvre sont nécessaires pour trancher.
+
+**Correctif de priorité :** les fiches détaillées sont maintenant
+consultées en premier lorsqu'une édition physique est explicitement
+déclarée dans la mangathèque, puis les œuvres en attente, puis les œuvres
+possédées, enfin les contrôles internationaux. Le rapport reste présenté
+dans son **ordre habituel**, afin de ne pas modifier l'échantillon ni
+les exports pour l'utilisateur. La sélection et le classement de
+l'œuvre ne deviennent **jamais** automatiques.
+
+Le JSON ajoute \`detail_priority_policy\`,
+\`declared_edition_entries\`, \`has_exact_candidate\` par fournisseur
+(qui inclut aussi les résultats classés ambigus) et, pour les détails
+Scrinis, \`volume_records_scanned\`, \`volume_scan_truncated\`,
+\`book_references_valid_in_scan\`, \`book_references_truncated\`.
+
+Le CSV précise \`priorite_fiches\`, \`isbn_references_incompletes\`,
+\`volumes_parcourus\`, \`isbn_valides_avant_limite\`.
+\`NON_EVALUE\` signifie que le fournisseur n'a pas été interrogé en détail
+ou que la fiche n'a pas pu être exploitée. Ce n'est **pas** un état
+d'absence d'ISBN ou de tomes.
+
+Ne pas lancer d'import massif sur ces rapports : pour le catalogue
+final, il faudra **une extraction bibliographique complète, paginée
+si la source le permet**, avec contrôle ISBN/édition, provenance et
+validation en staging avant insertion.
+
 ## Limites honnêtes
 
 - **GitHub Actions n'interroge pas les API en direct.** Les tests se basent
