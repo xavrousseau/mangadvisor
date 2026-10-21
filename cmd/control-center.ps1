@@ -291,7 +291,7 @@ function Load-Extended-Catalogue {
   Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
 }
 function Benchmark-Catalogue-Sources-V2 {
-  Say "Comparatif V2 : candidats concurrents, titres alternatifs, fiches detaillees"
+  Say "Comparatif V2 : mangas FR papier, scores oeuvre/edition et candidats concurrents"
   Ensure-Environment
   Check-Docker
   Compose @("up","-d","postgres","meilisearch","api")
@@ -300,12 +300,16 @@ function Benchmark-Catalogue-Sources-V2 {
   $null=Get-Count "manga"
   $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
   $details=Ask-Number "Maximum de fiches detaillees PAR API (max 20)" 12 20
+  Write-Host "Mangatheque : cible par defaut FR / papier (hypothese, pas preuve de possession)."
+  Write-Host "Catalogue general : edition internationale non restreinte."
+  Write-Host "Les editions declarees sur ce PC servent au classement LOCAL et ne sont pas envoyees aux API."
   Write-Host "Apercu des titres sans acces Internet :"
   Engine @("pipelines/engine/scripts/benchmark_manga_sources_v2.py",
            "--limit",[string]$count,"--detail-limit",[string]$details,"--dry-run")
   Write-Host "Recherches API par titres uniquement ; certaines fiches detaillees seront lues."
   Write-Host "Quotas stricts : Scrinis 15 appels/min sans cle ; MangaUpdates pause 2 secondes."
   Write-Host "Les resultats restent dans data\logs\catalog_sources ; aucun changement SQL."
+  Write-Host "Deux indicateurs distincts : correspondance oeuvre et edition FR papier (preuves, pas probabilites)."
   Write-Host "Les ISBN eventuels ne prouvent ni la possession ni l'edition declaree."
   if (!(Confirm "Autoriser les recherches publiques du benchmark V2 ?" $false)) {
     Write-Host "Operation annulee. Aucun appel distant n'a ete effectue."
