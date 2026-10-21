@@ -264,6 +264,9 @@ function Load-Catalogue {
   $catalogCount=Get-Count "manga"
   Write-Host "Notices fournisseur : $sourceCount ; mangas dans le catalogue : $catalogCount"
   if ($catalogCount -eq 0) { throw "Catalogue vide : chargement Tenrai invalide." }
+  try { Reindex-Manga-Search } catch {
+    Write-Warning ("Recherche SQL disponible ; index Meilisearch non actualise : " + $_.Exception.Message)
+  }
 }
 function Enrich-Catalogue-French-Scrinis {
   Say "Enrichir le catalogue MAL existant avec Scrinis FR (titres visibles)"
@@ -419,6 +422,9 @@ function Load-Complete-MAL-Catalogue {
   Write-Host ("Pages brutes Jikan : " + $jikanDirectory)
   Write-Host "Rapport de suivi : data\logs\catalogue_complete\last_sync.json"
   Write-Host "Fiches de ta mangatheque et relations existantes conservees."
+  try { Reindex-Manga-Search } catch {
+    Write-Warning ("Recherche SQL disponible ; index Meilisearch non actualise : " + $_.Exception.Message)
+  }
 }
 function Load-Extended-Catalogue {
   Say "Catalogue Tenrai etendu : progression jusqu'a la derniere page"
@@ -835,7 +841,6 @@ function Wizard {
   # 40-page popularity/SFW sample.
   Start-Application
   Load-Complete-MAL-Catalogue -InitialSetup
-  Reindex-Manga-Search
   Load-Recommendations
   Diagnostic
   Backup
