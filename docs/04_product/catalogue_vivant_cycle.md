@@ -70,7 +70,10 @@ Les JSON correspondant aux changements vont dans
 \`manga_page_N.json\` historiques.
 
 Les enrichissements reprennent ensuite avec un nombre borné de
-fiches : 8 Scrinis, 5 MangaUpdates et 3 BnF SRU par cycle.
+fiches : **40 Scrinis, 15 MangaUpdates et 10 BnF SRU par cycle**.
+L'objectif est de progresser sur le stock international et français,
+sans saturer les API publiques. Des erreurs de limite de débit arrêtent
+les traitements concernés sans créer de correspondances fictives.
 Les fichiers mensuels BnF **déjà présents localement** sont détectés
 automatiquement par leur SHA-256 lors d'un cycle (jusqu'à 3 fichiers) ;
 un même fichier ne sera pas réimporté.
