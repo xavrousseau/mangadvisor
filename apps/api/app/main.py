@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
 from apps.api.app.library_xlsx import xlsx_to_library_csv
+from apps.api.app.library_templates import reading_template_csv, reading_template_xlsx_base64
 from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
 from apps.api.app.library_seed_selection import (
@@ -1266,6 +1267,17 @@ def find_manga_for_import(
     cur.execute(sql, {"title": title})
     matches = cur.fetchall()
     return matches[0] if len(matches) == 1 else None
+
+
+@app.get("/library/import/template")
+def get_reading_library_template(format: Literal["csv", "xlsx"] = "csv") -> dict[str, str]:
+    """Public example files only: never read personal library information."""
+    if format == "xlsx":
+        return {"filename": "modele_bibliotheque_mangadvisor.xlsx",
+                "content_base64": reading_template_xlsx_base64(),
+                "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    return {"filename": "modele_bibliotheque_mangadvisor.csv",
+            "content": reading_template_csv(), "mime_type": "text/csv"}
 
 
 class LibraryXlsxConversionRequest(BaseModel):
