@@ -396,6 +396,10 @@ def _scrinis_details(body: dict) -> dict:
         "publishers": publishers[:12], "authors": authors,
         "editions": editions,
         "book_references": refs[:20], "volume_items_seen": len(volumes),
+        "volume_records_scanned": min(len(volumes), 100),
+        "volume_scan_truncated": len(volumes) > 100,
+        "book_references_valid_in_scan": len(refs),
+        "book_references_truncated": len(refs) > 20 or len(volumes) > 100,
         "has_summary": bool(body.get("summary") or body.get("summaries")
                             or body.get("description") or body.get("synopsis")),
     }
@@ -522,11 +526,21 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
                 "market_target": row.get("market_target", "INTERNATIONAL"),
                 "market_target_basis": row.get("market_target_basis"),
                 "sources": {}} for row in sample]
+    # The per-provider detail budget may be exhausted early. Explicitly
+    # declared physical editions are inspected FIRST, then unmatched library
+    # entries, recognised owned works, and finally international controls.
+    # Stable report order is unchanged because we write via original indexes.
+    def detail_priority(index: int) -> tuple[int, int, int]:
+        row = sample[index]
+        origin_rank = {"pending": 0, "owned": 1, "catalog": 2}.get(row["origin"], 3)
+        return (0 if row.get("edition_targets") else 1, origin_rank, index)
+    visit_indices = sorted(range(len(sample)), key=detail_priority)
     metrics = {}
     for provider in providers:
         remaining_details = detail_budget
         remaining_alt = alternate_budget
-        for row, record in zip(sample, entries):
+        for index in visit_indices:
+            row, record = sample[index], entries[index]
             result = client.call(provider, "search", query=row["title"])
             if result["status"] != "OK":
                 failure = {"status": result["status"],
@@ -553,6 +567,12 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
                     judged["alternate_search_status"] = "OK"
                     judged["search_queries"] = [row["title"], alias]
             judged["detail_status"] = "NOT_REQUESTED"
+            judged["detail_priority_reason"] = (
+                "DECLARED_PHYSICAL_EDITION_FIRST" if row.get("edition_targets")
+                else "LIBRARY_PENDING" if row["origin"] == "pending"
+                else "LIBRARY_OWNED" if row["origin"] == "owned"
+                else "INTERNATIONAL_CONTROL"
+            )
             if judged["status"] == "AMBIGUOUS":
                 # The diagnostic may READ the two conflicting series, but
                 # never assigns the selected details to a canonical work.
@@ -604,6 +624,10 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
         ident = counts["SAME_MAL_ID"] + counts["EXACT_TITLE"]
         metrics[provider] = {"statuses": dict(counts),
                              "evaluated": comparable,
+                             "has_exact_candidate": sum(
+                                 any(c.get("evidence") in ("EXACT_TITLE", "SAME_MAL_ID")
+                                     for c in entry["sources"][provider].get("candidates", []))
+                                 for entry in entries),
                              "exact_title_or_mal_id": ident,
                              "rate_percent": round(100 * ident / comparable, 1) if comparable else None,
                              "detail_ok": sum(row["sources"][provider].get("detail_status") == "OK"
@@ -619,6 +643,8 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
     return {
         "format_version": 2, "generated_at": datetime.now(timezone.utc).isoformat(),
         "sample_count": len(sample),
+        "detail_priority_policy": "DECLARED_EDITION > PENDING > OWNED > CATALOG",
+        "declared_edition_entries": sum(bool(s.get("edition_targets")) for s in sample),
         "privacy": "Recherche externe par titre seulement; aucun volume possede, score ou note transmis.",
         "disclaimer": ("Résultats et ISBN éventuels = indices documentaires non confirmés. "
                        "Aucune oeuvre, édition ou possession liée automatiquement."),
@@ -645,6 +671,8 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
             "score_oeuvre_indicatif", "etat_oeuvre", "type_oeuvre_indice",
             "score_edition_fr_indicatif", "etat_edition_fr",
             "signaux_edition", "isbn_fr_papier_candidats",
+            "priorite_fiches", "isbn_references_incompletes",
+            "volumes_parcourus", "isbn_valides_avant_limite",
             "avertissement"])
         writer.writeheader()
         for item in report["entries"]:
@@ -709,6 +737,16 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
                     "signaux_edition": " | ".join(edition_review.get("signals") or []),
                     "isbn_fr_papier_candidats": " | ".join(
                         edition_review.get("french_print_isbns") or []),
+                    "priorite_fiches": value.get("detail_priority_reason") or "",
+                    "isbn_references_incompletes": (
+                        "OUI" if (detail.get("book_references_truncated") or any(
+                            (c.get("details") or {}).get("book_references_truncated")
+                            for c in value.get("competing_details") or []))
+                        else "NON" if (detail or any(
+                            c.get("details") for c in value.get("competing_details") or []))
+                        else "NON_EVALUE"),
+                    "volumes_parcourus": detail.get("volume_records_scanned"),
+                    "isbn_valides_avant_limite": detail.get("book_references_valid_in_scan"),
                     "avertissement": first.get("warning") or "",
                 })
     return js, cs

@@ -180,6 +180,57 @@ class FrenchMatchingTests(unittest.TestCase):
                             review["competing_evidence"][1]["edition"]["status"])
         self.assertFalse(review["automatic_link"])
 
+    def test_declared_editions_use_limited_detail_budget_first(self):
+        """Dragon Ball at position 38 must not miss out on its only detail slot."""
+        class Client:
+            counts = {"scrinis": 0, "mangaupdates": 0}
+            def __init__(self):
+                self.calls = []
+            def call(self, provider, kind, **kwargs):
+                self.calls.append((kind, kwargs))
+                if kind == "detail":
+                    return {"status": "OK", "data": series_details()}
+                return {"status": "OK", "schema": {}, "candidates": [{
+                    "id": "38", "title": kwargs["query"], "aliases": [],
+                    "format": "manga", "mal_id": None,
+                    "has_isbn_in_search": False, "has_genres_in_search": False
+                }]}
+        rows = [sample("Tokyo Ghoul"), sample("Yakuza Zen"), sample(
+            "Dragon Ball", origin="owned", market_target="FR_PRINT",
+            edition_targets=["Pastel", "Deluxe"])]
+        rows[0]["market_target"] = "FR_PRINT"
+        rows[1]["market_target"] = "FR_PRINT"
+        client = Client()
+        report = v2.evaluate(rows, client=client, providers=("scrinis",),
+                             detail_budget=1, alternate_budget=0)
+        # Still ordered as selected; the *first* detail call went to Dragon Ball.
+        self.assertEqual([x["title"] for x in report["entries"]],
+                         ["Tokyo Ghoul", "Yakuza Zen", "Dragon Ball"])
+        self.assertEqual([call["query"] for kind, call in client.calls
+                          if kind == "search"][:1], ["Dragon Ball"])
+        self.assertEqual(len([a for a in client.calls if a[0] == "detail"]), 1)
+        dragon = report["entries"][2]["sources"]["scrinis"]
+        self.assertEqual(dragon["detail_status"], "OK")
+        self.assertEqual(dragon["detail_priority_reason"],
+                         "DECLARED_PHYSICAL_EDITION_FIRST")
+        self.assertEqual(dragon["matching_review"]["edition"]["status"],
+                         "FR_PRINT_PARTIAL_EDITION_MATCH_REVIEW")
+        self.assertEqual(report["declared_edition_entries"], 1)
+
+    def test_scrinis_volume_and_isbn_caps_are_explicit(self):
+        # Even valid references are intentionally bounded in the report.
+        detail = v2.parse_details("scrinis", {"public_n": 100, "titles": {
+            "primary": "Long Series"}, "volumes": [
+                {"n": i, "isbn_13": "9780306406157", "medium": "print",
+                 "lang": "fr", "edition": "standard"}
+                for i in range(101)]})
+        self.assertEqual(detail["volume_items_seen"], 101)
+        self.assertEqual(detail["volume_records_scanned"], 100)
+        self.assertEqual(detail["book_references_valid_in_scan"], 100)
+        self.assertEqual(len(detail["book_references"]), 20)
+        self.assertTrue(detail["book_references_truncated"])
+        self.assertTrue(detail["volume_scan_truncated"])
+
     def test_network_requests_remain_title_only(self):
         class Client:
             counts = {"scrinis": 0}
@@ -208,6 +259,9 @@ class FrenchMatchingTests(unittest.TestCase):
                        market_target_basis="USER_COLLECTION_DEFAULT_UNVERIFIED")
         report = v2.evaluate([entry], client=Client(), providers=("scrinis","mangaupdates"),
                              alternate_budget=0, detail_budget=0)
+        report["entries"][0]["sources"]["scrinis"]["competing_details"] = [{
+            "id": "100", "status": "OK",
+            "details": {"book_references_truncated": True}}]
         with tempfile.TemporaryDirectory() as directory:
             js, csv_path = v2.save_report(report, Path(directory))
             with csv_path.open(encoding="utf-8-sig", newline="") as file:
@@ -216,6 +270,8 @@ class FrenchMatchingTests(unittest.TestCase):
             self.assertEqual(rows[0]["cible_langue"], "fr")
             self.assertEqual(rows[0]["cible_support"], "print")
             self.assertEqual(rows[0]["editions_declarees"], "Pastel")
+            self.assertEqual(rows[0]["isbn_references_incompletes"], "OUI")
+            self.assertEqual(rows[1]["isbn_references_incompletes"], "NON_EVALUE")
             self.assertEqual(rows[0]["score_edition_fr_indicatif"], "0")
             self.assertIn("matching_review", js.read_text(encoding="utf-8"))
 
