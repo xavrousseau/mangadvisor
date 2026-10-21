@@ -518,31 +518,6 @@ function Benchmark-Catalogue-Sources-V2 {
            "--limit",[string]$count,"--detail-limit",[string]$details)
   Write-Host ("Rapports CSV et JSON V2 : " + (Join-Path $root "data\logs\catalog_sources"))
 }
-function Benchmark-Catalogue-Sources {
-  Say "Comparatif de 50 mangas : Scrinis et MangaUpdates (lecture seule)"
-  Ensure-Environment
-  Check-Docker
-  Compose @("up","-d","postgres","meilisearch","api")
-  Wait-Postgres
-  $null=Wait-Health
-  $null=Get-Count "manga"
-  $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
-  Write-Host "Selection : entrees de mangatheque en attente, oeuvres possedees, autres mangas."
-  Write-Host "L'outil va afficher la selection sans aucun appel Internet."
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count,"--dry-run")
-  Write-Host "Si tu confirmes, seuls les TITRES des oeuvres seront transmis aux deux API."
-  Write-Host "Les quantites, les lectures, les notes, les sources privees et les ISBN ne seront pas transmis."
-  Write-Host "Resultats locaux uniquement, aucune ecriture PostgreSQL."
-  Write-Host "Quota Scrinis : maximum 15 appels par minute sans cle (pause 4,5 s)."
-  if (!(Confirm "Lancer maintenant les recherches publiques sur ces titres ?" $false)) {
-    Write-Host "Comparatif annule : aucune requete publique envoyee."
-    return
-  }
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count)
-  $reportDir=Join-Path $root "data\logs\catalog_sources"
-  Write-Host ("Rapports CSV et JSON disponibles dans : " + $reportDir)
-  Write-Host "Aucun resultat n'est associe automatiquement a ta mangatheque."
-}
 function Import-BnF-Bulk {
   Say "Importer des lots bibliographiques officiels BnF (zone de candidats)"
   Ensure-Environment
@@ -888,7 +863,7 @@ try {
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
     "BnFBulk"         { Import-BnF-Bulk }
-    "SourcesBenchmark" { Benchmark-Catalogue-Sources }
+    "SourcesBenchmark" { Benchmark-Catalogue-Sources-V2 }
     "SourcesBenchmarkV2" { Benchmark-Catalogue-Sources-V2 }
     "BibliographicStaging" { Prepare-Bibliographic-Staging }
     "Wikidata"        { Enrich-Wikidata }
