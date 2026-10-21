@@ -100,6 +100,61 @@ def transform_jikan_item(item: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+# Empty incoming values must not erase richer records from another page.
+# For non-empty conflicting values the later source keeps precedence.
+TEXT_FIELDS = ("title", "title_english", "title_japanese", "synopsis", "status", "manga_type")
+SCALAR_FIELDS = (
+    "chapters", "volumes", "score", "popularity", "rank", "members",
+    "favorites", "published_from", "published_to",
+)
+JSON_ARRAY_FIELDS = (
+    "genres_json", "themes_json", "demographics_json",
+    "authors_json", "serializations_json",
+)
+
+
+def has_value(value: Any) -> bool:
+    return value is not None and (not isinstance(value, str) or bool(value.strip()))
+
+
+def merge_manga_rows(previous: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    """Merge the same MAL work without losing populated metadata to empty fields.
+
+    Later non-empty values win; blank arrays never discard populated arrays.
+    raw_json records the latest payload merged with missing keys from the old
+    payload. This does not combine distinct manga IDs or physical editions.
+    """
+    if int(previous["mal_id"]) != int(incoming["mal_id"]):
+        raise ValueError("Cannot merge different MAL IDs")
+    result = dict(previous)
+    for field in TEXT_FIELDS + SCALAR_FIELDS:
+        if has_value(incoming.get(field)):
+            result[field] = incoming[field]
+    for field in JSON_ARRAY_FIELDS:
+        try:
+            value = json.loads(incoming.get(field) or "[]")
+        except (TypeError, ValueError):
+            value = []
+        if isinstance(value, list) and value:
+            result[field] = incoming[field]
+    try:
+        old_raw = json.loads(previous.get("raw_json") or "{}")
+        new_raw = json.loads(incoming.get("raw_json") or "{}")
+        if isinstance(old_raw, dict) and isinstance(new_raw, dict):
+            result["raw_json"] = json.dumps(
+                {**old_raw, **{
+                    key: value for key, value in new_raw.items()
+                    if value is not None and value != "" and value != []
+                }}, ensure_ascii=False
+            )
+    except (TypeError, ValueError):
+        pass
+    # Preserve the provenance of the latest contributing populated record.
+    if incoming.get("source_name"):
+        result["source_name"] = incoming["source_name"]
+    return result
+
+
 def parse_args() -> argparse.Namespace:
     """
     Parse les arguments de ligne de commande.
@@ -254,7 +309,11 @@ def collect_rows_from_files(
             valid_in_file += 1
 
             if dedupe:
-                rows_by_mal_id[int(transformed["mal_id"])] = transformed
+                mid = int(transformed["mal_id"])
+                rows_by_mal_id[mid] = (
+                    merge_manga_rows(rows_by_mal_id[mid], transformed)
+                    if mid in rows_by_mal_id else transformed
+                )
             else:
                 rows.append(transformed)
 
