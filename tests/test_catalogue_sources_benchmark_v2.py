@@ -154,11 +154,23 @@ class BenchmarkV2Tests(unittest.TestCase):
             self.assertIn("ブリーチ", cs.read_text(encoding="utf-8-sig"))
 
     def test_only_samples_from_database_no_postgres_mutations(self):
-        from tests.test_catalogue_sources_benchmark import FakeConnection
-        db = FakeConnection()
+        class Cursor:
+            calls = []
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def execute(self, sql, params=None):
+                self.calls.append(sql)
+                assert sql.lstrip().upper().startswith("SELECT")
+            def fetchall(self):
+                return [{"title": "Naruto", "title_english": "", "title_japanese": "",
+                         "mal_id": 13}]
+        class Connection:
+            def __init__(self): self.cur = Cursor()
+            def cursor(self): return self.cur
+        db = Connection()
         items = v2.v1.select_samples(db, 50)
-        self.assertTrue(all(sql.strip().upper().startswith("SELECT") for sql in db.cur.calls))
-        self.assertTrue(items)
+        self.assertTrue(all(sql.lstrip().upper().startswith("SELECT") for sql in db.cur.calls))
+        self.assertEqual(len(items), 1)
 
 
 if __name__ == "__main__":
