@@ -17,21 +17,23 @@ class WebProxyLifecycleTests(unittest.TestCase):
         self.assertIn("proxy_pass http://$api_backend;", nginx)
         self.assertNotIn("proxy_pass http://api:8000/;", nginx)
 
-    def test_historical_streamlit_is_opt_in_only(self):
+    def test_streamlit_service_is_fully_retired(self):
         compose = (ROOT / "infra/compose/docker-compose.yml").read_text(encoding="utf-8")
         self.assertNotIn("\\n  ui:\\n", compose)
         stable = (ROOT / "infra/compose/docker-compose.local.yml").read_text("utf-8")
         self.assertNotIn("\\n  ui:\\n", stable)
         legacy = (ROOT / "infra/compose/docker-compose.dev.yml").read_text("utf-8")
-        self.assertIn('profiles: ["legacy"]', legacy)
+        self.assertNotIn("\\n  ui:\\n", legacy)
+        self.assertNotIn("streamlit", legacy.lower())
+        self.assertFalse((ROOT / "apps/ui").exists())
+        self.assertFalse((ROOT / "infra/docker/ui/Dockerfile").exists())
         app = (ROOT / "apps/web/assets/app.js").read_text(encoding="utf-8")
         self.assertNotIn("http://localhost:8502", app)
         self.assertNotIn("127.0.0.1:8502", app)
 
     def test_main_controller_stops_legacy_and_automatic_worker_safely(self):
         control = (ROOT / "cmd/control-center.ps1").read_text(encoding="utf-8")
-        self.assertIn('legacyArgs+@("stop","ui")', control)
-        self.assertIn('legacyArgs+@("rm","-f","ui")', control)
+        self.assertIn('@("rm","-f","mangadvisor_ui")', control)
         self.assertIn('Compose @("--profile","automation","stop","catalog-sync")', control)
         self.assertIn("function Show-Docker-Logs", control)
         self.assertIn("function Show-Service-Status", control)
