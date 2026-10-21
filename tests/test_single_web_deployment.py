@@ -1,4 +1,4 @@
-"""One supported end-user WEB stack; Streamlit is DEV/CI reference only."""
+"""One supported Web stack; retired Streamlit is no longer installed."""
 from pathlib import Path
 import unittest
 
@@ -17,8 +17,9 @@ class SingleWebStackTests(unittest.TestCase):
         self.assertNotIn("--reload",local)
         self.assertNotIn("/workspace",local.split("\n  api:",1)[1].split("\n  web:",1)[0])
         self.assertIn("../../data/raw:/workspace/data/raw",local)
-        self.assertIn('profiles: ["legacy"]',dev)
-        self.assertIn("8502",dev)
+        self.assertNotIn('profiles: ["legacy"]',dev)
+        self.assertNotIn("\\n  ui:\\n",dev)
+        self.assertNotIn("8502",dev)
         self.assertIn("--reload",dev)
 
     def test_normal_windows_entrypoints_use_only_stable_compose(self):
@@ -33,8 +34,8 @@ class SingleWebStackTests(unittest.TestCase):
 
     def test_only_main_controller_migrates_legacy_ui_safely(self):
         ps=(ROOT/"cmd/control-center.ps1").read_text("utf-8")
-        self.assertIn('legacyArgs+@("stop","ui")',ps)
-        self.assertIn('legacyArgs+@("rm","-f","ui")',ps)
+        self.assertIn('@("rm","-f","mangadvisor_ui")',ps)
+        self.assertNotIn('legacyArgs',ps)
         self.assertNotIn("down --volumes",ps)
         self.assertNotIn("down -v",ps)
         backup=(ROOT/"cmd/library-backup.ps1").read_text("utf-8")
