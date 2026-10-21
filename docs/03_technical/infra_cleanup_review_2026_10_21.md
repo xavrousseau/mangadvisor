@@ -45,3 +45,11 @@ Aucune suppression d'infrastructure n'est justifiée par la seule revue statique
 ### Suite
 
 Valider les workflows GitHub Actions du dernier commit. Ensuite comparer les fonctions Streamlit encore exclusives (notamment import Excel, centre de recommandations) avec leurs équivalents Web avant toute suppression du dossier `apps/ui/` ou du Dockerfile associé.
+
+## Pré-audit `apps/ui/` versus `apps/web/`
+
+Le prototype Streamlit contient encore `discovery.py` (normalisation et pagination du catalogue) et `recommendations.py` (présentation des recommandations). Les tests `test_discovery.py` et `test_recommendation_view.py` importent ces fonctions. L'interface Web actuelle fournit déjà des parcours de découverte, fiche et recommandations via `apps/web/assets/app.js`, `advisor-view.js` et les modules de collection ; **cela ne démontre pas à lui seul une équivalence fonctionnelle**.
+
+Le module principal Streamlit comporte des chemins d'import Excel utilisant `pandas` et `openpyxl`, tandis que l'interface Web possède `bulk-import-view.js` pour ses prévisualisations. Avant retrait, il faut comparer les formats Excel, les capacités d'import et les fonctions de lecture/recommandation sur données factices.
+
+Décision : conserver temporairement `apps/ui/`, `infra/docker/ui/Dockerfile` et le profil `legacy`, puis migrer uniquement les tests réutilisables vers des composants indépendants de Streamlit. Ne pas annoncer le retrait comme terminé.
