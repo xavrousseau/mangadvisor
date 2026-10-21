@@ -128,16 +128,13 @@ function Start-Application([bool]$Build=$true) {
   Say "Demarrage des services Mangadvisor"
   Ensure-Environment
   Check-Docker
-  # Turn off the old 8502 Streamlit UI, keeping data volumes untouched.
-  # The user-friendly stack has no Streamlit service at all.
-  # Retire an existing 8502 legacy container without removing its data or
-  # touching the PostgreSQL/Meilisearch volumes.
-  $devCompose=Join-Path $root "infra\compose\docker-compose.dev.yml"
-  $legacyArgs=@("compose","--env-file",$envFile,
-      "-f",(Join-Path $root "infra\compose\docker-compose.yml"),
-      "-f",$devCompose,"--profile","legacy")
-  Run "docker" ($legacyArgs+@("stop","ui")) "Impossible d'arreter l'ancienne interface"
-  Run "docker" ($legacyArgs+@("rm","-f","ui")) "Impossible de retirer l'ancien conteneur UI"
+  # Retire a container left by old installations WITHOUT removing volumes.
+  # The legacy Compose service no longer exists in the maintained repository.
+  $oldUi=(& docker container ls -a --format "{{.Names}}" 2>$null |
+    Where-Object { $_ -eq "mangadvisor_ui" })
+  if ($oldUi) {
+    Run "docker" @("rm","-f","mangadvisor_ui") "Impossible de retirer l'ancien conteneur UI"
+  }
   $args=@("up","-d")
   if ($Build) { $args+=@("--build") }
   Compose $args
