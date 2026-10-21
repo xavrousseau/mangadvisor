@@ -33,3 +33,15 @@
 ## Décision à ce stade
 
 Aucune suppression d'infrastructure n'est justifiée par la seule revue statique. La prochaine passe doit d'abord démontrer les usages réels de Meilisearch, des dépendances et de l'ancienne UI avant de proposer des retraits.
+
+## Résultat de la deuxième passe
+
+- Recherche des références `MEILI_HOST` : aucune utilisation métier trouvée dans `apps/api/` ou `pipelines/` ; la variable n'apparaît que dans la configuration Compose et la documentation. **Le moteur de recherche réellement exposé au public ne doit pas être annoncé comme Meilisearch.** Le service et son volume sont conservés pour ne pas changer l'infrastructure sans stratégie de migration.
+- `apps/ui/` contient encore un prototype Streamlit de plus de 35 ko et des fonctions testées directement par `tests/test_discovery.py` et `tests/test_recommendation_view.py`. Suppression **reportée**, car elle ferait perdre des tests et demande une comparaison fonctionnelle avec le Web actuel.
+- Aucun import `pandas` dans les scripts `pipelines/` identifiés : la dépendance `pandas` a été retirée de `pipelines/engine/requirements.txt`. Le prototype `apps/ui/app/app.py` utilise encore `pandas` de façon conditionnelle pour son import Excel ; ce composant doit être analysé à part.
+- `fastapi` est conservé dans l'image moteur : le synchroniseur charge des modules de `apps/api/` qui peuvent importer ce paquet ; retirer ce paquet sans tests serait prématuré.
+- Les commentaires de `infra/compose/docker-compose.yml` ont été corrigés pour distinguer les services déclarés des fonctionnalités réellement branchées.
+
+### Suite
+
+Valider les workflows GitHub Actions du dernier commit. Ensuite comparer les fonctions Streamlit encore exclusives (notamment import Excel, centre de recommandations) avec leurs équivalents Web avant toute suppression du dossier `apps/ui/` ou du Dockerfile associé.
