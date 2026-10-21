@@ -20,8 +20,8 @@ services:
     networks:
       - mangadvisor_network
 
-  # Moteur de recherche textuelle.
-  # Sert pour la recherche rapide par titre, alias et filtres.
+  # Infrastructure Meilisearch reservee aux evolutions futures.
+  # Aucun consommateur applicatif actif confirme : ne pas annoncer une indexation fonctionnelle.
   meilisearch:
     image: getmeili/meilisearch:v1.11
     container_name: mangadvisor_meilisearch
@@ -33,7 +33,8 @@ services:
       - mangadvisor_network
 
   # API backend du projet.
-  # Expose les endpoints applicatifs et dialogue avec PostgreSQL et Meilisearch.
+  # Expose les endpoints applicatifs et utilise PostgreSQL.
+  # Variables Meilisearch conservees pour compatibilite, sans client actif prouve.
   api:
     build:
       context: ../..
@@ -122,8 +123,8 @@ services:
     networks:
       - mangadvisor_network
 
-  # Moteur du pipeline data.
-  # Il servira à exécuter les scripts d'extraction, normalisation, enrichissement, chargement et indexation.
+  # Conteneur ponctuel d'execution des pipelines : aucun traitement ne tourne
+  # en continu dans ce service. L'indexation Meilisearch n'est pas active.
   engine:
     build:
       context: ../..
