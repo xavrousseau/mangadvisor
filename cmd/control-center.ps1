@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -411,84 +411,6 @@ function Load-Extended-Catalogue {
   Write-Host ("Notices distinctes en provenance fournisseur : {0}" -f $sourceCount)
   Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
 }
-function Prepare-Bibliographic-Staging {
-  Say "Preparation bibliographique : Scrinis, MangaUpdates, BnF (staging uniquement)"
-  Ensure-Environment
-  Check-Docker
-  Compose @("up","-d","postgres","meilisearch")
-  Wait-Postgres
-  $null=Get-Count "manga"
-  Write-Host "Source : dernier rapport JSON V2 local, genere via A -> 17."
-  Write-Host "Aucune interrogation Internet n'est effectuee dans cette etape."
-  Write-Host "Preparation sans ecriture PostgreSQL :"
-  Engine @("pipelines/engine/scripts/prepare_bibliographic_staging.py","--preview")
-  Write-Host "Les candidats d'oeuvres et editions restent a valider."
-  Write-Host "Les ISBN BnF restent des indices bibliographiques, pas des tomes possedes."
-  Write-Host "Les operations SQL sont limitees aux 4 tables bib_stage_* ; pas de fusion."
-  if (!(Confirm "Enregistrer ce lot dans la zone de preparation bibliographique SQL ?" $false)) {
-    Write-Host "Aucun changement en base. Les fichiers d'apercu restent locaux."
-    return
-  }
-  Engine @("pipelines/engine/scripts/prepare_bibliographic_staging.py","--import")
-  Write-Host "Lots de preparation enregistres :"
-  Engine @("pipelines/engine/scripts/prepare_bibliographic_staging.py","--status")
-  Write-Host ("Fichiers d'apercu : " + (Join-Path $root "data\logs\bibliographic_staging"))
-  Write-Host "Aucune entree du catalogue ou de la mangatheque n'a ete modifiee."
-}
-function Benchmark-Catalogue-Sources-V2 {
-  Say "Comparatif V2 : mangas FR papier, scores oeuvre/edition et candidats concurrents"
-  Ensure-Environment
-  Check-Docker
-  Compose @("up","-d","postgres","meilisearch","api")
-  Wait-Postgres
-  $null=Wait-Health
-  $null=Get-Count "manga"
-  $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
-  $details=Ask-Number "Maximum de fiches detaillees PAR API (max 20)" 12 20
-  Write-Host "Mangatheque : cible par defaut FR / papier (hypothese, pas preuve de possession)."
-  Write-Host "Catalogue general : edition internationale non restreinte."
-  Write-Host "Les editions declarees sur ce PC servent au classement LOCAL et ne sont pas envoyees aux API."
-  Write-Host "Apercu des titres sans acces Internet :"
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources_v2.py",
-           "--limit",[string]$count,"--detail-limit",[string]$details,"--dry-run")
-  Write-Host "Recherches API par titres uniquement ; certaines fiches detaillees seront lues."
-  Write-Host "Quotas stricts : Scrinis 15 appels/min sans cle ; MangaUpdates pause 2 secondes."
-  Write-Host "Les resultats restent dans data\logs\catalog_sources ; aucun changement SQL."
-  Write-Host "Deux indicateurs distincts : correspondance oeuvre et edition FR papier (preuves, pas probabilites)."
-  Write-Host "Les ISBN eventuels ne prouvent ni la possession ni l'edition declaree."
-  if (!(Confirm "Autoriser les recherches publiques du benchmark V2 ?" $false)) {
-    Write-Host "Operation annulee. Aucun appel distant n'a ete effectue."
-    return
-  }
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources_v2.py",
-           "--limit",[string]$count,"--detail-limit",[string]$details)
-  Write-Host ("Rapports CSV et JSON V2 : " + (Join-Path $root "data\logs\catalog_sources"))
-}
-function Benchmark-Catalogue-Sources {
-  Say "Comparatif de 50 mangas : Scrinis et MangaUpdates (lecture seule)"
-  Ensure-Environment
-  Check-Docker
-  Compose @("up","-d","postgres","meilisearch","api")
-  Wait-Postgres
-  $null=Wait-Health
-  $null=Get-Count "manga"
-  $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
-  Write-Host "Selection : entrees de mangatheque en attente, oeuvres possedees, autres mangas."
-  Write-Host "L'outil va afficher la selection sans aucun appel Internet."
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count,"--dry-run")
-  Write-Host "Si tu confirmes, seuls les TITRES des oeuvres seront transmis aux deux API."
-  Write-Host "Les quantites, les lectures, les notes, les sources privees et les ISBN ne seront pas transmis."
-  Write-Host "Resultats locaux uniquement, aucune ecriture PostgreSQL."
-  Write-Host "Quota Scrinis : maximum 15 appels par minute sans cle (pause 4,5 s)."
-  if (!(Confirm "Lancer maintenant les recherches publiques sur ces titres ?" $false)) {
-    Write-Host "Comparatif annule : aucune requete publique envoyee."
-    return
-  }
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count)
-  $reportDir=Join-Path $root "data\logs\catalog_sources"
-  Write-Host ("Rapports CSV et JSON disponibles dans : " + $reportDir)
-  Write-Host "Aucun resultat n'est associe automatiquement a ta mangatheque."
-}
 function Import-BnF-Bulk {
   Say "Importer des lots bibliographiques officiels BnF (zone de candidats)"
   Ensure-Environment
@@ -829,9 +751,6 @@ try {
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
     "BnFBulk"         { Import-BnF-Bulk }
-    "SourcesBenchmark" { Benchmark-Catalogue-Sources }
-    "SourcesBenchmarkV2" { Benchmark-Catalogue-Sources-V2 }
-    "BibliographicStaging" { Prepare-Bibliographic-Staging }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
     "Aliases"         { Enrich-Multilingual-Aliases }
