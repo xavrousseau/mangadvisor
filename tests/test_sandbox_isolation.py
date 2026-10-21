@@ -11,6 +11,10 @@ class SandboxIsolationTests(unittest.TestCase):
         self.assertIn("name: mangadvisor_sandbox_network", override)
         for service in ("postgres", "meilisearch", "api", "web", "engine", "ollama", "catalog_sync"):
             self.assertIn("container_name: mangadvisor_sandbox_" + service, override)
+        self.assertIn("manga_sandbox_raw:/workspace/data/raw", override)
+        self.assertIn("manga_sandbox_logs:/workspace/data/logs", override)
+        self.assertNotIn("../../data/logs:", override)
+        self.assertNotIn("../../data/raw:", override)
         self.assertNotIn("external: true", override)
         self.assertNotIn("mangadvisor_pgdata:", override)
         self.assertNotIn("mangadvisor_meili:", override)
