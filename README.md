@@ -225,4 +225,4 @@ L'option A → 16 utilise maintenant le même moteur V2 que A → 17 ; l'ancien 
 
 L'ancien prototype Streamlit, son image Docker et son profil de développement ont été retirés : **le Web est l'unique interface maintenue**. Le centre de pilotage peut encore retirer un ancien conteneur `mangadvisor_ui` sans supprimer les volumes. Les scripts de données historiquement nommés Jikan restent utilisables mais l'API source normale est Tenrai. Aucun historique de nommage ne justifie une suppression des volumes.
 
-[Audit et anomalies connues](docs/reports/repository_audit_2026_10_20.md) · [Architecture](docs/03_technical/project_structure.md) · [Import physique](docs/04_product/safe_inventory_import_3_8.md) · [Sauvegardes](docs/04_product/library_backup_recovery_3_2.md)
+[Inventaire actuel et décisions de nettoyage](docs/03_technical/inventaire_transversal_2026_10_21.md) · [Architecture](docs/03_technical/project_structure.md) · [Import physique](docs/04_product/safe_inventory_import_3_8.md) · [Sauvegardes](docs/04_product/library_backup_recovery_3_2.md)
