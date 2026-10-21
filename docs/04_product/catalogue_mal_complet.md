@@ -17,12 +17,40 @@ Liens :
 - [API Tenrai, pagination et documentation](https://api.tenrai.org/documentation)
 - [évolutions de Tenrai](https://api.tenrai.org/changelog)
 
+## Emplacement Jikan conservé et réparation hors réseau
+
+Le chemin de référence reste **le dossier historique des JSON Jikan** :
+\`F:\1.Boulot\03_Github\mangadvisor\data\raw\jikan\`
+(si le clone Git est bien installé sur F:). Le code calcule ce chemin à
+partir du projet, sans fixer une lettre de lecteur.
+
+La PR #81 enregistrait à tort les pages dans le sous-répertoire
+\`data/raw/jikan/complete_tenrai\`, sous des noms
+\`manga_page_00001.json\` à \`manga_page_00858.json\`.
+
+Au prochain **A → 19**, avant tout appel API, l'outil **reclasse localement**
+les fichiers valides dans \`data/raw/jikan/manga_page_1.json\`, etc.
+Un fichier \`manga_page_N.json\` ancien et incompatible est préservé dans
+\`data/raw/jikan/legacy_archive_before_complete_sync/\`. Les fiches
+JSON déjà obtenues restent intactes ; l'ancien chargeur
+\`load_jikan_to_postgres.py --sources legacy\` reconnaît les nouveaux noms.
+
+Le programme affiche ensuite le dernier état de synchronisation.
+**Si celui-ci est déjà \`CATALOGUE_COMPLETE\`, répondre Non à la nouvelle
+synchronisation : les 85 776 notices sont déjà dans PostgreSQL selon le
+rapport.** La réorganisation des fichiers ne retouche ni PostgreSQL ni la
+mangathèque.
+
+Le fichier \`data/logs/catalogue_complete/last_sync.json\` est un **bilan**,
+pas les mangas eux-mêmes. Les tables PostgreSQL sont stockées dans le
+volume Docker prévu, pas parmi les JSON bruts.
+
 ## Parcours concret
 
 \`mangadvisor.cmd → A → 19\` :
 
-1. Vérifie Docker, PostgreSQL et la connectivité de Tenrai.
-2. Interroge la **première page** en lecture seule afin d'afficher le
+1. Vérifie Docker et PostgreSQL et **rétablit le répertoire Jikan sans réseau**. La connectivité Tenrai n'est testée que si une nouvelle synchronisation est demandée.
+2. Si une nouvelle synchronisation est demandée, interroge la **première page** en lecture seule afin d'afficher le
    \`pagination.items.total\` et \`last_visible_page\` **déclarés par la
    source**. Ne les confondez pas avec les 10 033 mangas présents dans la
    base locale avant chargement.
@@ -38,7 +66,7 @@ Liens :
    prédéterminer 600 ou 2 000 pages. Garde-fou maximal 20 000 pages :
    si la source le dépasse, l'exécution **échoue sans se déclarer complète**.
 8. Enregistre chaque page à l'emplacement
-   \`data/raw/jikan/complete_tenrai/manga_page_00001.json\`. Les pages
+   \`data/raw/jikan/manga_page_1.json\` (puis \`manga_page_2.json\`, etc.). Les pages
    ont leur provenance et requête enregistrées et sont **réutilisables**
    après une interruption ; page 1 est rafraîchie à chaque exécution.
    La mise à jour complète des pages anciennes s'effectue en choisissant
@@ -66,7 +94,7 @@ aucune nouvelle relation \`manga_author\` n'est créée par cette phase.
 ## Interruption et reprise
 
 En cas de timeout, quota, blocage réseau ou arrêt volontaire :
-- les pages déjà vérifiées restent dans \`data/raw/jikan/complete_tenrai/\` ;
+- les pages déjà vérifiées restent dans \`data/raw/jikan/\` ;
 - les notices insérées en \`jikan_manga_source\` sont conservées ;
 - le catalogue \`manga\` conserve son état stable précédent si la source
   complète n'a pas été validée ;
