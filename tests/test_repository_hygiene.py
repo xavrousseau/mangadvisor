@@ -19,6 +19,26 @@ RETIRED = (
     "cmd/load-jikan-recommendations.cmd",
     "cmd/rebuild-canonical-catalog.cmd",
     "cmd/diagnose-jikan-recommendations.cmd",
+    "cmd/build.cmd",
+    "cmd/clean.cmd",
+    "cmd/common.cmd",
+    "cmd/down.cmd",
+    "cmd/install-check.cmd",
+    "cmd/logs.cmd",
+    "cmd/nuke.cmd",
+    "cmd/restart.cmd",
+    "cmd/retire-legacy-ui.cmd",
+    "cmd/run-library-goal-tests.cmd",
+    "cmd/run-library-import-robustness-tests.cmd",
+    "cmd/run-library-import-tests.cmd",
+    "cmd/run-library-recommendation-tests.cmd",
+    "cmd/run-library-status-tests.cmd",
+    "cmd/run-recommendation-tests.cmd",
+    "cmd/run-v0-8-validation.cmd",
+    "cmd/start.cmd",
+    "cmd/status.cmd",
+    "cmd/stop.cmd",
+    "cmd/up.cmd",
     "pipelines/engine/src/extract/jikan_client.py",
     "docs/reports/recommendation_profile_tests_v0_7_4.md",
     "docs/reports/project_file_audit_v0_8_13.txt",
@@ -40,6 +60,11 @@ class RepositoryHygieneTests(unittest.TestCase):
         self.assertIn('if "%CHOICE%"=="5" set "KEY=diagnostic"', menu)
         self.assertIn('if "%CHOICE%"=="6" set "KEY=stop"', menu)
         self.assertIn('if /I "%~1"=="catalogue" set "ACTION=Catalogue"', menu)
+        self.assertIn('if /I "%~1"=="logs" set "ACTION=Logs"', menu)
+        self.assertIn('if /I "%~1"=="status" set "ACTION=Status"', menu)
+        self.assertNotIn("CMD_SCRIPT", menu)
+        self.assertIn("Load-Complete-MAL-Catalogue",
+            (ROOT/"cmd/control-center.ps1").read_text(encoding="utf-8"))
         self.assertNotIn(" -Action Nuke", menu)
         self.assertIn('if "%CHOICE%"=="11" set "KEY=wikidata-enrich"', menu)
         self.assertNotIn('if "%CHOICE%"=="11" set "KEY=nuke"', menu)
