@@ -105,6 +105,28 @@ L'endpoint \`/catalogue/coverage\` expose notamment
 \`scrinis_work_labels_with_evidence\`. Ces chiffres sont **mesurés
 dans PostgreSQL**, pas estimés à partir des candidats d'API.
 
+## Gestion correcte des fiches individuelles indisponibles
+
+Un traitement Scrinis de 100 œuvres peut avoir correctement enregistré
+des titres français tout en rencontrant une seule fiche
+`DETAIL_UNAVAILABLE` (par exemple 404 sur l'ID public). Ce cas est un
+**résultat documentaire partiel**, pas une panne du fournisseur entier.
+Il est comptabilisé séparément dans `detail_unavailable` et conservé
+comme tentative à réexaminer après 24 heures. Si les autres œuvres ont
+été traitées, le programme retourne **code 0**, et les titres
+déjà enregistrés restent disponibles.
+
+Les véritables pannes globales (`UNAVAILABLE`, réponse 429,
+réponse 5xx, `NETWORK_ERROR`) continuent de compter comme
+`provider_errors`, d'arrêter le lot et d'émettre un **code non nul**.
+Le bilan inclut désormais `processed` et `completed`, pour distinguer
+une erreur réseau bloquante d'une fiche seulement indisponible.
+
+Les traitements utilisent des transactions indépendantes par œuvre :
+une fiche indisponible n'annule pas les enregistrements confirmés avant
+ou après elle. Aucune réimportation du catalogue MAL complet n'est
+nécessaire pour reprendre A → 20.
+
 ## Étapes suivantes
 
 Cette phase s'appuie sur **Scrinis en priorité** car sa fiche permet de
