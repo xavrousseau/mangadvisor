@@ -74,15 +74,9 @@ def main():
         "sql/schema/005_build_theme_demographic_from_jikan.sql",
     ]
     for iteration in (1,2):
-        if iteration == 1:
-            # The actual SQL scripts, as used by legacy Windows maintenance.
-            for filename in scripts:
-                sql((ROOT/filename).read_text(encoding="utf-8"))
-        else:
-            # The supported maintenance path applies the same additive SQL,
-            # without importing the retired legacy orchestrator.
-            for filename in scripts:
-                sql((ROOT/filename).read_text(encoding="utf-8"))
+        # Repeat exactly the supported additive SQL in an isolated CI database.
+        for filename in scripts:
+            sql((ROOT / filename).read_text(encoding="utf-8"))
         after=snapshot()
         for key in ("canonical_ids","library","editions","reading"):
             assert before[key]==after[key],(iteration,key,before[key],after[key])
