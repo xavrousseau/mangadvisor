@@ -61,7 +61,7 @@ def run():
             "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "buffer": output.getvalue(),
         })
-        expect(page.locator("#reading-csv")).to_contain_text("Naruto,READ,5,False", timeout=30000)
+        expect(page.locator("#reading-csv")).to_have_value("title,library_status,user_score,is_favorite\\nNaruto,READ,5,False\\n", timeout=30000)
         page.locator('[data-action="reading-preview"]').click()
         expect(page.locator("#reading-import-result")).to_contain_text("Naruto", timeout=30000)
         after_xlsx_preview = page.request.get(BASE + "/api/library?q=Naruto&limit=20").json()
