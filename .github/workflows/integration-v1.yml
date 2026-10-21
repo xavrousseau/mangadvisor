@@ -407,7 +407,7 @@ jobs:
 
       - name: Installer Playwright Chromium
         run: |
-          python -m pip install playwright requests pillow
+          python -m pip install playwright requests pillow openpyxl
           python -m playwright install --with-deps chromium
 
       # The advisor's synthetic French edition is tested before browser feedback
@@ -426,6 +426,9 @@ jobs:
 
       - name: Contrôler Streamlit ordinateur et mobile
         run: python tests/smoke/browser_smoke.py
+
+      - name: Valider le nouvel import de bibliothèque CSV/XLSX sur navigateur et base CI jetable
+        run: python tests/smoke/reading_library_browser.py
 
       - name: Valider le scanner ISBN sur ordinateur et mobile
         run: python tests/smoke/isbn_camera_browser.py
