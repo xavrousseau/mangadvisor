@@ -122,6 +122,47 @@ Un nombre élevé de fiches n'est **pas** une preuve d'exhaustivité :
 le critère est la dernière page atteinte, le total cohérent et la
 consolidation canonique vérifiée.
 
+## Utilisation directe des données déjà chargées dans Mangadvisor
+
+Après la récupération des 85 776 notices, **l'API et le site peuvent exploiter
+les données stockées, sans autre benchmark ou requête publique** :
+
+- Au démarrage de l'API, les éléments de \`jikan_manga_source.raw_json.titles[]\`
+  explicitement marqués \`French\`, \`English\` ou \`Japanese\` sont enregistrés
+  dans \`manga_title_alias\` avec source \`TENRAI_MAL_TYPED\`. Les simples
+  synonymes sans langue restent \`und\`, jamais transformés en faux titres
+  français. Chaque enregistrement est relié par \`source_mal_id=mal_id\`.
+- Les libellés français de Wikidata ne sont affichables comme titres de
+  l'œuvre que lorsque le lien \`P4087\` vers l'ID MAL a été vérifié par le
+  mécanisme \`manga_wikidata_attempt.status=MATCHED\`.
+- La recherche \`/mangas?q=...\` exploite les alias ; les listes et fiches
+  \`/mangas/{id}\` fournissent désormais \`title_fr\`,
+  \`title_fr_verified\`, \`title_fr_source\` et \`authors[]\`. Les auteurs
+  sont lus dans \`jikan_manga_source.authors_json\` et liés à la notice
+  canonique par l'ID MAL. Les champs d'origine \`title\`,
+  \`title_english\` et \`title_japanese\` restent inchangés.
+- L'interface Web utilise directement \`title_fr\` pour les cartes et les
+  fiches quand le site est en français, et affiche les auteurs disponibles.
+  Aucune commande manuelle d'import supplémentaire n'est nécessaire après
+  la **mise à jour (option 3)**, qui reconstruit l'application et exécute
+  l'initialisation additive des alias.
+- \`GET /catalogue/coverage\` renvoie des **compteurs SQL réels** :
+  \`canonical_works\`, \`mal_source_works\`,
+  \`explicit_french_mal_labels\`, \`works_with_french_label\`,
+  \`source_works_with_authors\`, \`works_with_synopsis\`.
+
+**Distinction capitale :** \`title_fr_verified=true\` signifie uniquement
+que la **langue du libellé de l'œuvre et son lien MAL** ont été explicitement
+documentés par Tenrai/MAL ou Wikidata. Cela ne certifie **ni la vente en
+France, ni une édition papier, ni un ISBN**. Le champ
+\`title_fr_publication_verified=false\` rend cette distinction explicite.
+Aucun nom français n'est traduit ou deviné.
+
+Si la source ne possède pas de titre français, Mangadvisor conserve son
+fallback habituel en anglais puis dans la langue source. La couverture
+réelle des titres français n'est pas connue avant le premier contrôle SQL.
+Scrinis et la BnF compléteront les œuvres françaises dans un second temps.
+
 ## Limites transparentes
 
 - Il s'agit du **catalogue public renvoyé par \`/manga\` de Tenrai à
