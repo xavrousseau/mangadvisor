@@ -265,16 +265,54 @@ def run(*, plan: bool = False, refresh: bool = False, max_pages: int = MAX_PAGES
         db.close()
 
 
+def finalize() -> dict:
+    """Mark completion ONLY after canonical SQL 003/005 was actually applied."""
+    status_path = LOGS / "last_sync.json"
+    if not status_path.is_file():
+        raise CatalogueError("Synchronisation source non commencée")
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    if not status.get("complete") or status.get("status") not in (
+            "SOURCE_COMPLETE_PENDING_CANONICAL_SQL", "CATALOGUE_COMPLETE"):
+        raise CatalogueError("Les pages source ne sont pas toutes récupérées")
+    with get_postgres_connection() as db, db.cursor() as cur:
+        cur.execute("""SELECT COUNT(*) AS n FROM jikan_manga_source j
+                      LEFT JOIN manga m ON m.source_mal_id = j.mal_id
+                      WHERE m.id IS NULL""")
+        missing = cur.fetchone()["n"]
+        if missing:
+            raise CatalogueError(f"{missing} œuvres MAL non synchronisées dans manga")
+        cur.execute("""SELECT
+          (SELECT COUNT(*) FROM jikan_manga_source) AS source_count,
+          (SELECT COUNT(*) FROM manga) AS canonical_count,
+          (SELECT COUNT(*) FROM manga_genre) AS genre_links,
+          (SELECT COUNT(*) FROM manga_theme) AS theme_links""")
+        counts = cur.fetchone()
+    if counts["source_count"] < status["unique_ids_in_run"]:
+        raise CatalogueError("Le nombre de références source en base est trop faible")
+    if counts["canonical_count"] < status["unique_ids_in_run"]:
+        raise CatalogueError("Le catalogue canonique est plus petit que l'échantillon collecté")
+    status.update({
+        "canonical_synced": True, "status": "CATALOGUE_COMPLETE",
+        "finalized_at": now(), "db_counts": dict(counts)})
+    write_status(status)
+    return status
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Catalogue MAL/Jikan complet via Tenrai, progressif et reprenable")
-    parser.add_argument("--plan", action="store_true", help="Compter les pages sans écrire PostgreSQL")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--plan", action="store_true", help="Compter les pages sans écrire PostgreSQL")
+    mode.add_argument("--finalize", action="store_true", help="Valider les compteurs APRES scripts SQL 003/005")
     parser.add_argument("--refresh", action="store_true", help="Retélécharger les pages déjà en cache")
     parser.add_argument("--max-pages", type=int, default=MAX_PAGES)
     parser.add_argument("--batch-pages", type=int, default=20)
     parser.add_argument("--pause", type=float, default=1.1)
     args = parser.parse_args(argv)
     try:
+        if args.finalize:
+            print(json.dumps(finalize(), ensure_ascii=False, indent=2))
+            return 0
         data = run(plan=args.plan, refresh=args.refresh, max_pages=args.max_pages,
                    batch_pages=args.batch_pages, pause=args.pause)
         print(json.dumps(data, ensure_ascii=False, indent=2))
