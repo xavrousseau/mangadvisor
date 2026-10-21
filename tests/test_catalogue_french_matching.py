@@ -259,6 +259,9 @@ class FrenchMatchingTests(unittest.TestCase):
                        market_target_basis="USER_COLLECTION_DEFAULT_UNVERIFIED")
         report = v2.evaluate([entry], client=Client(), providers=("scrinis","mangaupdates"),
                              alternate_budget=0, detail_budget=0)
+        report["entries"][0]["sources"]["scrinis"]["competing_details"] = [{
+            "id": "100", "status": "OK",
+            "details": {"book_references_truncated": True}}]
         with tempfile.TemporaryDirectory() as directory:
             js, csv_path = v2.save_report(report, Path(directory))
             with csv_path.open(encoding="utf-8-sig", newline="") as file:
@@ -267,6 +270,8 @@ class FrenchMatchingTests(unittest.TestCase):
             self.assertEqual(rows[0]["cible_langue"], "fr")
             self.assertEqual(rows[0]["cible_support"], "print")
             self.assertEqual(rows[0]["editions_declarees"], "Pastel")
+            self.assertEqual(rows[0]["isbn_references_incompletes"], "OUI")
+            self.assertEqual(rows[1]["isbn_references_incompletes"], "NON_EVALUE")
             self.assertEqual(rows[0]["score_edition_fr_indicatif"], "0")
             self.assertIn("matching_review", js.read_text(encoding="utf-8"))
 
