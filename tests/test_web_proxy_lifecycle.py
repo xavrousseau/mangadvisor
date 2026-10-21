@@ -17,34 +17,30 @@ class WebProxyLifecycleTests(unittest.TestCase):
         self.assertIn("proxy_pass http://$api_backend;", nginx)
         self.assertNotIn("proxy_pass http://api:8000/;", nginx)
 
-    def test_historical_streamlit_is_opt_in_only(self):
+    def test_single_web_ui_only(self):
         compose = (ROOT / "infra/compose/docker-compose.yml").read_text(encoding="utf-8")
         self.assertNotIn("\\n  ui:\\n", compose)
         stable = (ROOT / "infra/compose/docker-compose.local.yml").read_text("utf-8")
         self.assertNotIn("\\n  ui:\\n", stable)
         legacy = (ROOT / "infra/compose/docker-compose.dev.yml").read_text("utf-8")
-        self.assertIn('profiles: ["legacy"]', legacy)
+        self.assertNotIn("\\n  ui:\\n", legacy)
+        self.assertNotIn("8502", legacy)
         app = (ROOT / "apps/web/assets/app.js").read_text(encoding="utf-8")
         self.assertNotIn("http://localhost:8502", app)
         self.assertNotIn("127.0.0.1:8502", app)
 
-    def test_menu_stops_legacy_without_removing_volumes(self):
+    def test_windows_launcher_is_web_only_and_nondestructive(self):
         for relative in ("cmd/start.cmd", "cmd/up.cmd", "cmd/restart.cmd"):
             with self.subTest(script=relative):
-                code = (ROOT / relative).read_text(encoding="utf-8")
-                self.assertIn("retire-legacy-ui.cmd", code)
+                code=(ROOT/relative).read_text(encoding="utf-8")
+                self.assertNotIn("retire-legacy-ui.cmd", code)
                 self.assertNotIn("down -v", code)
                 self.assertNotIn("volume rm", code)
-        control = (ROOT / "cmd/control-center.ps1").read_text(encoding="utf-8")
-        self.assertIn('legacyArgs+@("stop","ui")', control)
-        self.assertIn('legacyArgs+@("rm","-f","ui")', control)
-        retire = (ROOT / "cmd/retire-legacy-ui.cmd").read_text("utf-8")
-        self.assertIn("--profile legacy stop ui", retire)
-        self.assertIn("--profile legacy rm -f ui", retire)
-        self.assertNotIn("--volumes", retire)
-        self.assertIn("/api/health", control)
-        self.assertIn("/api/library?limit=1", control)
-        self.assertNotIn("down -v", control)
+        control=(ROOT/"cmd/control-center.ps1").read_text(encoding="utf-8")
+        self.assertNotIn("legacyArgs",control)
+        self.assertIn("/api/health",control)
+        self.assertIn("/api/library?limit=1",control)
+        self.assertNotIn("down -v",control)
 
 
 if __name__ == "__main__":
