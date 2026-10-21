@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS manga_mangaupdates_evidence (
   checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY(manga_id,mu_id)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mangaupdates_verified_external_id
+ON manga_mangaupdates_evidence(mu_id) WHERE relation='MATCHED';
 """
 SELECT = """
 SELECT m.id,m.source_mal_id AS mal_id,m.title,m.title_english,m.title_japanese,
