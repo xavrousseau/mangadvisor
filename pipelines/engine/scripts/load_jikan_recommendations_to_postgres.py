@@ -13,7 +13,7 @@ Sortie :
 
 Exemple :
     python pipelines/engine/scripts/load_jikan_recommendations_to_postgres.py
-    python pipelines/engine/scripts/load_jikan_recommendations_to_postgres.py --reset
+    # --reset est explicitement refuse pour preserver les relations existantes
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reset",
         action="store_true",
-        help="Vide la table manga_recommendation_edge avant chargement.",
+        help="Option obsolete et refusee : aucun effacement du graphe.",
     )
 
     return parser.parse_args()
@@ -156,14 +156,10 @@ def iter_recommendation_files() -> list[Path]:
 def upsert_recommendation_rows(
     conn, rows: list[dict[str, Any]], *, reset: bool = False,
 ) -> int:
-    """Only replace the old recommendation graph in the SAME DB transaction.
-
-    An empty/corrupt incoming dataset cannot erase existing recommendations.
-    A failure during insertion rolls back the DELETE on connection close.
-    """
+    """Upsert recommendation edges without clearing the existing graph."""
+    if reset:
+        raise ValueError("--reset est desactive : les recommandations existantes sont preservees.")
     if not rows:
-        if reset:
-            raise ValueError("Import vide : les recommandations précédentes sont conservées.")
         return 0
 
     sql = """
@@ -195,10 +191,6 @@ def upsert_recommendation_rows(
     """
 
     with conn.cursor() as cursor:
-        if reset:
-            # DELETE is transactional. Never commit before successfully
-            # inserting the full validated replacement dataset.
-            cursor.execute("DELETE FROM manga_recommendation_edge;")
         cursor.executemany(sql, rows)
 
     conn.commit()
@@ -208,6 +200,8 @@ def upsert_recommendation_rows(
 
 def main() -> int:
     args = parse_args()
+    if args.reset:
+        raise ValueError("--reset est desactive : aucune suppression des recommandations.")
 
     print("==================================================")
     print("Mangadvisor - Chargement recommandations Jikan")
@@ -328,7 +322,7 @@ def main() -> int:
             print("[load_recommendations] REFUS : fichiers invalides ou zéro recommandation exploitable.")
             print("[load_recommendations] Relations existantes conservées.")
             return 1
-        loaded = upsert_recommendation_rows(conn, all_rows, reset=args.reset)
+        loaded = upsert_recommendation_rows(conn, all_rows)
 
     finally:
         conn.close()
