@@ -175,7 +175,7 @@ def rank(sample: dict, matches: list[dict]) -> dict:
     if first["evidence"] == "EXACT_TITLE":
         qualified = []
         for candidate in unique[1:]:
-            match = re.fullmatch(r"(.+?)\\s*\\(([^)]{2,80})\\)", candidate["title"])
+            match = re.fullmatch(r"(.+?)\s*\(([^)]{2,80})\)", candidate["title"])
             if not match:
                 continue
             prefix = v1.title_key(match.group(1))
