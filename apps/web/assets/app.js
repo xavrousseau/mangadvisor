@@ -10,6 +10,7 @@ import { enrichmentPanel, enrichmentResults, reconcileEnrichment, mergeEnrichmen
 import { bnfCachedCandidatesMarkup } from "./bnf-candidates-view.js";
 import { wikidataFactsMarkup } from "./wikidata-view.js";
 import { csvPreviewMarkup, reconciliationMarkup } from "./bulk-import-view.js";
+import { readingProfileMarkup } from "./reading-profile.js";
 import { resolverMarkup, isVerifiedIsbnRecord, EDITION_OPTIONS } from "./unknown-isbn-view.js";
 import { readingNow, personalPicks, recommendationSources } from "./home.js";
 import { preferredMangaTitle, declaredCountsByManga, libraryCardMeta } from "./library-display.js";
@@ -356,8 +357,10 @@ async function renderLibrary(token){
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
  '<div id="library-results">'+loadingCards(10)+'</div>'+
+ '<section class="bulk-workspace"><details id="reading-profile-workspace"><summary>◈ '+e(state.lang==="fr"?"Mon profil de lecture":"My reading profile")+'</summary><button class="btn btn-soft" type="button" data-action="reading-profile-load">'+e(state.lang==="fr"?"Afficher mon profil":"Show my profile")+'</button><div id="reading-profile-results"></div></details></section>'+
  '<section class="bulk-workspace"><details id="reading-import-workspace"><summary>▤ '+e(state.lang==="fr"?"Importer une bibliothèque de lecture (CSV / Excel)":"Import reading library (CSV / Excel)")+'</summary>'+
  '<p class="page-desc">'+e(state.lang==="fr"?"Ajoute de nouveaux statuts, notes et favoris sans écraser les fiches existantes. Les fichiers Excel sont convertis localement sur ton API. Ce n’est pas l’import de tomes ISBN.":"Add reading status and ratings without overwriting existing entries. This is not the ISBN book import.")+'</p>'+
+ '<div class="bulk-actions"><button type="button" class="btn btn-soft" data-action="reading-template-csv">↓ CSV</button><button type="button" class="btn btn-soft" data-action="reading-template-xlsx">↓ Excel XLSX</button></div>'+
  '<div class="field"><label for="reading-file">CSV / XLSX</label><input id="reading-file" type="file" class="input" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>'+
  '<div class="field"><label for="reading-csv">'+e(state.lang==="fr"?"Contenu CSV de bibliothèque":"Reading library CSV")+'</label><textarea class="textarea" id="reading-csv" rows="5" maxlength="150000" placeholder="title,library_status,user_score,is_favorite">'+e(state.readingCsv)+'</textarea></div>'+
  '<div class="field"><label for="reading-delimiter">'+e(state.lang==="fr"?"Séparateur CSV":"CSV delimiter")+'</label><select class="select" id="reading-delimiter"><option value=","'+(state.readingDelimiter===","?" selected":"")+'>,</option><option value=";"'+(state.readingDelimiter===";"?" selected":"")+'>;</option></select></div>'+
@@ -1254,6 +1257,28 @@ function readingPreviewMarkup(result){
  (result.matched_count?'<p class="collection-caveat">'+(lang?"Les entrées déjà présentes ne seront jamais écrasées. Vérifie ce résultat avant confirmation.":"Existing entries will not be overwritten. Review before confirming.")+'</p>'+
  '<button class="btn btn-primary" data-action="reading-apply">'+(lang?"Confirmer l’ajout":"Confirm import")+'</button>':'')+'</div>';
 }
+async function loadReadingProfile(){
+ const output=document.querySelector("#reading-profile-results");if(!output)return;
+ output.innerHTML='<div class="info">'+L("loading")+'</div>';
+ try{
+  const result=await request("/library/profile");
+  if(routeInfo().view==="library")output.innerHTML=readingProfileMarkup(result,state.lang,e);
+ }catch(error){output.innerHTML=errorBox(error);}
+}
+async function downloadReadingTemplate(format){
+ try{
+  const result=await request("/library/import/template?format="+format);
+  let bytes;
+  if(format==="xlsx"){
+   const binary=atob(result.content_base64);
+   bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));
+  }else bytes=new TextEncoder().encode("\uFEFF"+result.content);
+  const url=URL.createObjectURL(new Blob([bytes],{type:result.mime_type}));
+  const link=document.createElement("a");link.href=url;link.download=result.filename;
+  document.body.appendChild(link);link.click();link.remove();
+  URL.revokeObjectURL(url);
+ }catch(error){toast(error.message);}
+}
 async function previewReadingCsv(){
  const input=document.querySelector("#reading-csv"),target=document.querySelector("#reading-import-result");
  if(!input||!target)return;
@@ -1403,6 +1428,9 @@ root.addEventListener("click",async event=>{
  if(action==="pending-match-select")return selectPendingManga(button);
  if(action==="pending-match-external")return searchMangaDexPending(button);
  if(action==="pending-match-confirm")return confirmPendingManga(button);
+ if(action==="reading-profile-load")return loadReadingProfile();
+ if(action==="reading-template-csv")return downloadReadingTemplate("csv");
+ if(action==="reading-template-xlsx")return downloadReadingTemplate("xlsx");
  if(action==="reading-preview")return previewReadingCsv();
  if(action==="reading-apply")return applyReadingCsv(button);
  if(action==="bulk-preview")return previewBulkCsv();
