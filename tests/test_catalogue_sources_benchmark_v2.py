@@ -131,8 +131,9 @@ class BenchmarkV2Tests(unittest.TestCase):
                 {"number": 2, "isbn": "9780306406158"}],
             "description": "DO NOT COPY A COPYRIGHT BLURB"
         }})
-        self.assertEqual(detail["book_references"], [{
-            "isbn13": "9780306406157", "volume_label": "1", "edition_label": ""}])
+        self.assertEqual([v["isbn13"] for v in detail["book_references"]],
+                         ["9780306406157"])
+        self.assertEqual(detail["book_references"][0]["volume_label"], "1")
         self.assertNotIn("description", detail)
         self.assertTrue(detail["has_summary"])
         self.assertEqual(detail["genres"], ["Aventure"])
@@ -170,6 +171,81 @@ class BenchmarkV2Tests(unittest.TestCase):
             self.assertEqual(sess.get.call_count, 2)
             self.assertGreaterEqual(sleep.call_args.args[0], 0)
             self.assertLessEqual(client.counts["scrinis"], 2)
+
+    def test_official_scrinis_public_n_over_opaque_uuid(self):
+        # Fields reproduced from the official GET /api/v1/series/9884 and
+        # search result shape; identifiers are illustrative but typed.
+        search = {"items": [{
+            "hub_id": "7d362751-a6c9-4620-a873-864f33120482",
+            "public_n": 9884, "ids": {}, "title": "Bestia",
+            "title_localized": "Bestia", "type": "comic", "genres": ["Aventure"],
+        }]}
+        results, schema = v2.parse_hits(search, source="scrinis")
+        self.assertEqual(results[0]["id"], "9884")
+        self.assertEqual(schema["identity_field_types"]["hub_id"], "str")
+        self.assertEqual(schema["with_id"], 1)
+        details = v2.parse_details("scrinis", {
+            "hub_id": "7d362751-a6c9-4620-a873-864f33120482",
+            "public_n": 9884, "type": "comic",
+            "titles": {"primary": "Bestia", "all": [
+                {"lang": "fr", "title": "Bestia", "role": "primary"},
+                {"lang": "ja", "title": "ベスティア", "role": "alternative"}]},
+            "publication": {"publisher": "Les Humanoïdes Associés", "volume_count": 2},
+            "taxonomy": {
+                "genres": [{"slug": "adventure", "label": "Aventure", "kind": "genre"}],
+                "tags": [{"slug": "monsters", "label": "Monstres et créatures"}],
+                "demographics": [{"label": "Seinen"}]},
+            "credits": [{"role": "artist", "name": "Corc"},
+                        {"role": "author", "name": "Corc"}],
+            "editions": [{"edition": "standard", "medium": "print",
+                          "lang": "fr", "volume_count": 2},
+                         {"edition": "standard", "medium": "ebook",
+                          "lang": "fr", "volume_count": 2}],
+            "volumes": [
+                {"n": 1.0, "edition": "standard", "medium": "ebook",
+                 "lang": "fr", "isbn_13": "9782731624649"},
+                {"n": 1.0, "edition": "standard", "medium": "print",
+                 "lang": "fr", "isbn_13": "9782731652772"},
+                {"n": 2.0, "edition": "standard", "medium": "print",
+                 "lang": "fr", "isbn_13": "9782731672756"},
+                {"n": 2.0, "edition": "standard", "medium": "ebook",
+                 "lang": "fr", "isbn_13": "9782731653991"}],
+            "summary": {"kind": "publisher", "text": "copyright text must never be exported"},
+        })
+        self.assertEqual(details["id"], "9884")
+        self.assertEqual(details["title"], "Bestia")
+        self.assertIn("ベスティア", details["aliases"])
+        self.assertEqual(details["genres"], ["Aventure"])
+        self.assertEqual(details["themes"], ["Monstres et créatures"])
+        self.assertEqual(details["authors"], ["Corc"])
+        self.assertEqual(details["publishers"], ["Les Humanoïdes Associés"])
+        self.assertEqual(details["volume_items_seen"], 4)
+        self.assertEqual(details["editions"][0]["medium"], "print")
+        self.assertEqual(details["book_references"][0]["isbn13"], "9782731652772")
+        self.assertEqual(details["book_references"][1]["isbn13"], "9782731672756")
+        self.assertEqual([x["medium"] for x in details["book_references"]],
+                         ["print", "print", "ebook", "ebook"])
+        self.assertEqual(details["book_references"][0]["volume_label"], "1")
+        self.assertNotIn("summary", details)
+        self.assertNotIn("covers", details)
+
+    def test_scrinis_public_n_is_not_taken_from_other_provider(self):
+        payload = {"results": [{"title": "Bestia", "public_n": 9884,
+                                "hub_id": "uuid-opaque"}]}
+        scrinis, _ = v2.parse_hits(payload, source="scrinis")
+        other, _ = v2.parse_hits(payload, source="mangaupdates")
+        self.assertEqual(scrinis[0]["id"], "9884")
+        self.assertIsNone(other[0]["id"])
+
+    def test_detail_request_uses_verified_scrinis_public_n(self):
+        sess = FakeSession()
+        sess.get.return_value.status_code = 200
+        sess.get.return_value.content = b'{"public_n":9884,"titles":{"primary":"Bestia"},"volumes":[]}'
+        result = v2.request_public("scrinis", "detail", sess, identifier="9884")
+        self.assertEqual(result["status"], "OK")
+        self.assertEqual(result["data"]["id"], "9884")
+        self.assertEqual(sess.get.call_args.args[0],
+                         "https://scrin.is/api/v1/series/9884")
 
     def test_scrinis_cache_v1_parsed_null_id_is_invalidated(self):
         import hashlib
