@@ -18,8 +18,9 @@ Double-cliquer sur **mangadvisor.cmd** : c'est l'unique menu utilisateur.
 - **A -> 21** : verifier, activer, arreter ou inspecter le cycle incremental.
 - **A -> S** : maintenance, configuration et restauration.
 
-Les anciens lanceurs Docker de `cmd/` et les lanceurs de tests
-utilisant `--reset-library` ont ete retires. Aucun effacement de volume
+Les anciens lanceurs Docker de `cmd/` et les cinq scripts historiques
+utilisant `--reset-library` ont ete retires de la branche de nettoyage.
+Leur couverture fonctionnelle exhaustive reste a verifier avant fusion. Aucun effacement de volume
 PostgreSQL n'est expose au menu principal.
 
 ## Arborescence utile
@@ -49,9 +50,10 @@ PostgreSQL n'est expose au menu principal.
 2. Les scripts historiques appelés extract_jikan.py et extract_jikan_recommendations.py interrogent **Tenrai v1** (base configurable via MANGA_API_BASE_URL).
 3. Le système sauvegarde les réponses JSON sous data/raw/jikan/ (nom historique conservé pour compatibilité).
 4. Le chargeur écrit jikan_manga_source et le catalogue manga canonique **sans modifier les identifiants des œuvres existantes**. Les tags genre/thème/démographie sont synchronisés de manière additive.
-5. Le graphe de recommandations communautaires est chargé dans manga_recommendation_edge sans effacement préalable.
-6. Les éditions françaises sont proposées à partir de données BnF après vérification ; **aucune importation exhaustive automatique d'ISBN n'est assurée**.
-7. L'inventaire privé est importé uniquement après aperçu et validation explicite. Les correspondances incertaines restent à résoudre.
+5. Le graphe de recommandations communautaires est chargé dans manga_recommendation_edge sans effacement préalable : l'ancienne option `--reset` est refusee.
+6. En cas de doublons MAL entre fichiers SEARCH/TOP, le chargeur conserve les champs non vides ; l'UPSERT evite egalement de remplacer des metadonnees existantes par NULL ou des listes JSON vides.
+7. Les éditions françaises sont proposées à partir de données BnF après vérification ; **aucune importation exhaustive automatique d'ISBN n'est assurée**.
+8. L'inventaire privé est importé uniquement après aperçu et validation explicite. Les correspondances incertaines restent à résoudre.
 
 ### Ce qui existe mais ne doit pas être annoncé comme entièrement opérationnel
 
@@ -72,3 +74,11 @@ Une commande git pull supprime de l'arborescence suivie les fichiers retirés du
 ## Documents de conception V1
 
 Les fichiers data_pipeline_v1.md, data_model_v1.md et mangadvisor_architecture_v1.md portent désormais un avertissement : leurs diagrammes et promesses décrivent le plan initial, pas nécessairement les fonctionnalités branchées.
+
+## Nettoyage `pipelines/` (PR #89, non fusionnee)
+
+- Ancien orchestrateur `run_jikan_pipeline.py` retire. Les deux scripts SQL de consolidation sont appeles depuis le centre de pilotage, puis verifies sur une base CI jetable.
+- Cinq anciens lanceurs de tests destructeurs `run_library_*_tests.py` retires ; des tests modernes non destructifs subsistent dans `tests/`. Leur equivalence complete reste a confirmer.
+- Le menu avance A -> 16 redirige vers le comparatif V2, deja accessible en A -> 17 ; le module `benchmark_manga_sources.py` reste une dependance Python de la V2 et des enrichissements. Il n'est **pas** supprimable isolement.
+- Les tests GitHub Actions verts concernent une base jetable, pas les volumes du PC.
+- Politique de mise a jour source a approfondir : champ absent et suppression explicite fournisseur ne sont pas encore distingues.
