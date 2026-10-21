@@ -132,6 +132,13 @@ relations SQL ne sont pas vérifiés.
 
 Guide : [catalogue MAL complet](docs/04_product/catalogue_mal_complet.md).
 
+**Chemin historique respecté :** les pages sont enregistrées dans
+`data/raw/jikan/manga_page_1.json`, etc. A → 19 peut déplacer **sans réseau
+ni nouvelle écriture SQL** les pages déjà téléchargées dans l'ancien
+sous-dossier `complete_tenrai`. Le fichier `last_sync.json` reste un bilan,
+pas une archive des 85 776 mangas.
+
+
 ### Préparation bibliographique sécurisée — A → 18
 
 Après la collecte V2, **A → 18** prépare un staging SQL des œuvres candidates,
