@@ -53,3 +53,11 @@ Le prototype Streamlit contient encore `discovery.py` (normalisation et paginati
 Le module principal Streamlit comporte des chemins d'import Excel utilisant `pandas` et `openpyxl`, tandis que l'interface Web possède `bulk-import-view.js` pour ses prévisualisations. Avant retrait, il faut comparer les formats Excel, les capacités d'import et les fonctions de lecture/recommandation sur données factices.
 
 Décision : conserver temporairement `apps/ui/`, `infra/docker/ui/Dockerfile` et le profil `legacy`, puis migrer uniquement les tests réutilisables vers des composants indépendants de Streamlit. Ne pas annoncer le retrait comme terminé.
+
+## Décision finale sur Meilisearch — audit transversal après retrait de Streamlit
+
+**Verdict : configuration présente, consommation métier non démontrée.** Les recherches dans le code de l'API et des pipelines n'ont trouvé aucun usage actif d'un client ou des index Meilisearch. À l'inverse, le service est explicitement requis par les Compose stables et de développement, le centre de pilotage Windows (de nombreuses commandes `up postgres meilisearch`), les contrôles d'installation CI et certains contrats de persistance. Le retirer aujourd'hui n'est pas une simple suppression de dossier.
+
+**Arbitrage pour PR #89 : conserver temporairement le service et surtout le volume nommé `mangadvisor_meili`.** Ne pas annoncer une recherche Meilisearch fonctionnelle. Une désactivation propre devra être traitée à part : enlever les dépendances Docker, adapter les commandes PowerShell, les vérifications CI, les variables `.env` et les guides, avec migration explicite si des index conservés doivent être récupérés. Aucune action `docker compose down -v` ni `docker volume rm` ne devra être utilisée.
+
+**Situation Streamlit :** son code, son image et son profil Docker ont été retirés de la branche de nettoyage après migration des fonctions vers le Web ; les chemins historiques éventuels dans les rapports datés ne constituent pas des appels exécutables. Les suites de tests Python/Windows/Docker stables ont réussi sur ce lot, la validation d'intégration complète du dernier commit reste à confirmer.
