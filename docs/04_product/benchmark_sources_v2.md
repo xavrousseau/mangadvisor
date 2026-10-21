@@ -11,7 +11,7 @@ d'œuvre, une couverture exhaustive, ni des preuves de livres/ISBN possédés.
 ## Installation et démarrage
 
 Depuis Windows, utiliser \`mangadvisor.cmd → 3\` pour mettre à jour le dépôt,
-puis **A → 17**. Le menu **A → 16** conserve la V1 pour comparaison.
+puis **A → 17**. Le menu **A → 16** redirige désormais vers la même V2 que A → 17 ; la V1 n'est plus une action distincte du menu utilisateur.
 
 L'outil propose :
 1. Un maximum de **50 œuvres** (priorité aux entrées en attente puis à la
