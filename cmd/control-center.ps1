@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -247,6 +247,46 @@ function Load-Catalogue {
   $catalogCount=Get-Count "manga"
   Write-Host "Notices fournisseur : $sourceCount ; mangas dans le catalogue : $catalogCount"
   if ($catalogCount -eq 0) { throw "Catalogue vide : chargement Tenrai invalide." }
+}
+function Load-Complete-MAL-Catalogue {
+  Say "Catalogue MAL/Jikan complet via Tenrai : base du projet"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  $before=Get-Count "manga"
+  Write-Host "L'API publique Jikan est fermee depuis le 01/10/2026."
+  Write-Host "Tenrai donne acces au catalogue public MyAnimeList au format compatible Jikan."
+  Write-Host "Parcours : toutes categories manga, tri MAL ID ascendant, sans filtre SFW, 100 notices/page."
+  Write-Host "La source annonce sa vraie derniere page ; 20000 est seulement un garde-fou."
+  Write-Host "Le rapport montrera si toutes les pages et references ont ete recuperees."
+  Network
+  Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--plan")
+  if (!(Confirm "Demarrer/reprendre la synchronisation COMPLETE du catalogue public MAL ?" $false)) {
+    Write-Host "Aucune modification du catalogue."
+    return
+  }
+  $refresh=Confirm "Retelcharger toutes les pages, y compris celles du cache valide ?" $false
+  Backup
+  $params=@("pipelines/engine/scripts/sync_full_mal_catalogue.py",
+            "--batch-pages","20","--pause","1.1")
+  if ($refresh) { $params+=@("--refresh") }
+  Engine $params
+  # Never consolidate an incomplete source pass. Engine above must succeed.
+  foreach ($sql in @(
+    "sql\schema\003_build_canonical_from_jikan.sql",
+    "sql\schema\004_add_theme_demographic_tables.sql",
+    "sql\schema\005_build_theme_demographic_from_jikan.sql")) {
+    Sql-File $sql
+  }
+  Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--finalize")
+  $after=Get-Count "manga"
+  $source=Get-Count "jikan_manga_source"
+  Write-Host ("Mangas canonises avant : {0} ; apres : {1} ; progression nette : {2}" -f
+              $before,$after,($after-$before))
+  Write-Host ("Notices source MAL distinctes : {0}" -f $source)
+  Write-Host "Rapport local : data\logs\catalogue_complete\last_sync.json"
+  Write-Host "Fiches de ta mangatheque et relations existantes conservees."
 }
 function Load-Extended-Catalogue {
   Say "Catalogue Tenrai etendu : progression jusqu'a la derniere page"
@@ -716,6 +756,7 @@ try {
     "Aliases"         { Enrich-Multilingual-Aliases }
     "Catalogue"       { Load-Catalogue }
     "CatalogueExtended" { Load-Extended-Catalogue }
+    "CompleteMALCatalogue" { Load-Complete-MAL-Catalogue }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
     "Diagnostic"      { Diagnostic }
