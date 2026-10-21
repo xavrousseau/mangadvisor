@@ -348,6 +348,9 @@ def run_cycle(*, mal_client: Any = None,
                 result["bnf"]=bnf_runner(limit=3)
             result["status"]="SUCCESS"
         except Exception as exc:
+            # A PostgreSQL statement may have aborted the current
+            # transaction. Roll back before releasing the session lock.
+            db.rollback()
             result["status"]="FAILED"
             result["error_type"]=type(exc).__name__
             result["error"]=str(exc)[:320]
