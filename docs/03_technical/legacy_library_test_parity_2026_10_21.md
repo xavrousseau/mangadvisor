@@ -53,3 +53,11 @@ Des tests Python et Web couvrent les principaux contrats de conversion, d'aperç
 - Profil de lecture rendu dans `Ma bibliothèque` via `/library/profile`, sans mutation : statuts, compteurs, tags pondérés, sources influentes et signaux négatifs. La présentation Web est dans `apps/web/assets/reading-profile.js`.
 - Nouveaux tests `tests/test_library_templates.py` et `tests/web/reading-profile.test.mjs` ; le smoke Playwright charge aussi le profil et vérifie les modèles via API.
 - **Décision prudente :** ne pas retirer encore `apps/ui/` : la parité des fonctionnalités de lecture et de recommandations, les tests `tests/test_discovery.py` et `tests/test_recommendation_view.py` qui en importent des utilitaires, ainsi que la dernière CI restent à clôturer. Les anciennes dépendances et l'overlay dev sont donc conservés tant que le retrait complet ne peut pas être validé en un lot.
+
+## Clôture de la migration Streamlit (lot suivant)
+
+Le prototype Streamlit (`apps/ui/`), son `requirements.txt`, le Dockerfile `infra/docker/ui/Dockerfile` et la définition `ui` du Compose développement ont été **retirés de la branche PR #89** après migration des écrans utiles : découverte et fiches via Web, recommandations et conseiller via Web, import lecture CSV/XLSX, modèles et profil de lecture. La version utilisateur stable n'emploie que le site Web.
+
+Les tests de présentation propres à Streamlit ont été retirés ; les tests API catalogue, JavaScript Web, recommandations et parcours navigateur restent. La CI ne construit plus l'image `ui`. La mise à jour Windows conserve une opération de nettoyage du conteneur nommé `mangadvisor_ui` via `docker rm -f`, **sans option `-v` et sans suppression des volumes de données**.
+
+La première passe CI a détecté une dépendance de collecte `requests` installée auparavant indirectement par les dépendances UI et des assertions liées au profil `legacy`. Les dépendances de collecte ont été ajoutées explicitement à la CI et les assertions ont été mises à jour. **La réussite des quatre workflows du dernier HEAD est nécessaire avant de valider définitivement ce retrait**.
