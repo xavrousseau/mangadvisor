@@ -3,7 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import MagicMock
 
 from pipelines.engine.scripts.load_jikan_to_postgres import (
     collect_rows_from_files, merge_manga_rows, transform_jikan_item,
@@ -50,7 +50,7 @@ class MetadataMergeTests(unittest.TestCase):
             merge_manga_rows(a, b)
 
     def test_sql_upsert_preserves_existing_values(self):
-        connection = Mock()
+        connection = MagicMock()
         row = transform_jikan_item({"mal_id": 7, "title": "Example"})
         row["source_name"] = "tenrai"
         self.assertEqual(upsert_jikan_manga_batch(connection, [row]), 1)
