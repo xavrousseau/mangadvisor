@@ -332,11 +332,12 @@ def synchronize(db: Any, *, client: Any = None, newest_cap: int = RECENT_PAGE_CA
     }
 
 
-def bnf_import_and_review(*, max_files: int = 3, limit: int = 3) -> dict:
+def bnf_import_and_review(*, max_files: int = 3, limit: int = 3,
+                          target_ids: list[int] | None = None) -> dict:
     """Import only user-provided official monthly files; plus live SRU queue."""
     from apps.api.app import bnf_batch
     files=[]
-    if bnf_files.IMPORTS.is_dir():
+    if target_ids is None and bnf_files.IMPORTS.is_dir():
         files=sorted(p for p in bnf_files.IMPORTS.iterdir()
                      if p.is_file() and not p.is_symlink()
                      and p.name.lower().endswith(bnf_files.SUPPORTED))[:max_files]
@@ -345,7 +346,8 @@ def bnf_import_and_review(*, max_files: int = 3, limit: int = 3) -> dict:
         with get_postgres_connection() as conn:
             for p in files:
                 imported.append(bnf_files.ingest_one(p,preview=False,database=conn))
-    review=bnf_batch.run_batch(bnf_batch.connect_database,limit=limit)
+    review=bnf_batch.run_batch(bnf_batch.connect_database,limit=limit,
+                               target_ids=target_ids)
     return {"monthly_files":imported,"sru":review,
             "note":"BNF_MATCHES_ARE_CANDIDATES_NOT_VERIFIED_OWNERSHIP"}
 
@@ -371,15 +373,35 @@ def run_cycle(*, mal_client: Any = None,
                 # explicit rather than silently labeled as complete.
                 # Daily catch-up budget: high enough for genuine progress,
                 # bounded by provider-specific rate limiters and API caps.
+                # Prioritize changed MAL records (new works and corrected
+                # authors/titles) BEFORE ordinary backlog. Each queue still
+                # applies its own author/ambiguity/ISBN checks.
+                changed = result["mal"].get("ids_changed") or []
+                recent_ids: list[int] = []
+                if changed:
+                    with db.cursor() as cur:
+                        cur.execute("""SELECT id FROM manga
+                                       WHERE source_mal_id=ANY(%s)
+                                       ORDER BY id LIMIT 100""",(changed,))
+                        recent_ids = [int(r["id"]) for r in cur.fetchall()]
+                result["recent_canonical_ids"] = len(recent_ids)
+                if recent_ids:
+                    result["scrinis_recent"]=scrinis_runner(
+                        factory=factory,limit=12,target_ids=recent_ids)
+                    result["mangaupdates_recent"]=mu_runner(
+                        factory=factory,limit=5,target_ids=recent_ids)
+                    result["bnf_recent"]=bnf_runner(limit=5,target_ids=recent_ids)
                 result["scrinis"]=scrinis_runner(factory=factory,limit=40)
                 result["mangaupdates"]=mu_runner(factory=factory,limit=15)
                 result["bnf"]=bnf_runner(limit=10)
-                # A partial source outage must not be advertised as a
-                # fully healthy multi-source cycle, even if MAL succeeded.
-                problems = (
-                    result["scrinis"].get("provider_errors",0)
-                    + result["mangaupdates"].get("errors",0)
-                    + result["bnf"].get("sru",{}).get("error",0)
+                # An upstream outage must never look like full success.
+                problems = sum(
+                    value.get("provider_errors",0) + value.get("errors",0)
+                    + value.get("sru",{}).get("error",0)
+                    for name,value in result.items()
+                    if name in (
+                        "scrinis","scrinis_recent","mangaupdates",
+                        "mangaupdates_recent","bnf","bnf_recent")
                 )
                 if problems:
                     result["status"]="PARTIAL_SOURCE_UNAVAILABLE"
