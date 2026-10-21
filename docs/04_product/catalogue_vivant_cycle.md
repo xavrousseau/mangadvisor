@@ -71,6 +71,10 @@ Les JSON correspondant aux changements vont dans
 
 Les enrichissements reprennent ensuite avec un nombre borné de
 fiches : **40 Scrinis, 15 MangaUpdates et 10 BnF SRU par cycle**.
+Lorsque le cycle découvre ou corrige une notice MAL, ses nouveaux
+identifiants canoniques passent **en priorité** dans des lots spécifiques
+(maximum 12 Scrinis, 5 MangaUpdates et 5 BnF) avant de reprendre la file
+globale de rattrapage. Le rapprochement n'est toujours jamais forcé.
 L'objectif est de progresser sur le stock international et français,
 sans saturer les API publiques. Des erreurs de limite de débit arrêtent
 les traitements concernés sans créer de correspondances fictives.
