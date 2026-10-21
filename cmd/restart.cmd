@@ -10,13 +10,6 @@ echo ==================================================
 echo.
 
 pushd "%ROOT_DIR%"
-rem Retire seulement le conteneur Streamlit historique, jamais les volumes.
-call "%~dp0retire-legacy-ui.cmd"
-if errorlevel 1 (
-    popd
-    endlocal
-    exit /b 1
-)
 %COMPOSE_CMD% down
 if errorlevel 1 (
     popd
