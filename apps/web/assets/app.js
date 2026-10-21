@@ -35,6 +35,7 @@ const state = {
   enrichmentReport:null,enrichmentNonce:0,enrichmentAlias:"",enrichmentBusy:false,
   bnfCache:null,wikidataCache:null,
   bulkPreview:null,bulkCsv:"",bulkResolver:null,
+  readingCsv:"",readingPreview:null,readingDelimiter:",",readingDefaultStatus:"WANT_TO_READ",
   pendingRows:[],pendingMatch:null,
 };
 let renderToken = 0, searchTimer = null;
@@ -355,6 +356,14 @@ async function renderLibrary(token){
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
  '<div id="library-results">'+loadingCards(10)+'</div>'+
+ '<section class="bulk-workspace"><details id="reading-import-workspace"><summary>▤ '+e(state.lang==="fr"?"Importer une bibliothèque de lecture (CSV / Excel)":"Import reading library (CSV / Excel)")+'</summary>'+
+ '<p class="page-desc">'+e(state.lang==="fr"?"Ajoute de nouveaux statuts, notes et favoris sans écraser les fiches existantes. Les fichiers Excel sont convertis localement sur ton API. Ce n’est pas l’import de tomes ISBN.":"Add reading status and ratings without overwriting existing entries. This is not the ISBN book import.")+'</p>'+
+ '<div class="field"><label for="reading-file">CSV / XLSX</label><input id="reading-file" type="file" class="input" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>'+
+ '<div class="field"><label for="reading-csv">'+e(state.lang==="fr"?"Contenu CSV de bibliothèque":"Reading library CSV")+'</label><textarea class="textarea" id="reading-csv" rows="5" maxlength="150000" placeholder="title,library_status,user_score,is_favorite">'+e(state.readingCsv)+'</textarea></div>'+
+ '<div class="field"><label for="reading-delimiter">'+e(state.lang==="fr"?"Séparateur CSV":"CSV delimiter")+'</label><select class="select" id="reading-delimiter"><option value=","'+(state.readingDelimiter===","?" selected":"")+'>,</option><option value=";"'+(state.readingDelimiter===";"?" selected":"")+'>;</option></select></div>'+
+ '<div class="field"><label for="reading-default-status">'+e(state.lang==="fr"?"Statut par défaut":"Default status")+'</label><select class="select" id="reading-default-status">'+STATUS.map(s=>'<option value="'+s+'"'+(s===state.readingDefaultStatus?' selected':'')+'>'+e(libraryStatus(state.lang,s))+'</option>').join("")+'</select></div>'+
+ '<button type="button" class="btn btn-primary" data-action="reading-preview">'+e(state.lang==="fr"?"Simuler et vérifier":"Preview without changes")+' →</button>'+
+ '<div id="reading-import-result"></div></details></section>'+
  '<section class="physical-inventory-section"><details id="physical-inventory-workspace" open>'+
  '<summary>▤ '+L("physicalTitle")+'</summary>'+
  '<p class="page-desc">'+L("physicalIntro")+'</p>'+
@@ -1232,6 +1241,58 @@ async function confirmBulkAssociation(button){
  }
 }
 
+function readingPreviewMarkup(result){
+ const lang=state.lang==="fr";
+ const summary='<p>'+e(result.matched_count)+' '+(lang?"correspondances":"matched")+' · '+e(result.not_found_count)+' '+(lang?"inconnus":"not found")+' · '+e(result.error_count)+' '+(lang?"erreurs":"errors")+'</p>';
+ const rows=(result.imported_items||[]).slice(0,100).map(x=>'<li>'+e(x.requested_title)+' → '+e(x.matched_title)+' ('+e(x.library_status)+')</li>').join("");
+ const missing=(result.not_found_items||[]).slice(0,40).map(x=>'<li>'+e(x.title)+'</li>').join("");
+ const errors=(result.error_items||[]).slice(0,40).map(x=>'<li>'+e(x.error)+'</li>').join("");
+ return '<div class="bulk-preview">'+summary+
+ (rows?'<h3>'+(lang?"Mangas reconnus":"Matched titles")+'</h3><ul>'+rows+'</ul>':'')+
+ (missing?'<h3>'+(lang?"Titres non trouvés":"Unknown titles")+'</h3><ul>'+missing+'</ul>':'')+
+ (errors?'<h3>'+(lang?"Erreurs":"Errors")+'</h3><ul>'+errors+'</ul>':'')+
+ (result.matched_count?'<p class="collection-caveat">'+(lang?"Les entrées déjà présentes ne seront jamais écrasées. Vérifie ce résultat avant confirmation.":"Existing entries will not be overwritten. Review before confirming.")+'</p>'+
+ '<button class="btn btn-primary" data-action="reading-apply">'+(lang?"Confirmer l’ajout":"Confirm import")+'</button>':'')+'</div>';
+}
+async function previewReadingCsv(){
+ const input=document.querySelector("#reading-csv"),target=document.querySelector("#reading-import-result");
+ if(!input||!target)return;
+ const csv=input.value.trim();if(!csv){toast("CSV vide");return;}
+ const delimiter=document.querySelector("#reading-delimiter")?.value||",";
+ const status=document.querySelector("#reading-default-status")?.value||"WANT_TO_READ";
+ state.readingPreview=null;state.readingCsv=csv;state.readingDelimiter=delimiter;state.readingDefaultStatus=status;
+ target.innerHTML='<div class="info">'+L("loading")+'</div>';
+ try{
+  const result=await request("/library/import/csv",{method:"POST",data:{csv_content:csv,delimiter,default_status:status,dry_run:true}});
+  if(routeInfo().view!=="library")return;
+  state.readingPreview={csv,delimiter,status,result};
+  target.innerHTML=readingPreviewMarkup(result);
+ }catch(err){target.innerHTML=errorBox(err);}
+}
+async function applyReadingCsv(button){
+ const preview=state.readingPreview;
+ if(!preview||document.querySelector("#reading-csv")?.value.trim()!==preview.csv)return;
+ if(!confirm(state.lang==="fr"?"Ajouter les mangas reconnus sans modifier ceux déjà enregistrés ?":"Add matched manga without changing existing entries?"))return;
+ button.disabled=true;
+ try{
+  const result=await request("/library/import/csv",{method:"POST",data:{
+   csv_content:preview.csv,delimiter:preview.delimiter,default_status:preview.status,dry_run:false
+  }});
+  state.readingPreview=null;state.recResult=null;
+  const target=document.querySelector("#reading-import-result");
+  if(target)target.innerHTML='<div class="info">✓ '+e(result.matched_count)+' '+(state.lang==="fr"?"correspondances traitées (existants conservés)":"matches processed (existing entries preserved)")+'</div>';
+  await updateLibrary(renderToken);
+ }catch(err){button.disabled=false;toast(err.message);}
+}
+async function readingXlsxAsBase64(file){
+ return new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onerror=()=>reject(Error("Lecture Excel impossible"));
+  reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");
+  reader.readAsDataURL(file);
+ });
+}
+
 async function previewBulkCsv(){
  const input=document.querySelector("#bulk-csv-text");
  if(!input)return;
@@ -1342,6 +1403,8 @@ root.addEventListener("click",async event=>{
  if(action==="pending-match-select")return selectPendingManga(button);
  if(action==="pending-match-external")return searchMangaDexPending(button);
  if(action==="pending-match-confirm")return confirmPendingManga(button);
+ if(action==="reading-preview")return previewReadingCsv();
+ if(action==="reading-apply")return applyReadingCsv(button);
  if(action==="bulk-preview")return previewBulkCsv();
  if(action==="bulk-resolve")return startBulkResolution(button);
  if(action==="bulk-resolve-close"){state.bulkResolver=null;drawBulkResolver();return;}
@@ -1442,6 +1505,29 @@ root.addEventListener("change",async event=>{
    const save=document.querySelector('[data-action="pending-match-confirm"]');
    if(save)save.disabled=!input.checked;
  }
+ if(input.id==="reading-delimiter"||input.id==="reading-default-status"){
+  state.readingPreview=null;
+  const target=document.querySelector("#reading-import-result");if(target)target.innerHTML="";
+ }
+ if(input.id==="reading-file"&&input.files?.[0]){
+  const file=input.files[0];state.readingPreview=null;
+  const output=document.querySelector("#reading-import-result");
+  try{
+   let csv="";
+   if(file.name.toLowerCase().endsWith(".xlsx")){
+    if(file.size>512000)throw Error("Classeur Excel trop volumineux");
+    const converted=await request("/library/import/xlsx/convert",{method:"POST",data:{content_base64:await readingXlsxAsBase64(file)}});
+    csv=converted.csv_content;
+   }else if(file.name.toLowerCase().endsWith(".csv")){
+    if(file.size>150000)throw Error("CSV trop volumineux");
+    csv=await file.text();
+   }else throw Error("Choisir un fichier CSV ou XLSX");
+   state.readingCsv=csv;
+   const area=document.querySelector("#reading-csv");if(area)area.value=csv;
+   if(output)output.innerHTML='<p>'+(state.lang==="fr"?"Fichier prêt : lancer la simulation avant import.":"File ready: preview before import.")+'</p>';
+  }catch(err){if(output)output.innerHTML=errorBox(err);}
+  return;
+ }
  if(input.id==="bulk-csv-file"&&input.files?.[0]){
   const file=input.files[0];
   if(file.size>80000){toast(t(state.lang,"bulkFormat"));input.value="";return;}
@@ -1465,6 +1551,10 @@ root.addEventListener("change",async event=>{
 root.addEventListener("input",event=>{
  const id=event.target.id;
  if(id.startsWith("scan-")){isbnScanner.capture();return;}
+ if(id==="reading-csv"){
+  state.readingPreview=null;state.readingCsv=event.target.value;
+  const target=document.querySelector("#reading-import-result");if(target)target.innerHTML="";
+ }
  if(id==="bulk-resolve-volume")syncBulkConfirmation();
  if(id==="bulk-csv-text" && state.bulkPreview && event.target.value.trim()!==state.bulkCsv){
   state.bulkPreview=null;state.bulkResolver=null;
