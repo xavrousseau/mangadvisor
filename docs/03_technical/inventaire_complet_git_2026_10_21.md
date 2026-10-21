@@ -4,7 +4,7 @@
 
 - **Référence inventoriée** : `main` à `adb9a09a8c49e93a37ad04db4118a05b1dec701e` (303 fichiers suivis).
 - **Arborescence initiale** : 39 dossiers, 2 319 096 octets suivis.
-- **Après première passe de nettoyage** : 254 fichiers suivis, 1839658 octets ; 49 fichiers retirés du checkout ; l'historique Git permet de les retrouver.
+- **Après première passe de nettoyage** : 252 fichiers initiaux conservés, environ 1,82 Mo ; **51 fichiers retirés** du checkout ; l'historique Git permet de les retrouver. Ce document d'inventaire est ajouté en plus.
 - **Un fichier = une ligne** ci-dessous, avec son usage, la décision et la raison.
 - **Niveau de preuve** : inventaire de l'arbre GitHub exhaustif, contrôle statique de dépendances et examen ciblé des points d'entrée Windows, Docker, PostgreSQL, pipelines et API. **Le jugement individuel des 303 fichiers n'est pas une relecture manuelle ligne par ligne de chaque module**. Les suites CI effectuent ensuite les vérifications automatiques de syntaxe et de comportement. Le PostgreSQL privé du PC n'est pas accessible depuis cet audit.
 - Aucune suppression de `.env`, sauvegardes, JSON Jikan, PostgreSQL ou volumes personnels : **ils ne sont pas suivis par Git**.
@@ -345,7 +345,7 @@
 | `tests/test_collection_scan.py` | Non-régression Python : collection scan | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_conversational_advisor.py` | Non-régression Python : conversational advisor | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_cover_api.py` | Non-régression Python : cover api | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
-| `tests/test_discovery.py` | Non-régression Python : discovery | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
+| `tests/test_discovery.py` | Non-régression Python : discovery | **RETIRÉ** | Test dépendant exclusivement de la vue Streamlit supprimée ; tests Python API et Web moderne conservés. |
 | `tests/test_edition_discovery.py` | Non-régression Python : edition discovery | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_edition_enrichment.py` | Non-régression Python : edition enrichment | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_extended_tenrai_catalogue.py` | Non-régression Python : extended tenrai catalogue | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
@@ -365,7 +365,7 @@
 | `tests/test_recommendation_explanations.py` | Non-régression Python : recommendation explanations | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_recommendation_ingestion_health.py` | Non-régression Python : recommendation ingestion health | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_recommendation_quality.py` | Non-régression Python : recommendation quality | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
-| `tests/test_recommendation_view.py` | Non-régression Python : recommendation view | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
+| `tests/test_recommendation_view.py` | Non-régression Python : recommendation view | **RETIRÉ** | Test dépendant exclusivement de la vue Streamlit supprimée ; tests Python API et Web moderne conservés. |
 | `tests/test_repository_hygiene.py` | Non-régression Python : repository hygiene | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_repository_safety.py` | Non-régression Python : repository safety | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
 | `tests/test_single_web_deployment.py` | Non-régression Python : single web deployment | **CONSERVER** | Utilisé pour sécuriser les évolutions et prévenir les régressions. |
