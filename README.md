@@ -103,7 +103,7 @@ La base `bnf_bulk_notice` reçoit **uniquement les notices candidates** selon le
 
 ## Comparer des sources manga complémentaires (nouveau)
 
-Le menu **`mangadvisor.cmd → A → 16`** prépare un comparatif de **50 mangas**
+Le menu **`mangadvisor.cmd → A → 16`** est désormais un raccourci vers le **comparatif V2**, également disponible dans **A → 17**. Il prépare un comparatif sur un échantillon borné de mangas
 déjà présents ou en attente de rapprochement, puis interroge les recherches
 publiques de **Scrinis** et **MangaUpdates** seulement après confirmation.
 Il ne retélécharge pas Tenrai et **ne modifie jamais PostgreSQL**.
@@ -112,7 +112,7 @@ précède leur envoi en tant que recherches publiques aux fournisseurs.
 
 Les deux rapports restent sur le PC, dans `data/logs/catalog_sources/`.
 Les résultats distinguent les titres exacts des simples suggestions,
-des ambiguïtés, et des erreurs de fournisseur. Le benchmark ne constitue
+des ambiguïtés, et des erreurs de fournisseur. Le benchmark V2 ne constitue
 pas une preuve d'édition française et n'effectue aucun rapprochement
 automatique. Voir le [guide détaillé](docs/04_product/benchmark_sources_4_9.md).
 
@@ -200,7 +200,7 @@ bibliographiques vérifiés **sans jamais les associer automatiquement à une
 quotas et cache local (24 h).
 
 Lire le [guide comparatif V2](docs/04_product/benchmark_sources_v2.md).
-L'ancienne option A → 16 reste disponible pour comparaison.
+L'option A → 16 utilise maintenant le même moteur V2 que A → 17 ; l'ancien module V1 est conservé uniquement comme bibliothèque d'utilitaires nécessaire aux enrichissements.
 
 ## Architecture et contrôle qualité
 
