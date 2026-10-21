@@ -85,7 +85,7 @@ def hits_of(payload: Any) -> tuple[list[dict] | None, dict]:
     return None, diag
 
 
-def parse_hits(payload: Any) -> tuple[list[dict] | None, dict]:
+def parse_hits(payload: Any, *, source: str | None = None) -> tuple[list[dict] | None, dict]:
     hits, diagnostic = hits_of(payload)
     if hits is None:
         return None, diagnostic
@@ -109,6 +109,14 @@ def parse_hits(payload: Any) -> tuple[list[dict] | None, dict]:
                     "original_title", "titles", "original", "title_localized"):
             alts += names_from(obj.get(key))
         series_id = pick_id(obj, hit)
+        if source == "scrinis":
+            # Verified against /api/v1/series/9884 (public_n=9884,
+            # hub_id=UUID). Never use the UUID in the numeric API route.
+            for candidate in (obj, hit):
+                public_n = candidate.get("public_n")
+                if isinstance(public_n, int) and not isinstance(public_n, bool) and 0 < public_n < 10**14:
+                    series_id = str(public_n)
+                    break
         records.append({
             "id": series_id,
             "title": titles[0][:200],
@@ -236,7 +244,7 @@ def request_public(source: str, kind: str, session: Any, *,
     except (ValueError, UnicodeError):
         return {"status": "INVALID_JSON"}
     if kind == "search":
-        data, diagnostic = parse_hits(payload)
+        data, diagnostic = parse_hits(payload, source=source)
         return {"status": "OK", "candidates": data, "schema": diagnostic} if data is not None else {
             "status": "UNKNOWN_SCHEMA", "schema": diagnostic}
     return {"status": "OK", "data": parse_details(source, payload)}
@@ -260,6 +268,119 @@ def _labels(raw: Any, *, keys=("name", "genre", "category", "title")) -> list[st
     return list(dict.fromkeys(x[:100] for x in result if x))[:15]
 
 
+def _scrinis_details(body: dict) -> dict:
+    """Adapter for the *verified* Scrinis v1 response, not MangaUpdates JSON.
+
+    Official response: public_n, titles.primary/all, taxonomy.genres/tags,
+    publication.publisher, editions, volumes[n/isbn_13/medium/edition/lang].
+    Only bounded metadata is retained. No user collection write is possible.
+    """
+    titles = body.get("titles")
+    if not isinstance(titles, dict):
+        titles = {}
+    primary = names_from(titles.get("primary") or
+                         body.get("title") or body.get("name"))
+    alt = names_from(titles.get("localized_primary"))
+    all_titles = titles.get("all")
+    if isinstance(all_titles, list):
+        for entry in all_titles[:40]:
+            if isinstance(entry, dict):
+                alt.extend(names_from(entry.get("title")))
+    for key in ("title_localized", "alternative_titles", "aliases"):
+        alt.extend(names_from(body.get(key)))
+    alt = list(dict.fromkeys(x[:200] for x in alt if x))[:15]
+    taxonomy = body.get("taxonomy")
+    if not isinstance(taxonomy, dict):
+        taxonomy = {}
+    genres = _labels(taxonomy.get("genres") or body.get("genres"),
+                     keys=("label", "name", "genre", "title"))
+    themes = _labels(taxonomy.get("tags") or body.get("themes") or body.get("categories"),
+                     keys=("label", "name", "theme", "title"))
+    demographies = _labels(taxonomy.get("demographics"),
+                           keys=("label", "name", "demographic"))
+    publication = body.get("publication")
+    if not isinstance(publication, dict):
+        publication = {}
+    publisher = publication.get("publisher")
+    publishers = [publisher[:120]] if isinstance(publisher, str) and publisher else []
+    if not publishers:
+        publishers = _labels(body.get("publishers"), keys=("publisher_name", "name"))
+    credits = body.get("credits")
+    authors = []
+    if isinstance(credits, list):
+        authors = list(dict.fromkeys(
+            str(c["name"])[:120] for c in credits[:40]
+            if isinstance(c, dict) and c.get("role") in ("artist", "author", "writer")
+            and isinstance(c.get("name"), str)
+        ))[:12]
+    volumes = body.get("volumes") or body.get("tomes") or []
+    if isinstance(volumes, dict):
+        volumes = volumes.get("items") or volumes.get("data") or []
+    if not isinstance(volumes, list):
+        volumes = []
+    editions = []
+    listed_editions = body.get("editions")
+    if isinstance(listed_editions, list):
+        for edition in listed_editions[:25]:
+            if not isinstance(edition, dict):
+                continue
+            editions.append({
+                "edition": str(edition.get("edition") or "")[:80],
+                "medium": str(edition.get("medium") or "")[:20],
+                "lang": str(edition.get("lang") or "")[:20],
+                "volume_count": edition.get("volume_count") if isinstance(
+                    edition.get("volume_count"), int) else None
+            })
+    refs = []
+    for volume in volumes[:100]:
+        if not isinstance(volume, dict):
+            continue
+        code = volume.get("isbn_13") or volume.get("isbn13") or volume.get("isbn")
+        normalized = isbn13(str(code)) if isinstance(code, (str, int)) else None
+        if not normalized:
+            continue
+        num = volume.get("n")
+        if num is None:
+            num = volume.get("number") or volume.get("volume")
+        if isinstance(num, float) and num.is_integer():
+            num = int(num)
+        refs.append({
+            "isbn13": normalized,
+            "volume_label": str(num if num is not None else "")[:40],
+            "edition_label": str(volume.get("edition") or "")[:80],
+            "medium": str(volume.get("medium") or "")[:20],
+            "lang": str(volume.get("lang") or "")[:20],
+            "released_on": str(volume.get("released_on") or "")[:30],
+        })
+    # The report limit favours physical French reference data, but never
+    # claims these ISBNs are owned by the user.
+    refs.sort(key=lambda r: (r["lang"].lower() == "fr" and
+                             r["medium"].lower() == "print",
+                             r["lang"].lower() == "fr",
+                             r["medium"].lower() == "print"), reverse=True)
+    top = body.get("isbn_13") or body.get("isbn13") or body.get("isbn")
+    normalized_top = isbn13(str(top)) if isinstance(top, (str, int)) else None
+    if normalized_top and not any(x["isbn13"] == normalized_top for x in refs):
+        refs.append({"isbn13": normalized_top, "volume_label": "",
+                     "edition_label": "", "medium": "", "lang": "",
+                     "released_on": ""})
+    public_n = body.get("public_n")
+    series_id = (str(public_n) if isinstance(public_n, int)
+                 and not isinstance(public_n, bool) and 0 < public_n < 10**14
+                 else pick_id(body))
+    return {
+        "status": "OK", "id": series_id,
+        "title": primary[0][:200] if primary else None, "aliases": alt,
+        "work_type": str(body.get("type") or body.get("format") or "")[:60],
+        "genres": genres, "themes": themes, "demographics": demographies,
+        "publishers": publishers[:12], "authors": authors,
+        "editions": editions,
+        "book_references": refs[:20], "volume_items_seen": len(volumes),
+        "has_summary": bool(body.get("summary") or body.get("summaries")
+                            or body.get("description") or body.get("synopsis")),
+    }
+
+
 def parse_details(source: str, payload: Any) -> dict:
     """Save structured bibliographic evidence only, never covers or long text."""
     if not isinstance(payload, dict):
@@ -269,6 +390,8 @@ def parse_details(source: str, payload: Any) -> dict:
         body = body["series"]
     if isinstance(body.get("record"), dict):
         body = body["record"]
+    if source == "scrinis":
+        return _scrinis_details(body)
     title = names_from(body.get("title") or body.get("name"))
     alts = names_from(body.get("associated")) + names_from(body.get("aliases"))
     alts += names_from(body.get("alternative_titles"))
@@ -329,7 +452,7 @@ class RateLimitedClient:
         # fresh supplier JSON; reuse MangaUpdates caches unchanged.
         cache_key = [provider, kind, query, identifier]
         if provider == "scrinis":
-            cache_key.append("hub_id_reader_v2")
+            cache_key.append("scrinis_public_n_and_editions_v3")
         key = hashlib.sha256(json.dumps(cache_key,
                                         ensure_ascii=False).encode("utf-8")).hexdigest()
         path = self.cache_dir / f"{key}.json"
@@ -456,6 +579,7 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
             "nombre_candidats", "concurrents_ambigus", "autres_candidats",
             "detail_etat", "titre_detail", "titres_alternatifs",
             "genres", "themes", "isbn_valides_candidats", "references_tomes",
+            "editions", "isbn_papier_fr_candidats", "auteurs",
             "avertissement"])
         writer.writeheader()
         for item in report["entries"]:
@@ -479,6 +603,15 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
                     "themes": " | ".join(detail.get("themes") or []),
                     "isbn_valides_candidats": " | ".join(b["isbn13"] for b in books),
                     "references_tomes": detail.get("volume_items_seen"),
+                    "editions": " | ".join(
+                        str(e.get("edition") or "") + " / " +
+                        str(e.get("medium") or "") + " / " +
+                        str(e.get("lang") or "")
+                        for e in detail.get("editions") or []),
+                    "isbn_papier_fr_candidats": " | ".join(
+                        b["isbn13"] for b in books if b.get("medium") == "print"
+                        and b.get("lang") == "fr"),
+                    "auteurs": " | ".join(detail.get("authors") or []),
                     "avertissement": first.get("warning") or "",
                 })
     return js, cs

@@ -18,7 +18,7 @@ L'outil propose :
    collection reconnue, enfin au catalogue) ;
 2. Un maximum de **12 fiches détaillées par fournisseur**, paramétrable de 0 à
    20. Les fiches sont choisies uniquement quand un candidat a un identifiant
-   numérique exploitable et une correspondance par titre/MAL, même ambiguë ;
+   numérique exploitable et une correspondance par titre/MAL **non ambiguë** ;
 3. Un aperçu des titres sans requête externe ;
 4. Un accord explicite avant d'envoyer ces titres à Scrinis et MangaUpdates.
 
@@ -53,7 +53,8 @@ mises en cache 24 heures **sur le PC uniquement**, hors Git.
   été chargée**. L'absence dans un tableau n'implique pas absence chez
   Scrinis/MangaUpdates.
 - \`isbn_valides_candidats\` conserve uniquement des ISBN-10/13 à clé correcte
-  trouvés sur une fiche ou les 20 premiers tomes retournés ; un ISBN n'est
+  trouvés sur une fiche ou jusqu'à 100 tomes parcourus (20 ISBN conservés,
+  priorité au support papier français) ; un ISBN n'est
   **jamais** automatiquement lié à une œuvre/édition/possession.
 - \`concurrents_ambigus\` et \`autres_candidats\` permettent enfin de savoir
   pourquoi Bleach, Naruto, Demon Slayer, etc. sont ambigus.
@@ -92,21 +93,51 @@ La révision de la V2 corrige ces deux erreurs :
   alors pas lue comme s'il avait été validé.
 - Un doujinshi, artbook ou roman passe derrière une œuvre de type manga
   ordinaire **pour les simples suggestions non exactes**.
-- Le parseur essaie aussi le champ \`hub_id\` des résultats Scrinis si celui-ci
-  est un entier positif, et conserve le type des champs \`hub_id\`/\`ids\`
-  pour diagnostic. La correspondance avec le vrai endpoint de fiche reste à
-  vérifier sur une exécution réelle ; ne jamais prendre \`public_n\` pour
-  un identifiant d'œuvre.
+- **Identifiants Scrinis vérifiés :** le `hub_id` est un UUID, pas un entier.
+  Le champ `public_n` est le numéro de fiche public utilisable dans
+  `/api/v1/series/{id}`. Le nouveau lecteur utilise uniquement ce numéro
+  validé et conserve l'UUID comme identifiant opaque non adressable.
+
+## Troisième test réel du 21 octobre : cause exacte du blocage Scrinis
+
+Le rapport du 21 octobre au matin a confirmé que :
+- Scrinis restait à **0/50 identifiants** malgré ses 35 titres exacts ;
+- MangaUpdates avait correctement détecté l'homonymie **Wind Breaker**
+  et classé les œuvres sous \`AMBIGUOUS\` plutôt que de lire la mauvaise fiche ;
+- l'ancien parseur cherchait un entier dans \`hub_id\`, alors que la réponse
+  réelle indique \`hub_id\` comme chaîne et \`public_n\` comme entier.
+
+La fiche publique officielle
+[Bestia nº 9884](https://scrin.is/fr/series/9884-bestia) permet de suivre
+son lien direct [API](https://scrin.is/api/v1/series/9884). Le JSON réel
+indique :
+
+- \`hub_id\` UUID et \`public_n: 9884\` ;
+- \`titles.primary\` et \`titles.all\` avec les différentes langues ;
+- \`taxonomy.genres\`, \`taxonomy.tags\`, \`credits\`, \`publication.publisher\` ;
+- \`editions\` distinctes par \`medium\` (\`print\` ou \`ebook\`) et \`lang\` ;
+- \`volumes[].n\`, \`volumes[].isbn_13\`, \`edition\`, \`medium\`, \`lang\`.
+
+Le nouveau code reconnaît ces champs, distingue papier français et
+numérique et ajoute trois colonnes CSV : \`editions\`,
+\`isbn_papier_fr_candidats\`, \`auteurs\`.
+
+Les ISBN restent des **indices bibliographiques non confirmés**, sans
+liaison automatique aux volumes de la mangathèque. Le vieux cache Scrinis
+est invalidé automatiquement ; le cache MangaUpdates reste exploitable.
+
+Le prochain essai peut être réduit à **5 titres et 5 fiches par API**
+dans **A → 17**. Cette vérification permet de mesurer le nombre de fiches
+Scrinis effectivement accessibles et les ISBN papier français disponibles.
 
 ## Limites honnêtes
 
-- **Aucun appel API réel V2 n'a été exécuté dans GitHub Actions**. Les tests
-  utilisent des réponses synthétiques. Le format courant des résultats Scrinis
-  devra être validé grâce aux diagnostics du vrai rapport V2.
-- Le fournisseur Scrinis étant encore en bêta, les réponses peuvent être
-  incomplètes. Sa documentation officielle décrit \`/api/v1/search\` et
-  \`/api/v1/series/{id}\`, mais pas ici la structure détaillée de chaque
-  résultat. On ne devine jamais un ID numérique.
+- **GitHub Actions n'interroge pas les API en direct.** Les tests se basent
+  sur des fixtures correspondant au JSON de fiche officielle observé.
+  Le fonctionnement du nouveau lecteur sur ton PC reste à confirmer.
+- Scrinis est encore en bêta : les données peuvent être incomplètes.
+  Aucune recherche de fiche n'est tentée sans `public_n` positif validé,
+  et une correspondance ambiguë ne reçoit pas d'enrichissement arbitraire.
 - La documentation officielle MangaUpdates décrit \`POST /series/search\`
   et \`GET /series/{id}\`. Les catégories de séries dérivées ou artbooks
   restent visibles et ne sont pas fusionnées par simple similarité.
