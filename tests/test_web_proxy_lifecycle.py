@@ -28,23 +28,20 @@ class WebProxyLifecycleTests(unittest.TestCase):
         self.assertNotIn("http://localhost:8502", app)
         self.assertNotIn("127.0.0.1:8502", app)
 
-    def test_menu_stops_legacy_without_removing_volumes(self):
-        for relative in ("cmd/start.cmd", "cmd/up.cmd", "cmd/restart.cmd"):
-            with self.subTest(script=relative):
-                code = (ROOT / relative).read_text(encoding="utf-8")
-                self.assertIn("retire-legacy-ui.cmd", code)
-                self.assertNotIn("down -v", code)
-                self.assertNotIn("volume rm", code)
+    def test_main_controller_stops_legacy_and_automatic_worker_safely(self):
         control = (ROOT / "cmd/control-center.ps1").read_text(encoding="utf-8")
         self.assertIn('legacyArgs+@("stop","ui")', control)
         self.assertIn('legacyArgs+@("rm","-f","ui")', control)
-        retire = (ROOT / "cmd/retire-legacy-ui.cmd").read_text("utf-8")
-        self.assertIn("--profile legacy stop ui", retire)
-        self.assertIn("--profile legacy rm -f ui", retire)
-        self.assertNotIn("--volumes", retire)
-        self.assertIn("/api/health", control)
-        self.assertIn("/api/library?limit=1", control)
+        self.assertIn('Compose @("--profile","automation","stop","catalog-sync")', control)
+        self.assertIn("function Show-Docker-Logs", control)
+        self.assertIn("function Show-Service-Status", control)
+        self.assertIn("Load-Complete-MAL-Catalogue -InitialSetup", control)
         self.assertNotIn("down -v", control)
+        self.assertNotIn("down --volumes", control)
+        backup=(ROOT/"cmd/library-backup.ps1").read_text(encoding="utf-8")
+        self.assertIn("--profile automation stop catalog-sync",backup)
+        self.assertIn("/api/health",control)
+        self.assertIn("/api/library?limit=1",control)
 
 
 if __name__ == "__main__":
