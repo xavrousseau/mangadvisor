@@ -161,6 +161,19 @@ def french_print_isbns(detail: dict) -> list[str]:
         and str(book.get("medium", "")).lower() == "print"))
 
 
+def provider_failure(result: dict) -> bool:
+    """Distinguish a bad individual detail from an upstream outage.
+
+    404 / malformed series details require review for that one title.
+    429, 5xx and unavailable network/auth should stop the batch safely.
+    """
+    status = result.get("status")
+    if status in ("UNAVAILABLE", "SKIPPED_PROVIDER_UNAVAILABLE", "NETWORK_ERROR"):
+        return True
+    return (status == "HTTP_ERROR" and isinstance(result.get("http_status"), int)
+            and result["http_status"] >= 500)
+
+
 def lookup_work(item: dict, client: Any) -> dict:
     """Find a unique work, verify author or MAL, then French print ISBN."""
     sample = {"title": item.get("title"), "title_english": item.get("title_english"),
@@ -177,7 +190,8 @@ def lookup_work(item: dict, client: Any) -> dict:
         tried.append(term)
         result = client.call("scrinis", "search", query=term)
         if result.get("status") != "OK":
-            return {"status": "PROVIDER_ERROR", "reason": result.get("status") or "UNKNOWN"}
+            status = "PROVIDER_ERROR" if provider_failure(result) else "DETAIL_UNAVAILABLE"
+            return {"status": status, "reason": "SEARCH_" + str(result.get("status") or "UNKNOWN")}
         decision = scr.rank(sample, result.get("candidates") or [])
         if decision["status"] in ("AMBIGUOUS", "SAME_MAL_ID", "EXACT_TITLE"):
             break
@@ -201,8 +215,9 @@ def lookup_work(item: dict, client: Any) -> dict:
         return {"status": "MAL_ID_CONFLICT", "reason": "SUPPLIER_MAL_ID_DIFFERENT"}
     detail_result = client.call("scrinis", "detail", identifier=first["id"])
     if detail_result.get("status") != "OK":
-        return {"status": "DETAIL_UNAVAILABLE",
-                "reason": detail_result.get("status") or "UNKNOWN"}
+        status = "PROVIDER_ERROR" if provider_failure(detail_result) else "DETAIL_UNAVAILABLE"
+        return {"status": status,
+                "reason": "DETAIL_" + str(detail_result.get("status") or "UNKNOWN")}
     detail = detail_result.get("data") or {}
     if detail.get("status") != "OK" or str(detail.get("id")) != str(first["id"]):
         return {"status": "DETAIL_UNAVAILABLE", "reason": "DETAIL_ID_MISMATCH"}
@@ -273,7 +288,8 @@ def run_batch(factory: Callable[..., Any] = get_postgres_connection, *,
     if type(limit) is not int or not 1 <= limit <= MAX_BATCH:
         raise ValueError("Choisir un lot de 1 à 100 œuvres.")
     if target_ids is not None and (
-        len(target_ids)>100 or any(type(mid) is not int or mid<=0 for mid in target_ids)
+        len(target_ids) > 100 or any(type(mid) is not int or mid <= 0
+                                     for mid in target_ids)
     ):
         raise ValueError("Identifiants de fiches à rafraîchir invalides")
     client = client or scr.RateLimitedClient()
@@ -282,22 +298,27 @@ def run_batch(factory: Callable[..., Any] = get_postgres_connection, *,
             cur.execute(SCHEMA)
         conn.commit()
     sql = SELECT_WORK
-    params: dict[str, Any] = {"limit":limit}
+    params: dict[str, Any] = {"limit": limit}
     if target_ids is not None:
         if not target_ids:
-            return {"selected":0,"source":"SCRINIS_FR_PRINT",
-                    "new_french_aliases":0,"matched_sources":0,"review_needed":0,
-                    "provider_errors":0,"no_match":0,"status_counts":{}}
+            return {
+                "selected": 0, "source": "SCRINIS_FR_PRINT",
+                "new_french_aliases": 0, "matched_sources": 0,
+                "review_needed": 0, "provider_errors": 0,
+                "detail_unavailable": 0, "no_match": 0,
+                "status_counts": {}, "processed": 0, "completed": True,
+            }
         sql = sql.replace("ORDER BY\n  CASE WHEN EXISTS",
                           "AND m.id=ANY(%(target_ids)s)\nORDER BY\n  CASE WHEN EXISTS")
-        params["target_ids"]=target_ids
+        params["target_ids"] = target_ids
     with factory() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         targets = list(cur.fetchall())
     report: dict[str, Any] = {"selected": len(targets),
         "source": "SCRINIS_FR_PRINT", "new_french_aliases": 0,
         "matched_sources": 0, "review_needed": 0, "provider_errors": 0,
-        "no_match": 0, "status_counts": {}}
+        "detail_unavailable": 0, "no_match": 0, "status_counts": {},
+        "processed": 0, "completed": False}
     for row in targets:
         outcome = lookup_work(row, client)
         with factory() as conn:
@@ -308,18 +329,25 @@ def run_batch(factory: Callable[..., Any] = get_postgres_connection, *,
             report["new_french_aliases"] += 1
         if status in ("NEW_FR_ALIAS", "ALREADY_PRESENT"):
             report["matched_sources"] += 1
-        elif status in ("PROVIDER_ERROR", "DETAIL_UNAVAILABLE"):
+        elif status == "PROVIDER_ERROR":
             report["provider_errors"] += 1
+        elif status == "DETAIL_UNAVAILABLE":
+            report["detail_unavailable"] += 1
         elif status == "NO_MATCH":
             report["no_match"] += 1
         else:
             report["review_needed"] += 1
-        print(f"[{report['matched_sources']+report['review_needed']+report['provider_errors']+report['no_match']}/{len(targets)}] "
+        report["processed"] += 1
+        print(f"[{report['processed']}/{len(targets)}] "
               f"MAL {row['mal_id']}: {status}", flush=True)
         if status == "PROVIDER_ERROR":
             # Respect the public API if rate-limited/unavailable.
             print("Scrinis non disponible : arrêt du lot sans relancer massivement.", flush=True)
             break
+    report["completed"] = report["processed"] == len(targets) and report["provider_errors"] == 0
+    if report["detail_unavailable"]:
+        print(f"{report['detail_unavailable']} fiche(s) Scrinis individuelle(s) indisponible(s) : "
+              "conservées pour nouvelle vérification, sans annuler les autres ajouts.", flush=True)
     return report
 
 
@@ -331,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
     print("Titres seuls envoyés au fournisseur ; jamais de données de mangathèque.")
     result = run_batch(limit=args.limit)
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 2 if result["provider_errors"] else 0
+    return 2 if result["provider_errors"] or not result["completed"] else 0
 
 
 if __name__ == "__main__":
