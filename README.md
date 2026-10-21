@@ -116,6 +116,16 @@ des ambiguïtés, et des erreurs de fournisseur. Le benchmark ne constitue
 pas une preuve d'édition française et n'effectue aucun rapprochement
 automatique. Voir le [guide détaillé](docs/04_product/benchmark_sources_4_9.md).
 
+### Préparation bibliographique sécurisée — A → 18
+
+Après la collecte V2, **A → 18** prépare un staging SQL des œuvres candidates,
+des éditions et des ISBN bibliographiques. Un aperçu sans écriture précède
+une confirmation explicite ; les enregistrements restent `REVIEW_REQUIRED`.
+Les données BnF déjà importées sont recoupées en lecture seule par ISBN.
+Aucune mutation des fiches mangas canoniques ni de la collection personnelle.
+
+Voir [le guide de staging bibliographique](docs/04_product/bibliographic_staging_v1.md).
+
 ### Diagnostic approfondi des sources : V2
 
 Après le premier comparatif, le menu **`mangadvisor.cmd → A → 17`**
