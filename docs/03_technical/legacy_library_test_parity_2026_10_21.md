@@ -38,3 +38,11 @@ Ne pas fusionner ces parcours sous prétexte qu'ils s'appellent tous « import �
 2. Ajouter des tests hors ligne sur les cinq exclusions de statuts et les trois objectifs.
 3. Choisir ensuite une voie explicite pour l'import Excel de la bibliothèque avant toute suppression du prototype Streamlit.
 4. Ne pas fusionner tant que ces réserves restent ouvertes ou ne sont pas volontairement acceptées.
+
+## Migration Web en cours dans la PR #89
+
+Le Web propose maintenant dans **Ma bibliothèque** un atelier distinct des livres ISBN pour importer les statuts de lecture par CSV ou XLSX. Le CSV utilise l'endpoint existant `/library/import/csv` ; le XLSX est converti par `/library/import/xlsx/convert` via `openpyxl` avant utilisation du même contrat. La conversion est bornée (512 Ko XLSX, 1 500 lignes, 32 colonnes) et ne modifie aucune table.
+
+Le parcours comprend une simulation (`dry_run=true`), l'affichage des correspondances et erreurs, puis une confirmation explicite pour une importation **additive** (`ON CONFLICT DO NOTHING`). L'interface distingue ce parcours de l'import de livres ISBN vérifiés (`/collection/import/*`).
+
+Des tests Python et Web couvrent les principaux contrats de conversion, d'aperçu et de non-écrasement. Des tests additionnels vérifient la présence des trois objectifs de recommandation et les exclusions des deux statuts négatifs. Il reste à valider les interactions réelles en navigateur et les quatre workflows du dernier HEAD, avant d'affirmer une parité parfaite avec Streamlit. L'ancien prototype n'est donc pas supprimé.
