@@ -30,11 +30,11 @@ PostgreSQL n'est expose au menu principal.
 | mangadvisor.cmd | Menu principal pour tous les utilisateurs Windows |
 | cmd/control-center.ps1 | Enchaînement installation, alimentation, mises à jour et diagnostics |
 | cmd/*.ps1 (8 scripts) | Orchestrateur Windows, sauvegarde, Git, import personnel, benchmark prive, API locale, IA et acces mobile. Plus aucun lanceur .cmd historique dans ce dossier |
-| infra/compose/ | `docker-compose.yml` définit les services communs, `docker-compose.local.yml` fournit la configuration stable par défaut, `docker-compose.dev.yml` la configuration de développement et l'ancien Streamlit de test |
+| infra/compose/ | `docker-compose.yml` définit les services communs, `docker-compose.local.yml` fournit la configuration stable par défaut, `docker-compose.dev.yml` la configuration de développement sans ancienne interface Streamlit |
 | infra/docker/ | Images Docker des services actifs |
 | apps/web/ | **Interface principale** HTML/CSS/JS sur port UI_PORT (8501 par défaut) |
 | apps/api/ | API FastAPI, catalogue, recommandations, ISBN et bibliothèque |
-| apps/ui/ | Code historique Streamlit conservé provisoirement pour contrôler la migration fonctionnelle ; service défini uniquement dans `docker-compose.dev.yml` sous profil `legacy` |
+| apps/ui/ | **Retiré** : import CSV/XLSX de bibliothèque, modèles, profil de lecture et recommandations transférés vers l'API et le Web ; les utilitaires Python du prototype ne sont plus chargés |
 | pipelines/engine/scripts/ | Extraction du catalogue, chargement SQL, enrichissement communautaire, vérifications |
 | pipelines/engine/src/load/ | Écriture PostgreSQL depuis les JSON |
 | sql/schema/001…007 | Tables et mises à jour additives (les scripts 003/005 construisent le catalogue) |
@@ -59,7 +59,7 @@ PostgreSQL n'est expose au menu principal.
 
 Les services pgvector et Meilisearch sont prévus dans l'infrastructure ; cela **ne signifie pas** que les embeddings ou l'indexation Meilisearch complète sont systématiquement calculés et alimentés. AniList, MangaNews et le pipeline multi-sources complet décrit dans les documents V1 restent des pistes de développement, pas des étapes garanties.
 
-Une seule interface utilisateur existe dans la configuration stable : **Web sur 8501**. Le Compose principal n'a aucun service `ui` et le centre de pilotage retire au premier demarrage un eventuel ancien conteneur Streamlit. Le prototype Python est limité à l'overlay dev/test tant que ses fonctions spécifiques (import Excel, profil de lecture avancé) n'ont pas d'équivalent vérifié dans WEB. Le proxy Web valide l'API par le DNS interne Docker (127.0.0.11) après changement d'IP du conteneur.
+Une seule interface utilisateur existe dans la configuration stable : **Web sur 8501**. Le Compose principal n'a aucun service `ui` et le centre de pilotage retire au premier demarrage un eventuel ancien conteneur Streamlit. L'ancien prototype Streamlit et son profil de développement ont été retirés ; l'import CSV/XLSX, les modèles et le profil de lecture sont disponibles dans le Web. Le test de parité navigateur est maintenu dans la CI. Le proxy Web valide l'API par le DNS interne Docker (127.0.0.11) après changement d'IP du conteneur.
 
 ## Ce que le nettoyage 4.1 a retiré
 
