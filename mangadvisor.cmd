@@ -69,6 +69,7 @@ echo   13 - Recuperer les titres alternatifs FR, EN et JA
 echo   14 - Etendre le catalogue Tenrai (mangas et one-shots)
 echo   15 - Importer des fichiers bibliographiques BnF (candidats)
 echo   16 - Comparer les sources manga sur 50 titres (lecture seule)
+echo   17 - Comparatif V2 : editions, candidats et fiches detaillees
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -95,6 +96,7 @@ if "%CHOICE%"=="13" set "KEY=multilingual-aliases"
 if "%CHOICE%"=="14" set "KEY=catalogue-extended"
 if "%CHOICE%"=="15" set "KEY=bnf-bulk"
 if "%CHOICE%"=="16" set "KEY=sources-benchmark"
+if "%CHOICE%"=="17" set "KEY=sources-benchmark-v2"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -178,6 +180,7 @@ if /I "%~1"=="import" set "ACTION=Inventory"
 if /I "%~1"=="bnf-enrich" set "ACTION=BnF"
 if /I "%~1"=="bnf-bulk" set "ACTION=BnFBulk"
 if /I "%~1"=="sources-benchmark" set "ACTION=SourcesBenchmark"
+if /I "%~1"=="sources-benchmark-v2" set "ACTION=SourcesBenchmarkV2"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
 if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"
 if /I "%~1"=="multilingual-aliases" set "ACTION=Aliases"
@@ -247,7 +250,7 @@ echo   diagnostic       Verifier l'application
 echo   stop             Arreter sans supprimer les volumes
 echo.
 echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark,
-echo          bnf-enrich, bnf-bulk, sources-benchmark,
+echo          bnf-enrich, bnf-bulk, sources-benchmark, sources-benchmark-v2,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
