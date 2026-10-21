@@ -75,25 +75,75 @@ class BenchmarkV2Tests(unittest.TestCase):
         self.assertEqual(result["status"], "SUGGESTION_ONLY")
         self.assertEqual(result["candidates"][0]["title"], "Kimetsu no Yaiba")
 
-    def test_ambiguous_does_not_fetch_one_arbitrary_detail(self):
+    def test_inspect_two_competing_candidates_without_selecting_either(self):
         class Client:
-            counts = {"scrinis": 0, "mangaupdates": 0}
+            counts = {"scrinis": 2, "mangaupdates": 0}
             def __init__(self):
-                self.kinds = []
+                self.calls = []
             def call(self, provider, kind, **kwargs):
-                self.kinds.append(kind)
+                self.calls.append((kind, kwargs))
                 if kind == "detail":
-                    raise AssertionError("Ambiguous choice must not fetch just one candidate")
+                    return {"status": "OK", "data": {
+                        "title": "Wind Breaker",
+                        "authors": ["Nii Satoru"] if kwargs["identifier"] == "102"
+                                   else ["Other Artist"],
+                        "publishers": ["Different Publisher"], "book_references": []}}
                 return {"status": "OK", "schema": {}, "candidates": [
                     hit("Wind Breaker", 101, format="Manhwa"),
                     hit("Wind Breaker (NII Satoru)", 102, format="Manga"),
                 ]}
         client = Client()
-        report = v2.evaluate([work("Wind Breaker")], client=client, providers=("scrinis",),
-                             detail_budget=20, alternate_budget=0)
-        self.assertEqual(client.kinds, ["search"])
-        self.assertEqual(report["entries"][0]["sources"]["scrinis"]["detail_status"],
-                         "SKIPPED_AMBIGUOUS")
+        report = v2.evaluate([work("Wind Breaker")], client=client,
+                             providers=("scrinis",), detail_budget=2, alternate_budget=0)
+        src = report["entries"][0]["sources"]["scrinis"]
+        self.assertEqual(src["status"], "AMBIGUOUS")
+        self.assertEqual(src["detail_status"], "COMPARED_AMBIGUOUS")
+        self.assertEqual([x[1].get("identifier") for x in client.calls],
+                         [None, "101", "102"])
+        self.assertEqual(len(src["competing_details"]), 2)
+        self.assertNotIn("details", src)
+        self.assertEqual(report["providers"]["scrinis"]["ambiguous_candidate_details_ok"], 2)
+
+    def test_ambiguous_inspection_never_exceeds_remaining_budget(self):
+        class Client:
+            counts = {"scrinis": 0, "mangaupdates": 0}
+            def __init__(self):
+                self.calls = []
+            def call(self, provider, kind, **kwargs):
+                self.calls.append(kind)
+                if kind == "detail":
+                    raise AssertionError("Cannot inspect only half a competing pair")
+                return {"status": "OK", "schema": {}, "candidates": [
+                    hit("Wind Breaker", 101), hit("Wind Breaker", 102)]}
+        c = Client()
+        report = v2.evaluate([work("Wind Breaker")], client=c,
+                             providers=("scrinis",), detail_budget=1, alternate_budget=0)
+        self.assertEqual(c.calls, ["search"])
+        src = report["entries"][0]["sources"]["scrinis"]
+        self.assertEqual(src["detail_status"], "SKIPPED_AMBIGUOUS")
+        self.assertEqual(src["review_not_run_reason"], "INSUFFICIENT_DETAIL_BUDGET")
+
+    def test_foreign_language_edition_does_not_block_original_work(self):
+        result = v2.rank(work("Tokyo Ghoul"), [
+            hit("Tokyo Ghoul", 101, format="manga"),
+            hit("Tokyo Ghoul (en allemand)", 102, format="manga"),
+            hit("Tokyo Ghoul (en portugais)", 103, format="manga"),
+            hit("Tokyo Ghoul:re", 104, format="manga")
+        ])
+        self.assertEqual(result["status"], "EXACT_TITLE")
+        self.assertEqual(result["ambiguous_count"], 0)
+        self.assertEqual(result["selected_id"], "101")
+        self.assertEqual(len(result["candidates"]), 4)
+
+    def test_distinct_same_title_scrinis_hub_records_still_ambiguous(self):
+        result = v2.rank(work("Black Clover"), [
+            hit("Black Clover", 33269, format="manga"),
+            hit("Black Clover", 163154, format="manga")
+        ])
+        self.assertEqual(result["status"], "AMBIGUOUS")
+        self.assertEqual(result["ambiguous_count"], 1)
+        self.assertEqual([x["id"] for x in result["review_candidates"]],
+                         ["33269", "163154"])
 
     def test_mangaupdates_associated_titles(self):
         payload = {"results": [{"record": {
@@ -295,6 +345,7 @@ class BenchmarkV2Tests(unittest.TestCase):
             js, cs = v2.save_report(record, Path(tmp))
             self.assertEqual(json.loads(js.read_text())["format_version"], 2)
             self.assertIn("concurrents_ambigus", cs.read_text(encoding="utf-8-sig"))
+            self.assertIn("fiches_concurrentes_a_verifier", cs.read_text(encoding="utf-8-sig"))
             self.assertIn("ブリーチ", cs.read_text(encoding="utf-8-sig"))
 
     def test_only_samples_from_database_no_postgres_mutations(self):
