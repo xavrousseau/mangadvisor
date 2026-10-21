@@ -15,10 +15,19 @@ services:
     container_name: mangadvisor_sandbox_web
   engine:
     container_name: mangadvisor_sandbox_engine
+    # Sandbox engine uses the BASE + SANDBOX compose files only.
+    # No Windows F: bind mount; catalogue pages and logs persist between runs.
+    volumes:
+      - manga_sandbox_raw:/workspace/data/raw
+      - manga_sandbox_logs:/workspace/data/logs
   catalog-sync:
     container_name: mangadvisor_sandbox_catalog_sync
   ollama:
     container_name: mangadvisor_sandbox_ollama
+
+volumes:
+  manga_sandbox_raw:
+  manga_sandbox_logs:
 
 networks:
   mangadvisor_network:
