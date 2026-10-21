@@ -213,6 +213,17 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(json.loads((self.logs/"last_cycle.json")
                       .read_text())["status"],"SUCCESS")
 
+    def test_partial_provider_outage_not_reported_as_full_success(self):
+        db=FakeDB()
+        with patch.object(life,"synchronize",return_value={"new_mal_ids":0}):
+            result=life.run_cycle(factory=lambda:db,
+                scrinis_runner=lambda **k: {"provider_errors":1},
+                mu_runner=lambda **k: {"errors":0},
+                bnf_runner=lambda **k: {"sru":{"error":0}})
+        self.assertEqual(result["status"],"PARTIAL_SOURCE_UNAVAILABLE")
+        self.assertEqual(json.loads((self.logs/"last_cycle.json")
+                         .read_text())["status"],"PARTIAL_SOURCE_UNAVAILABLE")
+
     def test_source_mangaupdates_requires_independent_identity(self):
         fake=type("Provider",(),{"calls":[],
           "call":lambda self,prov,kind,**kw:(
