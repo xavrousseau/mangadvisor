@@ -374,7 +374,19 @@ def run_cycle(*, mal_client: Any = None,
                 result["scrinis"]=scrinis_runner(factory=factory,limit=40)
                 result["mangaupdates"]=mu_runner(factory=factory,limit=15)
                 result["bnf"]=bnf_runner(limit=10)
-            result["status"]="SUCCESS"
+                # A partial source outage must not be advertised as a
+                # fully healthy multi-source cycle, even if MAL succeeded.
+                problems = (
+                    result["scrinis"].get("provider_errors",0)
+                    + result["mangaupdates"].get("errors",0)
+                    + result["bnf"].get("sru",{}).get("error",0)
+                )
+                if problems:
+                    result["status"]="PARTIAL_SOURCE_UNAVAILABLE"
+                else:
+                    result["status"]="SUCCESS"
+            else:
+                result["status"]="SUCCESS"
         except Exception as exc:
             # A PostgreSQL statement may have aborted the current
             # transaction. Roll back before releasing the session lock.
