@@ -68,7 +68,7 @@ echo   12 - Enrichir ma mangatheque automatiquement (Wikidata et BnF)
 echo   13 - Recuperer les titres alternatifs FR, EN et JA
 echo   14 - Etendre le catalogue Tenrai (mangas et one-shots)
 echo   15 - Importer des fichiers bibliographiques BnF (candidats)
-echo   16 - Comparer les sources manga sur 50 titres (lecture seule)
+echo   16 - Comparatif sources (ancien raccourci vers V2)
 echo   17 - Comparatif V2 : mangas FR papier et editions, scores distincts
 echo   18 - Preparer les fiches bibliographiques (sans modifier la mangatheque)
 echo   19 - Charger tout le catalogue MAL/Jikan via Tenrai (avec reprise)
@@ -99,7 +99,7 @@ if "%CHOICE%"=="12" set "KEY=library-enrich"
 if "%CHOICE%"=="13" set "KEY=multilingual-aliases"
 if "%CHOICE%"=="14" set "KEY=catalogue-extended"
 if "%CHOICE%"=="15" set "KEY=bnf-bulk"
-if "%CHOICE%"=="16" set "KEY=sources-benchmark"
+if "%CHOICE%"=="16" set "KEY=sources-benchmark-v2"
 if "%CHOICE%"=="17" set "KEY=sources-benchmark-v2"
 if "%CHOICE%"=="18" set "KEY=bibliographic-staging"
 if "%CHOICE%"=="19" set "KEY=complete-mal-catalogue"
@@ -186,7 +186,7 @@ if /I "%~1"=="recommendations" set "ACTION=Recommendations"
 if /I "%~1"=="import" set "ACTION=Inventory"
 if /I "%~1"=="bnf-enrich" set "ACTION=BnF"
 if /I "%~1"=="bnf-bulk" set "ACTION=BnFBulk"
-if /I "%~1"=="sources-benchmark" set "ACTION=SourcesBenchmark"
+if /I "%~1"=="sources-benchmark" set "ACTION=SourcesBenchmarkV2"
 if /I "%~1"=="sources-benchmark-v2" set "ACTION=SourcesBenchmarkV2"
 if /I "%~1"=="bibliographic-staging" set "ACTION=BibliographicStaging"
 if /I "%~1"=="complete-mal-catalogue" set "ACTION=CompleteMALCatalogue"
