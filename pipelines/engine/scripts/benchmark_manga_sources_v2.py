@@ -739,8 +739,12 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
                         edition_review.get("french_print_isbns") or []),
                     "priorite_fiches": value.get("detail_priority_reason") or "",
                     "isbn_references_incompletes": (
-                        "OUI" if detail.get("book_references_truncated")
-                        else "NON" if detail else "NON_EVALUE"),
+                        "OUI" if (detail.get("book_references_truncated") or any(
+                            (c.get("details") or {}).get("book_references_truncated")
+                            for c in value.get("competing_details") or []))
+                        else "NON" if (detail or any(
+                            c.get("details") for c in value.get("competing_details") or []))
+                        else "NON_EVALUE"),
                     "volumes_parcourus": detail.get("volume_records_scanned"),
                     "isbn_valides_avant_limite": detail.get("book_references_valid_in_scan"),
                     "avertissement": first.get("warning") or "",
