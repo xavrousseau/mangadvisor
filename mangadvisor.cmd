@@ -71,6 +71,7 @@ echo   15 - Importer des fichiers bibliographiques BnF (candidats)
 echo   16 - Comparer les sources manga sur 50 titres (lecture seule)
 echo   17 - Comparatif V2 : mangas FR papier et editions, scores distincts
 echo   18 - Preparer les fiches bibliographiques (sans modifier la mangatheque)
+echo   19 - Charger tout le catalogue MAL/Jikan via Tenrai (avec reprise)
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -99,6 +100,7 @@ if "%CHOICE%"=="15" set "KEY=bnf-bulk"
 if "%CHOICE%"=="16" set "KEY=sources-benchmark"
 if "%CHOICE%"=="17" set "KEY=sources-benchmark-v2"
 if "%CHOICE%"=="18" set "KEY=bibliographic-staging"
+if "%CHOICE%"=="19" set "KEY=complete-mal-catalogue"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -184,6 +186,7 @@ if /I "%~1"=="bnf-bulk" set "ACTION=BnFBulk"
 if /I "%~1"=="sources-benchmark" set "ACTION=SourcesBenchmark"
 if /I "%~1"=="sources-benchmark-v2" set "ACTION=SourcesBenchmarkV2"
 if /I "%~1"=="bibliographic-staging" set "ACTION=BibliographicStaging"
+if /I "%~1"=="complete-mal-catalogue" set "ACTION=CompleteMALCatalogue"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
 if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"
 if /I "%~1"=="multilingual-aliases" set "ACTION=Aliases"
@@ -254,7 +257,7 @@ echo   stop             Arreter sans supprimer les volumes
 echo.
 echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark,
 echo          bnf-enrich, bnf-bulk, sources-benchmark, sources-benchmark-v2,
-echo          bibliographic-staging,
+echo          bibliographic-staging, complete-mal-catalogue,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
