@@ -20,8 +20,8 @@ services:
     networks:
       - mangadvisor_network
 
-  # Infrastructure Meilisearch reservee aux evolutions futures.
-  # Aucun consommateur applicatif actif confirme : ne pas annoncer une indexation fonctionnelle.
+  # Moteur de recherche de titres publics et alias multilingues.
+  # Index reconstruit via API (option A -> 22), PostgreSQL reste la source.
   meilisearch:
     image: getmeili/meilisearch:v1.11
     container_name: mangadvisor_meilisearch
@@ -34,7 +34,7 @@ services:
 
   # API backend du projet.
   # Expose les endpoints applicatifs et utilise PostgreSQL.
-  # Variables Meilisearch conservees pour compatibilite, sans client actif prouve.
+  # Recherche Meilisearch active apres construction de l'index ; repli SQL.
   api:
     build:
       context: ../..
@@ -124,7 +124,7 @@ services:
       - mangadvisor_network
 
   # Conteneur ponctuel d'execution des pipelines : aucun traitement ne tourne
-  # en continu dans ce service. L'indexation Meilisearch n'est pas active.
+  # en continu dans ce service. L'indexation Meilisearch est pilotee depuis l'API ou le menu Windows.
   engine:
     build:
       context: ../..
