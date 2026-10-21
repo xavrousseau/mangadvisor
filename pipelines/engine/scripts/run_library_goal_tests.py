@@ -15,7 +15,7 @@ from typing import Any
 
 API_BASE_URL = os.getenv("MANGADVISOR_API_BASE_URL", "http://localhost:8000")
 ROOT_DIR = Path(__file__).resolve().parents[3]
-REPORT_DIR = ROOT_DIR / "docs" / "reports"
+REPORT_DIR = ROOT_DIR / "data" / "logs" / "quality_reports"
 REPORT_PATH = REPORT_DIR / "library_goal_tests_v0_8_3.md"
 
 
