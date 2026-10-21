@@ -818,7 +818,7 @@ function Update {
   }
   Initialize-Database
   Start-Application
-  Write-Host "Après une mise à jour du catalogue, relancer la recherche intelligente via A -> 22."
+  Write-Host "Apres une mise a jour du catalogue, relancer la recherche intelligente via A -> 22."
   Diagnostic
   Write-Host "Mise a jour terminee. Fichiers personnels et volumes conserves."
 }
