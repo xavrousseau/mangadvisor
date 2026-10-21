@@ -2,7 +2,7 @@
 # Intentionally accepts only a numeric local TCP port; never a remote host.
 function Get-MangadvisorApiUrl([string]$EnvFile) {
   if (-not (Test-Path -LiteralPath $EnvFile -PathType Leaf)) {
-    throw "Fichier .env introuvable. Lance l'option 23 de mangadvisor.cmd."
+    throw "Fichier .env introuvable. Lance mangadvisor.cmd option 1 (premiere installation)."
   }
   $matchesInFile=@(Get-Content -LiteralPath $EnvFile | Where-Object { $_ -match '^\s*API_PORT\s*=' })
   if ($matchesInFile.Count -eq 0) {
