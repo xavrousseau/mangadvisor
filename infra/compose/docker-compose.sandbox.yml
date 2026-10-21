@@ -11,6 +11,10 @@ services:
     container_name: mangadvisor_sandbox_meilisearch
   api:
     container_name: mangadvisor_sandbox_api
+    # The sandbox web now reads the complete Tenrai catalogue, not CI fixtures.
+    # Preserve the demo database separately inside this same isolated Postgres.
+    environment:
+      POSTGRES_DB: mangadvisor_realtest
   web:
     container_name: mangadvisor_sandbox_web
   engine:
