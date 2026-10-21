@@ -9,7 +9,7 @@ const proxy = readFileSync(new URL('../../apps/web/nginx.conf', import.meta.url)
 test('manga cards and covers navigate to the manga detail route', () => {
   assert.match(controller, /data-go=[^\n]*?\/manga\//);
   assert.match(controller, /function routeInfo\(\)/);
-  assert.match(controller, /path\.match\(\/\^\\\/manga\\\/\(/);
+  assert.ok(controller.includes('path.match(/^\\/manga\\/('));
 });
 
 test('a direct page refresh keeps the Web SPA route', () => {
