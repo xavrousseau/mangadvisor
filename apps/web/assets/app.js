@@ -82,7 +82,7 @@ function coverUrl(url){
 }
 function poster(manga, urls, isButton=true){
   const url=coverUrl(urls?.[manga.manga_id||manga.id]);
-  const title=String(manga.title||"Manga");
+  const title=String(preferredMangaTitle(manga,state.lang)||"Manga");
   const visual=url
     ? '<img class="poster" loading="lazy" src="'+e(url)+'" alt="'+e(title)+'" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><div class="poster-fallback" hidden><span class="poster-letter">M.</span><small>'+e(title)+'</small></div>'
     : '<div class="poster-fallback"><span class="poster-letter">M.</span><small>'+e(title)+'</small></div>';
@@ -552,7 +552,7 @@ async function renderDetail(token,id){
   const synopsis=translation?.text||manga.synopsis||"";
   const reallyTranslated=state.lang==="fr"&&Boolean(translation?.translated);
   const displayTitle=preferredMangaTitle(manga,state.lang);
-  const alternateTitles=[manga.title,manga.title_japanese]
+  const alternateTitles=[manga.title,manga.title_english,manga.title_japanese]
     .filter((value,index,list)=>value&&value!==displayTitle&&list.indexOf(value)===index);
   const elements='<section class="detail-hero">'+
    poster(manga,urls,false)+'<div class="detail-info"><div class="eyebrow">MANGADVISOR · '+L("mangaDetails")+'</div>'+
@@ -561,6 +561,14 @@ async function renderDetail(token,id){
    '<div class="tag-row">'+badges(manga.genres,5)+badges(manga.demographics,2)+'</div>'+
    '<p class="muted tiny">'+L("status")+' : '+e(publication(state.lang,manga.status))+' · '+
    (manga.manga_type?tr(manga.manga_type):'Manga')+'</p>'+
+   ((manga.authors||[]).length?
+     '<p class="muted tiny">'+e(state.lang==="fr"?"Auteurs":"Authors")+' : '+
+     e(manga.authors.join(" · "))+'</p>':'')+
+   (manga.title_fr_verified && manga.title_fr_source?
+     '<p class="muted tiny">'+e(state.lang==="fr"?
+       "Titre français répertorié (œuvre, pas édition physique)":
+       "French-language work title (not a verified book edition)")+' · '+
+       e(manga.title_fr_source==="TENRAI_MAL_TYPED"?"MyAnimeList / Tenrai":"Wikidata / MAL")+'</p>':'')+
    '<div class="actions"><button class="btn btn-primary" data-action="scroll-save">＋ '+L(libraryItem?"inLibrary":"addLibrary")+'</button>'+
     '<button class="btn btn-soft" data-action="similar">✧ '+L("similar")+'</button>'+
  '<button class="btn btn-soft" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner un tome":"Scan a volume")+'</button></div></div></section>'+
