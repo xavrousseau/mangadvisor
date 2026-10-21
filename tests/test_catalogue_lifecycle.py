@@ -58,6 +58,8 @@ class FakeCursor:
             return {"locked":self.db.lock}
         if "FROM catalogue_lifecycle_state" in self.sql:
             return {"rolling_page":self.db.rolling}
+        if "to_regclass('public.manga_title_alias')" in self.sql:
+            return {"tbl":"manga_title_alias"}
         if "source_count" in self.sql:
             return {"source_count":85776,"canonical_count":85776,
                     "max_mal_id":200000,"orphan_source":0}
@@ -180,8 +182,10 @@ class LifecycleTests(unittest.TestCase):
     def test_sql_is_targeted_and_never_updates_private_collection(self):
         db=FakeDB()
         life.consolidate_changed(db,[7,8,7])
-        self.assertEqual(len(db.sql),7)
-        self.assertTrue(all(q[1]==([7,8],) for q in db.sql))
+        self.assertEqual(len(db.sql),9)
+        self.assertTrue(all(q[1]==([7,8],) for q in db.sql if q[1] is not None))
+        self.assertTrue(any("TENRAI_MAL_TYPED" in statement
+                            for statement,_ in db.sql))
         for text,params in db.sql:
             self.assertNotIn("user_manga_",text)
             self.assertNotIn("manga_fr_edition",text)
