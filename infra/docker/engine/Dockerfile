@@ -8,3 +8,5 @@ COPY pipelines/engine/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY pipelines/engine /workspace/pipelines/engine
+# Shared BnF SRU candidate module for background worker.
+COPY apps/api /workspace/apps/api

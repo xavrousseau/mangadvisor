@@ -283,16 +283,36 @@ def save_one(conn: Any, manga_id: int, result: dict) -> str:
 
 
 def run_batch(factory: Callable[..., Any] = get_postgres_connection, *,
-              limit: int = DEFAULT_BATCH, client: Any = None) -> dict[str, Any]:
+              limit: int = DEFAULT_BATCH, client: Any = None,
+              target_ids: list[int] | None = None) -> dict[str, Any]:
     if type(limit) is not int or not 1 <= limit <= MAX_BATCH:
         raise ValueError("Choisir un lot de 1 à 100 œuvres.")
+    if target_ids is not None and (
+        len(target_ids) > 100 or any(type(mid) is not int or mid <= 0
+                                     for mid in target_ids)
+    ):
+        raise ValueError("Identifiants de fiches à rafraîchir invalides")
     client = client or scr.RateLimitedClient()
     with factory() as conn:
         with conn.cursor() as cur:
             cur.execute(SCHEMA)
         conn.commit()
+    sql = SELECT_WORK
+    params: dict[str, Any] = {"limit": limit}
+    if target_ids is not None:
+        if not target_ids:
+            return {
+                "selected": 0, "source": "SCRINIS_FR_PRINT",
+                "new_french_aliases": 0, "matched_sources": 0,
+                "review_needed": 0, "provider_errors": 0,
+                "detail_unavailable": 0, "no_match": 0,
+                "status_counts": {}, "processed": 0, "completed": True,
+            }
+        sql = sql.replace("ORDER BY\n  CASE WHEN EXISTS",
+                          "AND m.id=ANY(%(target_ids)s)\nORDER BY\n  CASE WHEN EXISTS")
+        params["target_ids"] = target_ids
     with factory() as conn, conn.cursor() as cur:
-        cur.execute(SELECT_WORK, {"limit": limit})
+        cur.execute(sql, params)
         targets = list(cur.fetchall())
     report: dict[str, Any] = {"selected": len(targets),
         "source": "SCRINIS_FR_PRINT", "new_french_aliases": 0,

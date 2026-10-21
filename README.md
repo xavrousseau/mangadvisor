@@ -147,6 +147,22 @@ sous-dossier `complete_tenrai`. Le fichier `last_sync.json` reste un bilan,
 pas une archive des 85 776 mangas.
 
 
+### Catalogue vivant et veille automatique — A → 21
+
+Le catalogue MAL/Jikan **complet est initialisé une seule fois** via
+A → 19. Le nouveau menu **A → 21** vérifie ce socle, exécute un cycle
+incrémental, active/désactive la veille Docker quotidienne et affiche son
+rapport. Seules les notices nouvelles ou corrigées sont mises à jour :
+nouvelles pages MAL + pages anciennes tournantes. Scrinis, MangaUpdates et
+BnF poursuivent des enrichissements bornés sans jamais attribuer de livres
+à l'utilisateur. Les archives mensuelles BnF doivent encore être déposées
+localement ; le contrôle SRU est automatisé.
+
+Le conteneur autonome est **facultatif et activé explicitement** ; il ne
+fonctionne que lorsque Docker Desktop et le PC sont allumés.
+
+Guide : [catalogue vivant et suivi des sorties](docs/04_product/catalogue_vivant_cycle.md).
+
 ### Enrichir directement les fiches MAL avec Scrinis FR — A → 20
 
 Après avoir chargé le socle international MAL dans PostgreSQL, le menu

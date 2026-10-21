@@ -425,6 +425,8 @@ def parse_details(source: str, payload: Any) -> dict:
     themes = _labels(body.get("categories"), keys=("category", "name", "title"))
     themes += _labels(body.get("themes"), keys=("theme", "name", "title"))
     publication = _labels(body.get("publishers"), keys=("publisher_name", "name"))
+    authors = _labels(body.get("authors") or body.get("author"),
+                      keys=("name", "author_name", "author", "title"))
     # Scrinis describes volumes/tomes. Never equate their ISBN with ownership.
     volumes = body.get("volumes") or body.get("tomes") or []
     if isinstance(volumes, dict):
@@ -449,7 +451,7 @@ def parse_details(source: str, payload: Any) -> dict:
         "title": title[0][:200] if title else None, "aliases": alts[:15],
         "work_type": str(body.get("type") or body.get("format") or "")[:60],
         "genres": tags, "themes": list(dict.fromkeys(themes))[:15],
-        "publishers": publication[:12],
+        "publishers": publication[:12], "authors": authors[:12],
         "book_references": book_refs[:20],
         "volume_items_seen": len(volumes),
         "has_summary": bool(body.get("description") or body.get("synopsis") or body.get("summary")),

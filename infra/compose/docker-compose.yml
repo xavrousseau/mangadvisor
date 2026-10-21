@@ -70,6 +70,32 @@ services:
     networks:
       - mangadvisor_network
 
+  # Opt-in only: daily catalogue worker. Enabled from mangadvisor.cmd A -> 21.
+  # Does not rerun the initial complete Jikan import on daily cycles.
+  catalog-sync:
+    build:
+      context: ../..
+      dockerfile: infra/docker/engine/Dockerfile
+    container_name: mangadvisor_catalog_sync
+    profiles: ["automation"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      MANGA_API_BASE_URL: ${MANGA_API_BASE_URL:-https://api.tenrai.org/v1}
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    command: ["python","-u","pipelines/engine/scripts/catalogue_lifecycle.py","--daemon"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mangadvisor_network
+
   # Local AI model: optional, never exposed via a host port. Use option 15
   # in mangadvisor.cmd to start it and download the model explicitly.
   ollama:
