@@ -116,6 +116,22 @@ des ambiguïtés, et des erreurs de fournisseur. Le benchmark ne constitue
 pas une preuve d'édition française et n'effectue aucun rapprochement
 automatique. Voir le [guide détaillé](docs/04_product/benchmark_sources_4_9.md).
 
+### Socle international complet — A → 19 (priorité du projet)
+
+**Le point de départ reste le catalogue MyAnimeList/Jikan.** Comme
+l'instance Jikan publique a fermé le 1er octobre 2026, l'import complet
+passe par **Tenrai**, compatible avec son format et les identifiants MAL.
+
+\`mangadvisor.cmd → A → 19\` suit toutes les pages du catalogue public
+\`/manga\`, sans filtre de type ou SFW, reprend depuis son cache après une
+interruption, et alimente **\`jikan_manga_source\` puis \`manga\`** sans
+supprimer les données personnelles. L'outil affiche le total du fournisseur,
+les identifiants effectivement traités et le bilan des tables canoniques.
+Il ne prétend pas avoir réussi tant que l'ensemble des pages et des
+relations SQL ne sont pas vérifiés.
+
+Guide : [catalogue MAL complet](docs/04_product/catalogue_mal_complet.md).
+
 ### Préparation bibliographique sécurisée — A → 18
 
 Après la collecte V2, **A → 18** prépare un staging SQL des œuvres candidates,
