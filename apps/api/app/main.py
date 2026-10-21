@@ -229,6 +229,46 @@ def health() -> dict[str, Any]:
         )
 
 
+
+# Read-only catalogue enrichment from the 85k+ MAL/Tenrai records already
+# stored in jikan_manga_source. Do not rewrite the canonical Japanese/English
+# title or equate a French-labeled title with a licensed physical edition.
+# Every display name must be explicitly tagged French by MAL or verified
+# through Wikidata P4087 (same MAL ID), never inferred from a synonym.
+PUBLIC_METADATA_SELECT = """
+            (SELECT a.alias FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.language_code='fr'
+               AND a.source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087')
+             ORDER BY CASE a.source_name WHEN 'TENRAI_MAL_TYPED' THEN 0 ELSE 1 END,
+                      a.alias_key
+             LIMIT 1) AS title_fr,
+            EXISTS (
+                SELECT 1 FROM manga_title_alias a
+                WHERE a.manga_id=m.id AND a.language_code='fr'
+                  AND a.source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087')
+            ) AS title_fr_verified,
+            (SELECT a.source_name FROM manga_title_alias a
+             WHERE a.manga_id=m.id AND a.language_code='fr'
+               AND a.source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087')
+             ORDER BY CASE a.source_name WHEN 'TENRAI_MAL_TYPED' THEN 0 ELSE 1 END,
+                      a.alias_key
+             LIMIT 1) AS title_fr_source,
+            FALSE AS title_fr_publication_verified,
+            (SELECT COALESCE(
+                array_agg(DISTINCT LEFT(BTRIM(author.item->>'name'),150)
+                          ORDER BY LEFT(BTRIM(author.item->>'name'),150)),
+                ARRAY[]::text[])
+             FROM jikan_manga_source src
+             CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(src.authors_json)='array'
+                     THEN src.authors_json ELSE '[]'::jsonb END
+             ) AS author(item)
+             WHERE src.mal_id=m.source_mal_id
+               AND jsonb_typeof(author.item)='object'
+               AND LENGTH(BTRIM(author.item->>'name')) BETWEEN 2 AND 150
+            ) AS authors,
+"""
+
 @app.get("/mangas")
 def list_mangas(
     q: str | None = Query(
@@ -293,6 +333,7 @@ def list_mangas(
             m.title,
             m.title_english,
             m.title_japanese,
+            {PUBLIC_METADATA_SELECT}
             m.status,
             m.chapters,
             m.volumes,
@@ -386,18 +427,57 @@ def list_mangas(
     }
 
 
+
+@app.get("/catalogue/coverage")
+def catalogue_coverage() -> dict[str, Any]:
+    """Count REAL catalogue metadata after Jikan/Tenrai ingestion.
+
+    No API calls, no staging, no writes, no personal-library information.
+    The French label total is source-labeled only, NOT a count of French
+    licensed editions or of physical books.
+    """
+    sql = """
+        SELECT
+          (SELECT COUNT(*) FROM manga) AS canonical_works,
+          (SELECT COUNT(*) FROM jikan_manga_source) AS mal_source_works,
+          (SELECT COUNT(*) FROM manga_title_alias
+           WHERE source_name='TENRAI_MAL_TYPED' AND language_code='fr')
+            AS explicit_french_mal_labels,
+          (SELECT COUNT(DISTINCT manga_id) FROM manga_title_alias
+           WHERE language_code='fr'
+             AND source_name IN ('TENRAI_MAL_TYPED','WIKIDATA_P4087'))
+            AS works_with_french_label,
+          (SELECT COUNT(*) FROM jikan_manga_source j
+           WHERE jsonb_typeof(j.authors_json)='array'
+             AND jsonb_array_length(j.authors_json)>0) AS source_works_with_authors,
+          (SELECT COUNT(*) FROM manga WHERE synopsis IS NOT NULL
+           AND LENGTH(BTRIM(synopsis))>0) AS works_with_synopsis
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            counts = cur.fetchone()
+    return {
+        **counts,
+        "french_label_is_licensed_edition": False,
+        "catalogue_identity": "MyAnimeList mal_id",
+        "enrichment_source": "Jikan/Tenrai raw_json + verified Wikidata P4087",
+    }
+
+
 @app.get("/mangas/{manga_id}")
 def get_manga(manga_id: int) -> dict[str, Any]:
     """
     Récupère un manga par son identifiant interne Mangadvisor.
     """
-    sql = """
+    sql = f"""
         SELECT
             m.id,
             m.source_mal_id,
             m.title,
             m.title_english,
             m.title_japanese,
+            {PUBLIC_METADATA_SELECT}
             m.synopsis,
             m.status,
             m.chapters,
@@ -3702,6 +3782,33 @@ def prepare_fr_collection() -> None:
                 JOIN manga_wikidata_fact f
                      ON f.manga_id=m.id AND f.source_mal_id=m.source_mal_id
                 WHERE f.label_fr IS NOT NULL AND LENGTH(BTRIM(f.label_fr)) BETWEEN 2 AND 200
+                ON CONFLICT (manga_id,source_name,language_code,alias_key)
+                DO NOTHING
+            """)
+            # One-shot additive backfill on API startup, using the existing
+            # jikan_manga_source.raw_json. Exact MAL ID join only. These are
+            # language-tagged WORK titles, not verified French book editions.
+            cur.execute("""
+                INSERT INTO manga_title_alias
+                  (manga_id,source_name,source_id,language_code,alias,alias_key,source_url)
+                SELECT m.id,'TENRAI_MAL_TYPED',m.source_mal_id::text,
+                       CASE LOWER(BTRIM(t.item->>'type'))
+                         WHEN 'french' THEN 'fr'
+                         WHEN 'english' THEN 'en'
+                         WHEN 'japanese' THEN 'ja'
+                       END,
+                       LEFT(BTRIM(t.item->>'title'),200),
+                       LEFT(LOWER(BTRIM(t.item->>'title')),200),
+                       'https://myanimelist.net/manga/'||m.source_mal_id
+                FROM manga m
+                JOIN jikan_manga_source src ON src.mal_id=m.source_mal_id
+                CROSS JOIN LATERAL jsonb_array_elements(
+                  CASE WHEN jsonb_typeof(src.raw_json->'titles')='array'
+                       THEN src.raw_json->'titles' ELSE '[]'::jsonb END
+                ) AS t(item)
+                WHERE jsonb_typeof(t.item)='object'
+                  AND LOWER(BTRIM(t.item->>'type')) IN ('french','english','japanese')
+                  AND LENGTH(BTRIM(t.item->>'title')) BETWEEN 2 AND 200
                 ON CONFLICT (manga_id,source_name,language_code,alias_key)
                 DO NOTHING
             """)
