@@ -116,6 +116,19 @@ des ambiguïtés, et des erreurs de fournisseur. Le benchmark ne constitue
 pas une preuve d'édition française et n'effectue aucun rapprochement
 automatique. Voir le [guide détaillé](docs/04_product/benchmark_sources_4_9.md).
 
+### Diagnostic approfondi des sources : V2
+
+Après le premier comparatif, le menu **`mangadvisor.cmd → A → 17`**
+conserve les candidats concurrents, recherche éventuellement un titre
+alternatif connu et charge un nombre contrôlé de fiches détaillées. Le
+rapport local V2 conserve genres, thèmes, provenance des candidats et ISBN
+bibliographiques vérifiés **sans jamais les associer automatiquement à une
+édition ou une possession**. Les appels externes sont soumis à consentement,
+quotas et cache local (24 h).
+
+Lire le [guide comparatif V2](docs/04_product/benchmark_sources_v2.md).
+L'ancienne option A → 16 reste disponible pour comparaison.
+
 ## Architecture et contrôle qualité
 
 | Composant | Emplacement |

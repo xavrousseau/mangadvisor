@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -289,6 +289,31 @@ function Load-Extended-Catalogue {
   Write-Host ("Catalogue avant : {0} / apres : {1} / variation nette : {2}" -f $before,$after,($after-$before))
   Write-Host ("Notices distinctes en provenance fournisseur : {0}" -f $sourceCount)
   Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
+}
+function Benchmark-Catalogue-Sources-V2 {
+  Say "Comparatif V2 : candidats concurrents, titres alternatifs, fiches detaillees"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  $null=Wait-Health
+  $null=Get-Count "manga"
+  $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
+  $details=Ask-Number "Maximum de fiches detaillees PAR API (max 20)" 12 20
+  Write-Host "Apercu des titres sans acces Internet :"
+  Engine @("pipelines/engine/scripts/benchmark_manga_sources_v2.py",
+           "--limit",[string]$count,"--detail-limit",[string]$details,"--dry-run")
+  Write-Host "Recherches API par titres uniquement ; certaines fiches detaillees seront lues."
+  Write-Host "Quotas stricts : Scrinis 15 appels/min sans cle ; MangaUpdates pause 2 secondes."
+  Write-Host "Les resultats restent dans data\logs\catalog_sources ; aucun changement SQL."
+  Write-Host "Les ISBN eventuels ne prouvent ni la possession ni l'edition declaree."
+  if (!(Confirm "Autoriser les recherches publiques du benchmark V2 ?" $false)) {
+    Write-Host "Operation annulee. Aucun appel distant n'a ete effectue."
+    return
+  }
+  Engine @("pipelines/engine/scripts/benchmark_manga_sources_v2.py",
+           "--limit",[string]$count,"--detail-limit",[string]$details)
+  Write-Host ("Rapports CSV et JSON V2 : " + (Join-Path $root "data\logs\catalog_sources"))
 }
 function Benchmark-Catalogue-Sources {
   Say "Comparatif de 50 mangas : Scrinis et MangaUpdates (lecture seule)"
@@ -656,6 +681,7 @@ try {
     "BnF"             { Enrich-BnF }
     "BnFBulk"         { Import-BnF-Bulk }
     "SourcesBenchmark" { Benchmark-Catalogue-Sources }
+    "SourcesBenchmarkV2" { Benchmark-Catalogue-Sources-V2 }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
     "Aliases"         { Enrich-Multilingual-Aliases }
