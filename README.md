@@ -28,7 +28,7 @@ Le site est ensuite disponible par défaut sur **http://localhost:8501**. Le por
 
 Le catalogue utilise **PostgreSQL comme source de vérité** et **Meilisearch pour classer les résultats d'une recherche de titre**, y compris si le texte contient une faute de frappe. L'index de recherche contient uniquement des **données publiques** : identifiant interne de manga, titres principaux anglais/japonais, alias vérifiés, genre et statut. Les volumes possédés, la mangathèque personnelle, les notes et les préférences restent uniquement dans PostgreSQL.
 
-L'index est construit lors de la première installation guidée et après mise à jour. Pour le reconstruire manuellement après un enrichissement des titres, utiliser **`mangadvisor.cmd → A → 22`**. La reconstruction utilise un index temporaire et une permutation atomique ; elle ne modifie aucune table PostgreSQL et n'efface aucun volume Docker.
+L'index est construit lors de la première installation guidée. Après une mise à jour du catalogue ou un enrichissement des titres, utiliser **`mangadvisor.cmd → A → 22`**. La reconstruction utilise un index temporaire et une permutation atomique ; elle ne modifie aucune table PostgreSQL et n'efface aucun volume Docker.
 
 Dans la page **Découvrir**, la recherche simple utilise le classement Meilisearch pour les premières pages, puis PostgreSQL fournit les fiches complètes. Si l'index est absent/indisponible ou ne trouve rien, la recherche SQL historique prend le relais. Les recherches combinées à des filtres de genre/statut et la pagination profonde restent pour l'instant réalisées dans PostgreSQL ; elles n'ont pas encore la tolérance aux fautes de frappe.
 
