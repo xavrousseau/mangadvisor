@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS manga_scrinis_fr_attempt (
  manga_id INTEGER PRIMARY KEY REFERENCES manga(id) ON DELETE CASCADE,
  status TEXT NOT NULL CHECK(status IN (
   'MATCHED','AMBIGUOUS','NO_MATCH','NEEDS_AUTHOR_REVIEW',
-  'WORK_TYPE_CONFLICT','AUTHOR_CONFLICT','NO_FR_PRINT_ISBN',
+  'WORK_TYPE_CONFLICT','AUTHOR_CONFLICT','MAL_ID_CONFLICT','NO_FR_PRINT_ISBN',
   'DETAIL_UNAVAILABLE','PROVIDER_ERROR','MISSING_SOURCE')),
  reason TEXT NOT NULL,
  checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -77,7 +77,7 @@ SELECT m.id, m.source_mal_id AS mal_id, m.title, m.title_english,
 FROM manga m
 LEFT JOIN manga_scrinis_fr_attempt previous ON previous.manga_id=m.id
 WHERE m.source_mal_id IS NOT NULL AND m.source_mal_id>0
-AND COALESCE(m.manga_type,'Manga') IN ('Manga','Manhwa','Manhua','One-shot')
+AND COALESCE(m.manga_type,'Manga') IN ('Manga','Manhwa','Manhua')
 AND NOT EXISTS (
  SELECT 1 FROM manga_title_alias a WHERE a.manga_id=m.id
    AND a.language_code='fr'
@@ -193,6 +193,12 @@ def lookup_work(item: dict, client: Any) -> dict:
     first = selected[0]
     if not first.get("id"):
         return {"status": "MISSING_SOURCE", "reason": "NO_SCRINIS_PUBLIC_ID"}
+    # An explicit supplier MAL ID disagreeing with ours is definitive negative
+    # evidence, even when an identical author and title are present.
+    external_mal = first.get("mal_id")
+    if external_mal is not None and str(external_mal).isdigit() and (
+            int(external_mal) != int(item["mal_id"])):
+        return {"status": "MAL_ID_CONFLICT", "reason": "SUPPLIER_MAL_ID_DIFFERENT"}
     detail_result = client.call("scrinis", "detail", identifier=first["id"])
     if detail_result.get("status") != "OK":
         return {"status": "DETAIL_UNAVAILABLE",
@@ -200,7 +206,10 @@ def lookup_work(item: dict, client: Any) -> dict:
     detail = detail_result.get("data") or {}
     if detail.get("status") != "OK" or str(detail.get("id")) != str(first["id"]):
         return {"status": "DETAIL_UNAVAILABLE", "reason": "DETAIL_ID_MISMATCH"}
-    if not japanese_work_type_matches(item, detail):
+    # Search-level formats sometimes identify derivatives more precisely
+    # than the series detail; reject either source of type conflict.
+    if not japanese_work_type_matches(item, {**detail,
+            "work_type": detail.get("work_type") or first.get("format")}):
         return {"status": "WORK_TYPE_CONFLICT", "reason": "MANGA_VS_DERIVATIVE"}
     author_check = compare_authors(item.get("mal_authors") or [], detail.get("authors") or [])
     if author_check == "CONFLICT":
@@ -214,6 +223,9 @@ def lookup_work(item: dict, client: Any) -> dict:
     title = str(detail.get("title") or "").strip()
     if len(title) < 2 or len(title) > 200:
         return {"status": "MISSING_SOURCE", "reason": "NO_USABLE_SCRINIS_SERIES_TITLE"}
+    alias_key = fr.normalized(title)[:200]
+    if len(alias_key) < 2:
+        return {"status": "MISSING_SOURCE", "reason": "INVALID_FRENCH_TITLE_KEY"}
     return {
         "status": "MATCHED", "reason": "SOURCE_CONFIRMED", "title": title,
         "scrinis_id": str(first["id"]), "mal_id": int(item["mal_id"]),
@@ -221,7 +233,7 @@ def lookup_work(item: dict, client: Any) -> dict:
         "author_evidence": author_check, "isbn_count": len(isbns),
         "url": "https://scrin.is/api/v1/series/" + str(first["id"]),
         "manga_id": int(item["id"]),
-        "alias_key": fr.normalized(title)[:200],
+        "alias_key": alias_key,
     }
 
 
