@@ -61,11 +61,13 @@ def sync_catalogue(connect, *, batch: int = 500) -> int:
     """
     staging = INDEX + "_next"
     try:
-        task = _request("DELETE", "/indexes/" + staging)
-        _wait_task(task["taskUid"])
+        _request("GET", "/indexes/" + staging)
     except urllib.error.HTTPError as exc:
         if exc.code != 404:
             raise
+    else:
+        task = _request("DELETE", "/indexes/" + staging)
+        _wait_task(task["taskUid"])
     task = _request("POST", "/indexes", {"uid": staging, "primaryKey": "id"})
     _wait_task(task["taskUid"])
     task = _request("PATCH", "/indexes/" + staging + "/settings", {
