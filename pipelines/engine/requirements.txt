@@ -1,4 +1,3 @@
 requests
 psycopg[binary]
-pandas
 fastapi
