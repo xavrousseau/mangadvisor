@@ -2,18 +2,25 @@
 
 > Ce document décrit les fichiers exécutés **aujourd'hui**, et non le plan d'architecture V1. Voir aussi [l'audit transversal 4.4](audit_transversal_4_4.md) pour l'inventaire fichier par fichier et les limites des tests.
 
-## Point d'entrée Windows
+## Point d'entree Windows
 
 Double-cliquer sur **mangadvisor.cmd** : c'est l'unique menu utilisateur.
-- **22** : assistant complet de première installation (config, SQL, Docker, catalogue, recommandations, sauvegardes, inventaire, contrôles).
-- **25** : extraction puis synchronisation du catalogue manga depuis **Tenrai v1**.
-- **26** : extraction et chargement des recommandations communautaires.
-- **27** : diagnostic complet.
-- **29** : diagnostic de l'accès réseau et de la réponse API manga.
-- **17–21** : sauvegarde, vérification/restauration, benchmark et import contrôlé de bibliothèque.
-- **11** : seule option destructive de volumes ; confirmation explicite requise.
 
-L'ancien sous-menu **12** n'est plus proposé. Le numéro 12 reste un alias temporaire vers 25 pour les anciennes habitudes. Les raccourcis jikan-reset et jikan-pages sont refusés, au profit du parcours sécurisé 25.
+- **1** : installation guidee, incluant le catalogue MAL/Jikan **complet**.
+- **2** : demarrer et ouvrir l'application Web.
+- **3** : mettre a jour le code, sauvegarder et controler les services.
+- **4** : sauvegarder et verifier la restauration PostgreSQL.
+- **5** : diagnostic.
+- **6** : arreter l'application **et le synchroniseur** s'il est actif.
+- **7** : mise a jour du code GitHub uniquement.
+- **A -> 19** : revalidation / rechargement manuel du catalogue MAL complet.
+- **A -> 20** : enrichment FR par Scrinis.
+- **A -> 21** : verifier, activer, arreter ou inspecter le cycle incremental.
+- **A -> S** : maintenance, configuration et restauration.
+
+Les anciens lanceurs Docker de `cmd/` et les lanceurs de tests
+utilisant `--reset-library` ont ete retires. Aucun effacement de volume
+PostgreSQL n'est expose au menu principal.
 
 ## Arborescence utile
 
@@ -21,7 +28,7 @@ L'ancien sous-menu **12** n'est plus proposé. Le numéro 12 reste un alias temp
 |---|---|
 | mangadvisor.cmd | Menu principal pour tous les utilisateurs Windows |
 | cmd/control-center.ps1 | Enchaînement installation, alimentation, mises à jour et diagnostics |
-| cmd/*.cmd (maintenance active) | Petits lanceurs Docker ; certains outils PowerShell concernent la bibliothèque, l'IA et le mobile |
+| cmd/*.ps1 (8 scripts) | Orchestrateur Windows, sauvegarde, Git, import personnel, benchmark prive, API locale, IA et acces mobile. Plus aucun lanceur .cmd historique dans ce dossier |
 | infra/compose/ | `docker-compose.yml` définit les services communs, `docker-compose.local.yml` fournit la configuration stable par défaut, `docker-compose.dev.yml` la configuration de développement et l'ancien Streamlit de test |
 | infra/docker/ | Images Docker des services actifs |
 | apps/web/ | **Interface principale** HTML/CSS/JS sur port UI_PORT (8501 par défaut) |
@@ -50,7 +57,7 @@ L'ancien sous-menu **12** n'est plus proposé. Le numéro 12 reste un alias temp
 
 Les services pgvector et Meilisearch sont prévus dans l'infrastructure ; cela **ne signifie pas** que les embeddings ou l'indexation Meilisearch complète sont systématiquement calculés et alimentés. AniList, MangaNews et le pipeline multi-sources complet décrit dans les documents V1 restent des pistes de développement, pas des étapes garanties.
 
-Une seule interface utilisateur existe dans la configuration stable : **Web sur 8501**. Le Compose principal n'a aucun service `ui` et le menu retire au premier démarrage un éventuel ancien conteneur Streamlit. Le prototype Python est limité à l'overlay dev/test tant que ses fonctions spécifiques (import Excel, profil de lecture avancé) n'ont pas d'équivalent vérifié dans WEB. Le proxy Web valide l'API par le DNS interne Docker (127.0.0.11) après changement d'IP du conteneur.
+Une seule interface utilisateur existe dans la configuration stable : **Web sur 8501**. Le Compose principal n'a aucun service `ui` et le centre de pilotage retire au premier demarrage un eventuel ancien conteneur Streamlit. Le prototype Python est limité à l'overlay dev/test tant que ses fonctions spécifiques (import Excel, profil de lecture avancé) n'ont pas d'équivalent vérifié dans WEB. Le proxy Web valide l'API par le DNS interne Docker (127.0.0.11) après changement d'IP du conteneur.
 
 ## Ce que le nettoyage 4.1 a retiré
 
@@ -58,7 +65,7 @@ Les arborescences _archive/ et legacy/ n'étaient jamais lancées par Docker, le
 
 ## Fichiers privés : ne jamais les supprimer automatiquement
 
-Les dossiers ignorés .env, private-data/, backups/, mobile-local/, .env.mobile et les données dans les **volumes Docker PostgreSQL/Meilisearch** sont **hors du nettoyage Git**. Pour les préserver, faire une sauvegarde vérifiée via le menu 17, puis en conserver une copie hors du PC.
+Les dossiers ignorés .env, private-data/, backups/, mobile-local/, .env.mobile et les données dans les **volumes Docker PostgreSQL/Meilisearch** sont **hors du nettoyage Git**. Pour les préserver, faire une sauvegarde verifiee via le menu principal 4, puis en conserver une copie hors du PC.
 
 Une commande git pull supprime de l'arborescence suivie les fichiers retirés du dépôt, mais **ne supprime pas ces fichiers privés ignorés ou les volumes Docker**.
 
