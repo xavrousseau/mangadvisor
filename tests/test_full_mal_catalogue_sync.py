@@ -86,7 +86,8 @@ class FullCatalogueTests(unittest.TestCase):
         self.p2 = patch.object(sync, "LOGS", self.logs)
         self.p3 = patch("pipelines.engine.scripts.sync_full_mal_catalogue.time.sleep")
         self.p4 = patch.dict("os.environ", {"MANGA_API_BASE_URL": "https://api.tenrai.org/v1"})
-        for p in (self.p1, self.p2, self.p3, self.p4):
+        self.p5 = patch.object(sync, "PREVIOUS_RAW", self.raw / "complete_tenrai")
+        for p in (self.p1, self.p2, self.p3, self.p4, self.p5):
             p.start()
             self.addCleanup(p.stop)
 
@@ -97,6 +98,75 @@ class FullCatalogueTests(unittest.TestCase):
         self.assertNotIn("type", sync.query(1))
         self.assertNotIn("q", sync.query(1))
         self.assertNotIn("genres", sync.query(1))
+
+    def test_historical_jikan_paths_and_legacy_loader_discovery(self):
+        from pipelines.engine.scripts.load_jikan_to_postgres import iter_jikan_json_files
+        sync.persist(1, sync.DEFAULT_BASE, page(1))
+        sync.persist(2, sync.DEFAULT_BASE, page(2))
+        self.assertEqual(sync.cache_path(1), self.raw / "manga_page_1.json")
+        self.assertEqual(sync.cache_path(2), self.raw / "manga_page_2.json")
+        self.assertEqual([p.name for p in iter_jikan_json_files(self.raw, ["legacy"])],
+                         ["manga_page_1.json", "manga_page_2.json"])
+
+    def test_offline_migration_preserves_older_jikan_pages(self):
+        # PR #81 put the pages in complete_tenrai/manga_page_00001.json.
+        sync.PREVIOUS_RAW.mkdir(parents=True)
+        p1 = page(1)
+        previous = {**p1, "mangadvisor_source": "tenrai",
+                    "mangadvisor_api_base": sync.DEFAULT_BASE,
+                    "mangadvisor_query": sync.query(1)}
+        sync.previous_cache_path(1).write_text(json.dumps(previous), encoding="utf-8")
+        sync.cache_path(1).parent.mkdir(parents=True, exist_ok=True)
+        old_jikan = {"data": [manga(999)], "mangadvisor_source": "jikan"}
+        sync.cache_path(1).write_text(json.dumps(old_jikan), encoding="utf-8")
+        sync.previous_cache_path(2).write_text(json.dumps({
+            **page(2), "mangadvisor_source": "tenrai",
+            "mangadvisor_api_base": sync.DEFAULT_BASE,
+            "mangadvisor_query": sync.query(2)}, ensure_ascii=False), encoding="utf-8")
+        with patch.object(sync, "get_postgres_connection",
+                          side_effect=AssertionError("SQL should never open")), \
+             patch.object(sync.requests, "Session",
+                          side_effect=AssertionError("HTTP forbidden")):
+            info = sync.repair_layout()
+        self.assertEqual(info["moved"], 2)
+        self.assertEqual(info["archived_old_root_files"], 1)
+        self.assertEqual(info["valid_root_pages"], 2)
+        self.assertEqual(info["remaining_legacy_pages"], 0)
+        saved = (self.raw / "legacy_archive_before_complete_sync" / "manga_page_1.json")
+        self.assertEqual(json.loads(saved.read_text()), old_jikan)
+        self.assertEqual(sync.load_cache(1, sync.DEFAULT_BASE)["data"][0]["mal_id"], 1)
+        self.assertEqual(sync.load_cache(2, sync.DEFAULT_BASE)["data"][0]["mal_id"], 3)
+        self.assertEqual(sync.repair_layout()["moved"], 0)
+
+    def test_invalid_old_cache_not_imported_and_existing_new_cache_not_overwritten(self):
+        sync.PREVIOUS_RAW.mkdir(parents=True)
+        sync.previous_cache_path(1).write_text("invalid", encoding="utf-8")
+        sync.persist(2, sync.DEFAULT_BASE, page(2))
+        previous = {**page(2), "mangadvisor_source": "tenrai",
+                    "mangadvisor_api_base": sync.DEFAULT_BASE,
+                    "mangadvisor_query": sync.query(2)}
+        sync.previous_cache_path(2).write_text(json.dumps(previous), encoding="utf-8")
+        info = sync.repair_layout()
+        self.assertEqual(info["invalid_previous_pages"], 1)
+        self.assertEqual(info["already_in_place"], 1)
+        self.assertEqual(info["moved"], 0)
+        self.assertEqual(info["valid_root_pages"], 1)
+        self.assertTrue(sync.previous_cache_path(2).exists())
+        self.assertIsNone(sync.load_cache(1, sync.DEFAULT_BASE))
+
+    def test_cli_layout_repair_and_status_never_touch_network_or_sql(self):
+        sync.PREVIOUS_RAW.mkdir(parents=True)
+        sync.previous_cache_path(1).write_text(json.dumps({
+            **page(1), "mangadvisor_source": "tenrai",
+            "mangadvisor_api_base": sync.DEFAULT_BASE,
+            "mangadvisor_query": sync.query(1)}))
+        with patch.object(sync, "get_postgres_connection",
+                          side_effect=AssertionError("SQL forbidden")), \
+             patch.object(sync.requests, "Session",
+                          side_effect=AssertionError("Network forbidden")):
+            self.assertEqual(sync.main(["--repair-layout"]), 0)
+            self.assertEqual(sync.main(["--status"]), 0)
+        self.assertTrue(sync.cache_path(1).exists())
 
     def test_plan_is_read_only_and_uses_real_last_page(self):
         client = Session()
