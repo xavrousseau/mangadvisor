@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -272,6 +272,59 @@ function Enrich-Catalogue-French-Scrinis {
   Write-Host "Nouveaux titres FR et auteurs consultables directement dans Mangadvisor."
   Write-Host "Pour les statistiques reelles : /catalogue/coverage sur ton API."
 }
+function Manage-Catalogue-Lifecycle {
+  Say "Catalogue vivant : base MAL complete + mises a jour automatiques"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  Write-Host "Le catalogue MAL/Jikan initial est charge une seule fois via A -> 19."
+  Write-Host "Chaque cycle quotidien : nouvelles oeuvres MAL + fiches anciennes tournantes."
+  Write-Host "Enrichissements limites : Scrinis, MangaUpdates, BnF SRU et fichiers mensuels deja presents."
+  Write-Host "Jamais de retour aux 858 pages a chaque demarrage."
+  Write-Host "Ne modifie JAMAIS tes livres possedes, editions declarees, notes ou lectures."
+  Write-Host "L'automatisme ne fonctionne que lorsque Docker Desktop tourne sur ce PC."
+  Write-Host "1 - Verifier le catalogue initial (aucun appel Internet)"
+  Write-Host "2 - Executer un cycle MAINTENANT (nouveautes uniquement)"
+  Write-Host "3 - ACTIVER la synchronisation quotidienne Docker"
+  Write-Host "4 - ARRETER la synchronisation quotidienne Docker"
+  Write-Host "5 - Dernier rapport de veille et etat du service"
+  $choice=(Read-Host "Ton choix (1-5)").Trim()
+  switch ($choice) {
+    "1" {
+      Engine @("pipelines/engine/scripts/catalogue_lifecycle.py","--audit")
+    }
+    "2" {
+      Engine @("pipelines/engine/scripts/catalogue_lifecycle.py","--audit")
+      if (!(Confirm "Sauvegarder puis mettre a jour les seules nouvelles fiches MAL et candidates ?" $false)) { return }
+      Backup
+      Engine @("pipelines/engine/scripts/catalogue_lifecycle.py","--once")
+    }
+    "3" {
+      Engine @("pipelines/engine/scripts/catalogue_lifecycle.py","--audit")
+      if (!(Confirm "ACTIVER la veille quotidienne pendant que Docker Desktop fonctionne ?" $false)) { return }
+      Backup
+      Compose @("--profile","automation","up","-d","--build","catalog-sync")
+      Write-Host "Veille auto ACTIVE dans le conteneur mangadvisor_catalog_sync."
+      Write-Host "Premier cycle au demarrage puis un cycle par jour tant que Docker fonctionne."
+      Write-Host "Pour afficher le journal :"
+      Compose @("--profile","automation","logs","--tail","40","catalog-sync")
+    }
+    "4" {
+      if (!(Confirm "Desactiver la veille automatique du catalogue ?" $false)) { return }
+      Compose @("--profile","automation","stop","catalog-sync")
+      Compose @("--profile","automation","rm","-f","catalog-sync")
+      Write-Host "Veille desactivee sans suppression de PostgreSQL, JSON ou mangatheque."
+    }
+    "5" {
+      Engine @("pipelines/engine/scripts/catalogue_lifecycle.py","--status")
+      Compose @("--profile","automation","ps","catalog-sync")
+      Write-Host "Fichier de controle : data\logs\catalogue_lifecycle\last_cycle.json"
+    }
+    default { Write-Host "Action annulee. Choisir une valeur de 1 a 5." }
+  }
+}
+
 function Load-Complete-MAL-Catalogue {
   Say "Catalogue MAL/Jikan complet via Tenrai : base du projet"
   Ensure-Environment
@@ -796,6 +849,7 @@ try {
     "CatalogueExtended" { Load-Extended-Catalogue }
     "CompleteMALCatalogue" { Load-Complete-MAL-Catalogue }
     "CatalogueFrenchScrinis" { Enrich-Catalogue-French-Scrinis }
+    "CatalogueLifecycle" { Manage-Catalogue-Lifecycle }
     "Recommendations" { Load-Recommendations }
     "Network"         { Network }
     "Diagnostic"      { Diagnostic }
