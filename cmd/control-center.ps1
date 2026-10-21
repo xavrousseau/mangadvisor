@@ -260,10 +260,23 @@ function Load-Complete-MAL-Catalogue {
   Write-Host "Parcours : toutes categories manga, tri MAL ID ascendant, sans filtre SFW, 100 notices/page."
   Write-Host "La source annonce sa vraie derniere page ; 20000 est seulement un garde-fou."
   Write-Host "Le rapport montrera si toutes les pages et references ont ete recuperees."
+  $jikanDirectory=Join-Path $root "data\raw\jikan"
+  Write-Host ("Repertoire Jikan historique sur Windows : " + $jikanDirectory)
+  Write-Host "Les fichiers du catalogue complet : manga_page_1.json, manga_page_2.json, etc."
+  Write-Host "Migration des pages deja recuperees depuis l'ancien sous-dossier : AUCUN appel API, AUCUNE ecriture SQL."
+  Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--repair-layout")
+  Write-Host "Derniere synchronisation et emplacement des vrais JSON :"
+  Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--status")
+  Write-Host "Si la derniere synchronisation est complete, tu as deja les donnees : pas besoin de les telecharger."
+  if (!(Confirm "Faire une NOUVELLE synchronisation du catalogue public MAL ?" $false)) {
+    Write-Host ("Fichiers existants conserves dans " + $jikanDirectory)
+    Write-Host "La base PostgreSQL et la mangatheque n'ont pas ete modifiees."
+    return
+  }
   Network
   Engine @("pipelines/engine/scripts/sync_full_mal_catalogue.py","--plan")
-  if (!(Confirm "Demarrer/reprendre la synchronisation COMPLETE du catalogue public MAL ?" $false)) {
-    Write-Host "Aucune modification du catalogue."
+  if (!(Confirm "Confirmer les appels API et la consolidation des notices ?" $false)) {
+    Write-Host "La migration des fichiers existants est terminee ; pas de nouvelle synchronisation."
     return
   }
   $refresh=Confirm "Retelcharger toutes les pages, y compris celles du cache valide ?" $false
@@ -285,7 +298,8 @@ function Load-Complete-MAL-Catalogue {
   Write-Host ("Mangas canonises avant : {0} ; apres : {1} ; progression nette : {2}" -f
               $before,$after,($after-$before))
   Write-Host ("Notices source MAL distinctes : {0}" -f $source)
-  Write-Host "Rapport local : data\logs\catalogue_complete\last_sync.json"
+  Write-Host ("Pages brutes Jikan : " + $jikanDirectory)
+  Write-Host "Rapport de suivi : data\logs\catalogue_complete\last_sync.json"
   Write-Host "Fiches de ta mangatheque et relations existantes conservees."
 }
 function Load-Extended-Catalogue {
