@@ -477,8 +477,27 @@ def extract_page(args: argparse.Namespace, page: int) -> tuple[Path, int]:
 
     if args.mode == "search" and not args.no_legacy_search_copy and not getattr(args, "manga_type", None):
         legacy_file = legacy_search_output_path(page)
-        save_json(payload, legacy_file)
-        print(f"[extract_jikan] copie legacy sauvegardée : {legacy_file}")
+        # Complete MAL sync now writes Jikan's historical manga_page_N.json.
+        # Never overwrite a 100-item all-catalogue page with a filtered or
+        # popularity-sorted 25-item legacy page.
+        full_catalogue_page = False
+        if legacy_file.is_file():
+            try:
+                existing = json.loads(legacy_file.read_text(encoding="utf-8"))
+                full_catalogue_page = (
+                    existing.get("mangadvisor_query") == {
+                        "page": page, "limit": 100,
+                        "order_by": "mal_id", "sort": "asc"}
+                    and existing.get("mangadvisor_source") == "tenrai"
+                    and existing.get("mangadvisor_api_base") == JIKAN_BASE_URL
+                )
+            except (OSError, ValueError, TypeError, AttributeError):
+                pass
+        if full_catalogue_page:
+            print(f"[extract_jikan] conserve le catalogue MAL complet : {legacy_file}")
+        else:
+            save_json(payload, legacy_file)
+            print(f"[extract_jikan] copie legacy sauvegardée : {legacy_file}")
 
     nb_items = len(payload.get("data", []))
 
