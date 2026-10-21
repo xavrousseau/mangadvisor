@@ -30,7 +30,12 @@ from pipelines.engine.scripts.load_jikan_to_postgres import transform_jikan_item
 from pipelines.engine.src.load.postgres_loader import get_postgres_connection, upsert_jikan_manga_batch
 
 ROOT = Path(__file__).resolve().parents[3]
-RAW = ROOT / "data" / "raw" / "jikan" / "complete_tenrai"
+# Historically, Jikan stored raw manga pages directly under data/raw/jikan.
+# The Windows path is the host checkout's matching F:\...\data\raw\jikan.
+RAW = ROOT / "data" / "raw" / "jikan"
+# PR #81 mistakenly used this extra subdirectory; keep a migration reader
+# so all 858 already-downloaded pages can be reused without HTTP or SQL.
+PREVIOUS_RAW = RAW / "complete_tenrai"
 LOGS = ROOT / "data" / "logs" / "catalogue_complete"
 DEFAULT_BASE = "https://api.tenrai.org/v1"
 LIMIT = 100
@@ -91,23 +96,89 @@ def pagination(payload: Any, page: int) -> tuple[int, bool, int | None]:
 
 
 def cache_path(page: int) -> Path:
-    return RAW / f"manga_page_{page:05d}.json"
+    # Old Jikan V0.6-compatible filename, also picked up by --sources legacy.
+    return RAW / f"manga_page_{page}.json"
 
 
-def load_cache(page: int, base: str) -> dict | None:
-    path = cache_path(page)
+def previous_cache_path(page: int) -> Path:
+    return PREVIOUS_RAW / f"manga_page_{page:05d}.json"
+
+
+def _verified_cache(path: Path, page: int, base: str) -> dict | None:
     if not path.is_file() or path.is_symlink():
         return None
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-        if (value.get("mangadvisor_source") != "tenrai" or
-                value.get("mangadvisor_api_base") != base or
-                value.get("mangadvisor_query") != query(page)):
+        if (not isinstance(value, dict)
+                or value.get("mangadvisor_source") != "tenrai"
+                or value.get("mangadvisor_api_base") != base
+                or value.get("mangadvisor_query") != query(page)):
             return None
         pagination(value, page)
         return value
     except (ValueError, OSError, TypeError, KeyError):
         return None
+
+
+def repair_layout(base: str | None = None) -> dict:
+    """Move the previous 858 cached files to the HISTORICAL Jikan folder.
+
+    Fully local. No network and NO DATABASE CONNECTION. Archives any older
+    root file before replacing it; never destroys the original Jikan raw JSON.
+    Re-running is idempotent. An invalid legacy cache is left untouched.
+    """
+    base = base or base_url()
+    summary = {
+        "target": str(RAW), "old_location": str(PREVIOUS_RAW),
+        "moved": 0, "already_in_place": 0, "archived_old_root_files": 0,
+        "invalid_previous_pages": 0, "remaining_legacy_pages": 0,
+        "status": "NO_OLD_LAYOUT" if not PREVIOUS_RAW.exists() else "DONE",
+    }
+    if not PREVIOUS_RAW.is_dir() or PREVIOUS_RAW.is_symlink():
+        return summary
+    sources = sorted(PREVIOUS_RAW.glob("manga_page_*.json"))
+    for old in sources:
+        found = re.fullmatch(r"manga_page_(\d{5}).json", old.name)
+        if not found or old.is_symlink():
+            summary["invalid_previous_pages"] += 1
+            continue
+        page = int(found.group(1))
+        if page < 1 or not _verified_cache(old, page, base):
+            summary["invalid_previous_pages"] += 1
+            continue
+        target = cache_path(page)
+        if _verified_cache(target, page, base):
+            summary["already_in_place"] += 1
+            # Keep the old copy rather than deleting evidence unnecessarily.
+            continue
+        if target.exists():
+            archive_dir = RAW / "legacy_archive_before_complete_sync"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            name = target.name
+            saved = archive_dir / name
+            suffix = 1
+            while saved.exists():
+                saved = archive_dir / f"{name}.backup{suffix}"
+                suffix += 1
+            target.replace(saved)
+            summary["archived_old_root_files"] += 1
+        RAW.mkdir(parents=True, exist_ok=True)
+        old.replace(target)
+        summary["moved"] += 1
+    summary["remaining_legacy_pages"] = len(list(PREVIOUS_RAW.glob("manga_page_*.json")))
+    summary["valid_root_pages"] = sum(
+        bool(_verified_cache(cache_path(int(f.group(1))), int(f.group(1)), base))
+        for path in RAW.glob("manga_page_*.json")
+        if (f := re.fullmatch(r"manga_page_(\d+).json", path.name))
+    )
+    return summary
+
+
+def load_cache(page: int, base: str) -> dict | None:
+    # Normal legacy-compatible Jikan folder first; allow transition if a
+    # caller invokes the collector without explicitly repairing the layout.
+    return (_verified_cache(cache_path(page), page, base)
+            or _verified_cache(previous_cache_path(page), page, base))
 
 
 def persist(page: int, base: str, payload: dict) -> None:
@@ -199,6 +270,9 @@ def run(*, plan: bool = False, refresh: bool = False, max_pages: int = MAX_PAGES
               "canonical_synced": False}
     if plan:
         return report
+    # Previous PR put raw pages in a nested directory. Bring them back to
+    # Jikan's original root before continuing, without redownloading them.
+    repair_layout(base)
     persist(1, base, first)
     seen: set[int] = set()
     page_rows = []
@@ -304,12 +378,28 @@ def main(argv: list[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--plan", action="store_true", help="Compter les pages sans écrire PostgreSQL")
     mode.add_argument("--finalize", action="store_true", help="Valider les compteurs APRES scripts SQL 003/005")
+    mode.add_argument("--repair-layout", action="store_true",
+                      help="Replacer les JSON déjà téléchargés dans data/raw/jikan, SANS appel API/SQL")
+    mode.add_argument("--status", action="store_true",
+                      help="Lire le dernier bilan et le chemin historique sans réseau/SQL")
     parser.add_argument("--refresh", action="store_true", help="Retélécharger les pages déjà en cache")
     parser.add_argument("--max-pages", type=int, default=MAX_PAGES)
     parser.add_argument("--batch-pages", type=int, default=20)
     parser.add_argument("--pause", type=float, default=1.1)
     args = parser.parse_args(argv)
     try:
+        if args.repair_layout:
+            print(json.dumps(repair_layout(), ensure_ascii=False, indent=2))
+            return 0
+        if args.status:
+            report_path = LOGS / "last_sync.json"
+            report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.is_file() else {}
+            print(json.dumps({
+                "raw_jikan_directory": str(RAW),
+                "pages_in_legacy_root": len(list(RAW.glob("manga_page_*.json"))) if RAW.is_dir() else 0,
+                "last_sync": report,
+            }, ensure_ascii=False, indent=2))
+            return 0
         if args.finalize:
             print(json.dumps(finalize(), ensure_ascii=False, indent=2))
             return 0
