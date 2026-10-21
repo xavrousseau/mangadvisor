@@ -57,7 +57,7 @@ PostgreSQL n'est expose au menu principal.
 
 ### Ce qui existe mais ne doit pas être annoncé comme entièrement opérationnel
 
-Les services pgvector et Meilisearch sont prévus dans l'infrastructure ; cela **ne signifie pas** que les embeddings ou l'indexation Meilisearch complète sont systématiquement calculés et alimentés. AniList, MangaNews et le pipeline multi-sources complet décrit dans les documents V1 restent des pistes de développement, pas des étapes garanties.
+PostgreSQL reste la source de vérité. Meilisearch indexe les titres/alias publics du catalogue lorsque le processus de synchronisation (installation/chargement ou menu A → 22) est exécuté ; la recherche simple profite alors des fautes tolérées. Sans index, le système retombe sur la recherche SQL. Les embeddings pgvector ne sont pas produits automatiquement. AniList, MangaNews et le pipeline multi-sources complet décrit dans les documents V1 restent des pistes de développement, pas des étapes garanties.
 
 Une seule interface utilisateur existe dans la configuration stable : **Web sur 8501**. Le Compose principal n'a aucun service `ui` et le centre de pilotage retire au premier demarrage un eventuel ancien conteneur Streamlit. L'ancien prototype Streamlit et son profil de développement ont été retirés ; l'import CSV/XLSX, les modèles et le profil de lecture sont disponibles dans le Web. Le test de parité navigateur est maintenu dans la CI. Le proxy Web valide l'API par le DNS interne Docker (127.0.0.11) après changement d'IP du conteneur.
 
