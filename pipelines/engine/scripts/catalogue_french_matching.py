@@ -194,10 +194,16 @@ def edition_review(sample: dict, detail: dict | None) -> dict:
     if isbn_refs:
         signs.append("FR_PRINT_BIBLIOGRAPHIC_ISBN_PRESENT")
         score += 15
+    matched_families = target_families & found_families
+    missing_families = target_families - found_families
     if target_families:
-        if target_families & found_families:
-            score += 25
+        if matched_families:
+            # Two declared variants (Pastel + Deluxe) cannot both be marked
+            # found merely because one Deluxe listing exists.
+            score += (25 * len(matched_families)) // len(target_families)
             signs.append("DECLARED_EDITION_FAMILY_PRESENT")
+            if missing_families:
+                signs.append("SOME_DECLARED_EDITION_FAMILIES_UNCONFIRMED")
         elif found_families:
             signs.append("DECLARED_EDITION_NOT_FOUND_AMONG_CANDIDATES")
             # Do not assert that an edition is absent from the API globally.
@@ -210,6 +216,8 @@ def edition_review(sample: dict, detail: dict | None) -> dict:
         signs.append("EXACT_EDITION_NOT_DECLARED")
     if not (fr_print or isbn_refs):
         status = "NO_FR_PRINT_EVIDENCE"
+    elif "SOME_DECLARED_EDITION_FAMILIES_UNCONFIRMED" in signs:
+        status = "FR_PRINT_PARTIAL_EDITION_MATCH_REVIEW"
     elif "DECLARED_EDITION_FAMILY_PRESENT" in signs:
         status = "FR_PRINT_EDITION_CANDIDATE_REVIEW"
     elif "DECLARED_EDITION_NOT_FOUND_AMONG_CANDIDATES" in signs:
@@ -223,6 +231,8 @@ def edition_review(sample: dict, detail: dict | None) -> dict:
                 str(r["isbn13"]) for r in isbn_refs))[:20],
             "declared_editions": declarations,
             "candidate_edition_families": sorted(found_families),
+            "matched_declared_families": sorted(matched_families),
+            "unconfirmed_declared_families": sorted(missing_families),
             "isbn_ownership_verified": False}
 
 
