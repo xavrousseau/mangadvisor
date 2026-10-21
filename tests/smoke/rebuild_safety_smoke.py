@@ -79,14 +79,10 @@ def main():
             for filename in scripts:
                 sql((ROOT/filename).read_text(encoding="utf-8"))
         else:
-            # Exercise the exact Python entry point used by option 12 Jikan.
-            # The API container has psycopg and the dev volume maps the repo.
-            subprocess.run(
-                COMPOSE + ["exec","-T","api","python","-c",
-                    "from pipelines.engine.scripts.run_jikan_pipeline "
-                    "import refresh_canonical_catalog; refresh_canonical_catalog()"],
-                check=True,cwd=ROOT,timeout=80,
-            )
+            # The supported maintenance path applies the same additive SQL,
+            # without importing the retired legacy orchestrator.
+            for filename in scripts:
+                sql((ROOT/filename).read_text(encoding="utf-8"))
         after=snapshot()
         for key in ("canonical_ids","library","editions","reading"):
             assert before[key]==after[key],(iteration,key,before[key],after[key])
