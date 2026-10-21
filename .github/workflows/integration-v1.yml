@@ -41,11 +41,10 @@ jobs:
           fi
           $BASE --profile ai config --services | grep -Fx ollama
           $BASE config --services | grep -Fx web
-          if $BASE config --services | grep -Fx ui; then
-            echo "Legacy Streamlit must not start by default"
+          if $BASE --profile legacy config --services | grep -Fx ui; then
+            echo "Retired Streamlit service must not be present even with legacy profile"
             exit 1
           fi
-          $BASE --profile legacy config --services | grep -Fx ui
 
       - name: Démarrer PostgreSQL et Meilisearch
         run: |
@@ -75,10 +74,10 @@ jobs:
               psql -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci < "$file"
           done
 
-      - name: Construire le site principal et la UI Streamlit pour tests uniquement
+      - name: Construire uniquement API et site Web principal
         run: |
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.dev.yml --profile legacy up --build -d api ui web
+            -f infra/compose/docker-compose.dev.yml up --build -d api web
 
       - name: Tester les vraies requêtes SQL via HTTP
         run: |
@@ -424,7 +423,7 @@ jobs:
       - name: Valider le conseiller conversationnel sur ordinateur et mobile
         run: python tests/smoke/advisor_browser.py
 
-      - name: Contrôler Streamlit ordinateur et mobile
+      - name: Contrôler l'interface Web ordinateur et mobile
         run: python tests/smoke/browser_smoke.py
 
       - name: Valider le nouvel import de bibliothèque CSV/XLSX sur navigateur et base CI jetable
@@ -790,4 +789,4 @@ jobs:
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
             -f infra/compose/docker-compose.dev.yml ps
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.dev.yml logs --tail=160 api ui postgres
+            -f infra/compose/docker-compose.dev.yml logs --tail=160 api web postgres
