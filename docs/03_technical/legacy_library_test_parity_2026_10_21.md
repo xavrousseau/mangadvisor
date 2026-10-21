@@ -46,3 +46,10 @@ Le Web propose maintenant dans **Ma bibliothèque** un atelier distinct des livr
 Le parcours comprend une simulation (`dry_run=true`), l'affichage des correspondances et erreurs, puis une confirmation explicite pour une importation **additive** (`ON CONFLICT DO NOTHING`). L'interface distingue ce parcours de l'import de livres ISBN vérifiés (`/collection/import/*`).
 
 Des tests Python et Web couvrent les principaux contrats de conversion, d'aperçu et de non-écrasement. Des tests additionnels vérifient la présence des trois objectifs de recommandation et les exclusions des deux statuts négatifs. Il reste à valider les interactions réelles en navigateur et les quatre workflows du dernier HEAD, avant d'affirmer une parité parfaite avec Streamlit. L'ancien prototype n'est donc pas supprimé.
+
+## Passage de parité Streamlit → Web — octobre 2026
+
+- Modèles CSV et XLSX de bibliothèque générés sans Streamlit par le nouvel endpoint `GET /library/import/template?format=csv|xlsx`. Les modèles contiennent uniquement des exemples publics (Naruto, Bleach, One Piece, Fairy Tail).
+- Profil de lecture rendu dans `Ma bibliothèque` via `/library/profile`, sans mutation : statuts, compteurs, tags pondérés, sources influentes et signaux négatifs. La présentation Web est dans `apps/web/assets/reading-profile.js`.
+- Nouveaux tests `tests/test_library_templates.py` et `tests/web/reading-profile.test.mjs` ; le smoke Playwright charge aussi le profil et vérifie les modèles via API.
+- **Décision prudente :** ne pas retirer encore `apps/ui/` : la parité des fonctionnalités de lecture et de recommandations, les tests `tests/test_discovery.py` et `tests/test_recommendation_view.py` qui en importent des utilitaires, ainsi que la dernière CI restent à clôturer. Les anciennes dépendances et l'overlay dev sont donc conservés tant que le retrait complet ne peut pas être validé en un lot.
