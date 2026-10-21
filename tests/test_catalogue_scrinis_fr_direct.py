@@ -182,6 +182,64 @@ class ScrinisDirectEnrichmentTests(unittest.TestCase):
         self.assertEqual(len(client.calls), 1)
         self.assertEqual(report["selected"], 2)
 
+    def test_missing_one_detail_in_100_does_not_cancel_34_saved_aliases(self):
+        # Reproduce the real 2026-10-21 Windows A->20 result exactly:
+        # 34 French labels created, 41 reviewed, 24 absent, one detail 404.
+        records = [{**row(mal_id=1000 + i), "id":i} for i in range(1, 101)]
+        db = DB(rows=records)
+        def source_result(record, client):
+            i = record["id"]
+            if i <= 34:
+                return {
+                    "status":"MATCHED", "reason":"SOURCE_CONFIRMED",
+                    "manga_id":i, "mal_id":record["mal_id"],
+                    "scrinis_id":str(20000 + i), "title":"French Title " + str(i),
+                    "alias_key":"french title " + str(i),
+                    "url":"https://scrin.is/api/v1/series/" + str(20000+i),
+                    "work_evidence":"EXACT_TITLE_AUTHOR",
+                    "author_evidence":"MATCH", "isbn_count":1,
+                }
+            if i <= 75:
+                return {"status":"AMBIGUOUS", "reason":"MULTIPLE_PLAUSIBLE_WORKS"}
+            if i <= 99:
+                return {"status":"NO_MATCH", "reason":"NO_EXACT_WORK_EVIDENCE"}
+            return {"status":"DETAIL_UNAVAILABLE", "reason":"DETAIL_HTTP_ERROR"}
+        with patch.object(mod, "lookup_work", side_effect=source_result):
+            report = mod.run_batch(lambda:db, limit=100, client=Provider())
+        self.assertEqual(report["selected"],100)
+        self.assertEqual(report["processed"],100)
+        self.assertEqual(report["new_french_aliases"],34)
+        self.assertEqual(report["review_needed"],41)
+        self.assertEqual(report["no_match"],24)
+        self.assertEqual(report["detail_unavailable"],1)
+        self.assertEqual(report["provider_errors"],0)
+        self.assertTrue(report["completed"])
+        self.assertEqual(report["status_counts"]["DETAIL_UNAVAILABLE"],1)
+        with patch.object(mod, "run_batch", return_value=report):
+            self.assertEqual(mod.main(["--limit","100"]),0)
+
+    def test_a_missing_detail_is_soft_but_429_or_5xx_is_not(self):
+        for http_code, expected in [
+            (404, "DETAIL_UNAVAILABLE"),
+            (429, "PROVIDER_ERROR"),
+            (503, "PROVIDER_ERROR"),
+        ]:
+            with self.subTest(code=http_code):
+                status = ("UNAVAILABLE" if http_code == 429 else "HTTP_ERROR")
+                provider = Provider(detail={
+                    "status":status, "http_status":http_code})
+                outcome = mod.lookup_work(row(), provider)
+                self.assertEqual(outcome["status"],expected)
+                self.assertEqual(outcome["reason"], "DETAIL_" + status)
+        self.assertTrue(mod.provider_failure({"status":"NETWORK_ERROR"}))
+        self.assertFalse(mod.provider_failure({"status":"HTTP_ERROR","http_status":404}))
+        self.assertFalse(mod.provider_failure({"status":"INVALID_JSON"}))
+
+    def test_real_provider_outage_still_returns_failing_exit_code(self):
+        report={"provider_errors":1,"completed":False}
+        with patch.object(mod, "run_batch", return_value=report):
+            self.assertEqual(mod.main(["--limit","20"]),2)
+
     def test_sql_targets_unenriched_canonical_mal_and_prioritizes_library(self):
         sql = mod.SELECT_WORK
         self.assertIn("FROM manga m", sql)
