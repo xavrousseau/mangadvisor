@@ -1,6 +1,6 @@
 # Structure actuelle de Mangadvisor (4.x)
 
-> Ce document décrit les fichiers exécutés **aujourd'hui**, et non le plan d'architecture V1. Voir aussi [l'audit transversal 4.4](audit_transversal_4_4.md) pour l'inventaire fichier par fichier et les limites des tests.
+> Ce document décrit les fichiers exécutés **aujourd'hui**, et non le plan d'architecture V1. Voir [l'inventaire transversal actuel](inventaire_transversal_2026_10_21.md) pour la liste des fichiers suivis et les limites de la revue.
 
 ## Point d'entree Windows
 
@@ -63,7 +63,7 @@ Une seule interface utilisateur existe dans la configuration stable : **Web sur 
 
 ## Ce que le nettoyage 4.1 a retiré
 
-Les arborescences _archive/ et legacy/ n'étaient jamais lancées par Docker, les menus ou les tests modernes. Elles ont été retirées de la **version courante du dépôt**, tout en restant consultables dans **l'historique Git**. Les scripts Windows historiques isolés nécessitant un Python hôte ont également été retirés lorsqu'ils reproduisaient les commandes du menu central. Voir [le relevé précis du nettoyage](cleanup_4_1.md).
+Les arborescences _archive/ et legacy/ n'étaient jamais lancées par Docker, les menus ou les tests modernes. Elles ont été retirées de la **version courante du dépôt**, tout en restant consultables dans **l'historique Git**. Les scripts Windows historiques isolés nécessitant un Python hôte ont également été retirés lorsqu'ils reproduisaient les commandes du menu central. Les décisions historiques restent accessibles dans les commits Git antérieurs.
 
 ## Fichiers privés : ne jamais les supprimer automatiquement
 
