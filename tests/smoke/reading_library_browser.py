@@ -34,6 +34,16 @@ def run():
         page.locator("#reading-import-workspace summary").click()
         expect(page.locator("#reading-file")).to_be_visible()
         assert page.locator("#bulk-csv-file").count() == 1, "ISBN import must remain separate"
+        expect(page.locator('[data-action="reading-template-csv"]')).to_be_visible()
+        expect(page.locator('[data-action="reading-template-xlsx"]')).to_be_visible()
+        template_csv = page.request.get(BASE + "/api/library/import/template?format=csv")
+        assert template_csv.ok and "Naruto" in template_csv.json()["content"]
+        template_excel = page.request.get(BASE + "/api/library/import/template?format=xlsx")
+        assert template_excel.ok and template_excel.json()["content_base64"]
+        page.locator("#reading-profile-workspace summary").click()
+        page.locator('[data-action="reading-profile-load"]').click()
+        expect(page.locator("#reading-profile-results")).to_contain_text("Genres dominants", timeout=30000)
+
 
         before = page.request.get(BASE + "/api/library?q=Naruto&limit=20").json()
         csv = b"title,library_status,user_score,is_favorite\nNaruto,READ,1,true\n"
