@@ -130,6 +130,18 @@ class RepositoryHygieneTests(unittest.TestCase):
             self.assertNotIn(required, entries)
             self.assertNotIn(required + "/", entries)
 
+    def test_runtime_diagnostics_never_overwrite_versioned_reports(self):
+        for name in ("analyze_jikan_recommendation_edges.py",
+                     "run_recommendation_profile_tests.py"):
+            with self.subTest(name=name):
+                text = (ROOT / "pipelines/engine/scripts" / name).read_text(
+                    encoding="utf-8"
+                )
+                self.assertIn(' / "data" / "logs" / "diagnostics"', text)
+                self.assertNotIn(' / "docs" / "reports"', text)
+        ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("data/logs/*", ignore)
+
     def test_recommendation_profile_has_only_one_output(self):
         report = (ROOT / "pipelines/engine/scripts/run_recommendation_profile_tests.py").read_text(encoding="utf-8")
         self.assertIn('recommendation_profile_tests_latest.md', report)
