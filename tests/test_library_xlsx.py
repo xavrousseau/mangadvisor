@@ -32,7 +32,7 @@ class ReadingXlsxTests(unittest.TestCase):
     def test_conversion_rejects_corrupt_or_oversized_input(self):
         with self.assertRaises(HTTPException):
             xlsx_to_library_csv("not-base64")
-        big = base64.b64encode(b"PK\\x03\\x04"+b"x"*MAX_XLSX_BYTES).decode("ascii")
+        big = base64.b64encode(b"PK\x03\x04"+b"x"*MAX_XLSX_BYTES).decode("ascii")
         with self.assertRaises(HTTPException):
             xlsx_to_library_csv(big)
 
