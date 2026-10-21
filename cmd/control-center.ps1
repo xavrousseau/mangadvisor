@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","Wikidata","LibraryEnrichment","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -289,6 +289,30 @@ function Load-Extended-Catalogue {
   Write-Host ("Catalogue avant : {0} / apres : {1} / variation nette : {2}" -f $before,$after,($after-$before))
   Write-Host ("Notices distinctes en provenance fournisseur : {0}" -f $sourceCount)
   Write-Host "Operation non destructive. Les alias FR et les ISBN sont traites separement."
+}
+function Prepare-Bibliographic-Staging {
+  Say "Preparation bibliographique : Scrinis, MangaUpdates, BnF (staging uniquement)"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch")
+  Wait-Postgres
+  $null=Get-Count "manga"
+  Write-Host "Source : dernier rapport JSON V2 local, genere via A -> 17."
+  Write-Host "Aucune interrogation Internet n'est effectuee dans cette etape."
+  Write-Host "Preparation sans ecriture PostgreSQL :"
+  Engine @("pipelines/engine/scripts/prepare_bibliographic_staging.py","--preview")
+  Write-Host "Les candidats d'oeuvres et editions restent a valider."
+  Write-Host "Les ISBN BnF restent des indices bibliographiques, pas des tomes possedes."
+  Write-Host "Les operations SQL sont limitees aux 4 tables bib_stage_* ; pas de fusion."
+  if (!(Confirm "Enregistrer ce lot dans la zone de preparation bibliographique SQL ?" $false)) {
+    Write-Host "Aucun changement en base. Les fichiers d'apercu restent locaux."
+    return
+  }
+  Engine @("pipelines/engine/scripts/prepare_bibliographic_staging.py","--import")
+  Write-Host "Lots de preparation enregistres :"
+  Engine @("pipelines/engine/scripts/prepare_bibliographic_staging.py","--status")
+  Write-Host ("Fichiers d'apercu : " + (Join-Path $root "data\logs\bibliographic_staging"))
+  Write-Host "Aucune entree du catalogue ou de la mangatheque n'a ete modifiee."
 }
 function Benchmark-Catalogue-Sources-V2 {
   Say "Comparatif V2 : mangas FR papier, scores oeuvre/edition et candidats concurrents"
@@ -686,6 +710,7 @@ try {
     "BnFBulk"         { Import-BnF-Bulk }
     "SourcesBenchmark" { Benchmark-Catalogue-Sources }
     "SourcesBenchmarkV2" { Benchmark-Catalogue-Sources-V2 }
+    "BibliographicStaging" { Prepare-Bibliographic-Staging }
     "Wikidata"        { Enrich-Wikidata }
     "LibraryEnrichment" { Enrich-My-Library }
     "Aliases"         { Enrich-Multilingual-Aliases }
