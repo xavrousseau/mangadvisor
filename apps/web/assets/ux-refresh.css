@@ -1,0 +1,62 @@
+/* UX refresh — additive styles; keep existing actions, theme variants and data untouched. */
+:root{--ux-ease:cubic-bezier(.2,.8,.2,1)}
+body{font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.layout{grid-template-columns:218px minmax(0,1fr)}
+.sidebar{padding:24px 13px 18px}
+.brand{padding:0 9px 30px}
+.nav{gap:6px}
+.nav-link{min-height:45px;padding:10px 13px;border-radius:12px;transition:background .18s,color .18s,transform .18s var(--ux-ease)}
+.nav-link:hover{transform:translateX(2px)}
+.nav-link.active{box-shadow:inset 3px 0 0 var(--accent)}
+.topbar{height:68px;padding-inline:clamp(20px,3vw,48px)}
+.main-content{max-width:1380px;padding:32px clamp(20px,3vw,48px) 85px}
+.page-title{line-height:1.12;text-wrap:balance}
+.page-desc{max-width:70ch;line-height:1.65}
+.headline-row{align-items:center}
+.hero{min-height:286px;padding:34px clamp(26px,4vw,52px);border-radius:18px;box-shadow:0 16px 40px rgba(0,0,0,.12)}
+.hero h1{font-size:clamp(32px,3.55vw,52px);line-height:1.07;max-width:15ch}
+.hero p{max-width:57ch;font-size:14px;line-height:1.65}
+.quick-actions{gap:12px}
+.quick-card,.step,.option-panel,.filters,.empty{border-radius:14px}
+.quick-card{transition:transform .18s var(--ux-ease),border-color .18s}
+.quick-card:hover{transform:translateY(-3px)}
+.manga-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,175px),1fr));gap:16px}
+.manga-card{border-radius:15px;transition:transform .2s var(--ux-ease),border-color .2s,box-shadow .2s}
+.manga-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 24px rgba(0,0,0,.16)}
+.manga-card .poster-btn{aspect-ratio:3/4.1}
+.manga-card-body{padding:13px 14px 14px}
+.manga-card-title{font-size:15px;line-height:1.32;min-height:0}
+.manga-card-meta{margin-bottom:7px;font-size:12px}
+.card-open{display:inline-flex;align-items:center;min-height:33px;font-size:12px;padding:4px 0}
+.filters{gap:12px;padding:16px}
+.filters :is(input,select){min-height:42px}
+.option-panel{padding:clamp(18px,2.5vw,28px)}
+input,select,textarea{max-width:100%}
+.btn{min-height:43px;border-radius:10px;font-size:13px}
+.btn-small{min-height:37px}
+:where(.manga-card,.quick-card,.rec-card,.option-panel){min-width:0}
+:where(.manga-card-title,.rec-body h3,.page-title){overflow-wrap:anywhere}
+details>summary{min-height:35px;line-height:1.4;cursor:pointer}
+details[open]>summary{margin-bottom:12px}
+.pagination button{min-height:40px}
+@media(min-width:1600px){.main-content{max-width:1510px}.manga-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:18px}}
+@media(min-width:741px) and (max-width:1150px){.layout{grid-template-columns:192px minmax(0,1fr)}.main-content{padding-inline:22px}.manga-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}}
+@media(max-width:740px){
+ .layout{display:block}
+ .main-content{padding:22px 16px calc(112px + env(safe-area-inset-bottom))}
+ .topbar{height:60px;padding-inline:16px}.topbar-right{gap:8px}
+ .sidebar{inset:auto 0 0;z-index:100;height:auto;padding:7px 8px calc(8px + env(safe-area-inset-bottom));background:var(--sidebar);border-top:1px solid var(--border);box-shadow:0 -12px 32px rgba(0,0,0,.2)}
+ .nav{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+ .nav-link{min-height:58px;padding:7px 2px;border-radius:12px;gap:3px;font-size:11px;line-height:1.15}
+ .nav-link:hover{transform:none}.nav-link.active{box-shadow:inset 0 2px 0 var(--accent)}
+ .nav-ico{font-size:21px;line-height:1.25}
+ .hero{min-height:0;padding:29px 23px;border-radius:17px}
+ .hero h1{font-size:clamp(30px,9vw,42px);max-width:13ch}.hero-decor{opacity:.3}
+ .headline-row{align-items:flex-start;flex-wrap:wrap}.page-title{font-size:clamp(27px,7vw,34px)}
+ .quick-actions{grid-template-columns:1fr;gap:10px}.quick-card{min-height:0}
+ .manga-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .manga-card-body{padding:10px 11px 12px}.manga-card-title{font-size:14px}.manga-card-meta{font-size:11px}
+ .filters{padding:14px}.field,.field.medium{min-width:0}.btn{min-height:44px}.option-panel{padding:17px}
+}
+@media(max-width:390px){.main-content{padding-inline:12px}.hero{padding:24px 19px}.nav-link{font-size:10px}.manga-grid{gap:9px}.topbar .avatar{display:none}}
+@media(prefers-reduced-motion:reduce){.nav-link,.manga-card,.quick-card{transition:none!important}.nav-link:hover,.manga-card:hover,.quick-card:hover{transform:none!important}}
