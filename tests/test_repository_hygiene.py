@@ -61,11 +61,20 @@ class RepositoryHygieneTests(unittest.TestCase):
         for item in (".env", "private-data/", "backups/", ".env.mobile", "mobile-local/"):
             self.assertIn(item, gitignore)
 
-    def test_recommendation_profile_has_only_one_output(self):
-        report = (ROOT / "pipelines/engine/scripts/run_recommendation_profile_tests.py").read_text(encoding="utf-8")
-        self.assertIn('recommendation_profile_tests_latest.md', report)
-        self.assertNotIn('LEGACY_REPORT_PATH', report)
-        self.assertNotIn('recommendation_profile_tests_v0_7_4.md', report)
+    def test_historical_qa_reports_and_manual_launchers_are_retired(self):
+        self.assertFalse((ROOT / "docs/reports").exists())
+        for path in (
+            "pipelines/engine/scripts/run_recommendation_profile_tests.py",
+            "pipelines/engine/scripts/run_library_goal_tests.py",
+            "pipelines/engine/scripts/analyze_jikan_recommendation_edges.py",
+            "cmd/nuke.cmd", "cmd/clean.cmd", "cmd/retire-legacy-ui.cmd",
+            "apps/ui", "infra/docker/ui/Dockerfile",
+            "pipelines/engine/scripts/prepare_bibliographic_staging.py",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse((ROOT / path).exists())
+        ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("data/logs/*", ignored)
 
 
 if __name__ == "__main__":
