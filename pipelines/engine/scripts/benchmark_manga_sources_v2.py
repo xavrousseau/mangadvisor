@@ -21,6 +21,7 @@ from typing import Any
 import requests
 
 from pipelines.engine.scripts import benchmark_manga_sources as v1
+from pipelines.engine.scripts import catalogue_french_matching as fr_policy
 from pipelines.engine.scripts.bnf_bulk_import import isbn13
 
 REPORT_DIR = v1.REPORT_DIR
@@ -518,6 +519,8 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
              alternate_budget=ALT_BUDGET, providers=SOURCES) -> dict:
     client = client or RateLimitedClient()
     entries = [{"title": row["title"], "origin": row["origin"],
+                "market_target": row.get("market_target", "INTERNATIONAL"),
+                "market_target_basis": row.get("market_target_basis"),
                 "sources": {}} for row in sample]
     metrics = {}
     for provider in providers:
@@ -526,10 +529,12 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
         for row, record in zip(sample, entries):
             result = client.call(provider, "search", query=row["title"])
             if result["status"] != "OK":
-                record["sources"][provider] = {"status": result["status"],
+                failure = {"status": result["status"],
                     "error_type": result.get("error_type"),
                     "http_status": result.get("http_status"),
                     "schema": result.get("schema")}
+                failure["matching_review"] = fr_policy.review_entry(row, failure)
+                record["sources"][provider] = failure
                 continue
             judged = rank(row, result["candidates"])
             judged["search_schema"] = result["schema"]
@@ -590,6 +595,7 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
                     judged["details"] = detail["data"]
                 else:
                     judged["detail_error"] = detail.get("http_status") or detail.get("error_type")
+            judged["matching_review"] = fr_policy.review_entry(row, judged)
             record["sources"][provider] = judged
         counts = Counter(row["sources"][provider]["status"] for row in entries)
         comparable = sum(counts.get(x, 0) for x in
@@ -634,6 +640,11 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
             "genres", "themes", "isbn_valides_candidats", "references_tomes",
             "editions", "isbn_papier_fr_candidats", "auteurs",
             "fiches_concurrentes_a_verifier", "raison_controle_non_execute",
+            "cible_marche", "cible_langue", "cible_support",
+            "editions_declarees", "formats_declares",
+            "score_oeuvre_indicatif", "etat_oeuvre", "type_oeuvre_indice",
+            "score_edition_fr_indicatif", "etat_edition_fr",
+            "signaux_edition", "isbn_fr_papier_candidats",
             "avertissement"])
         writer.writeheader()
         for item in report["entries"]:
@@ -643,6 +654,9 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
                 first = candidates[0] if candidates else {}
                 detail = value.get("details") or {}
                 books = detail.get("book_references") or []
+                review = value.get("matching_review") or {}
+                work_review = review.get("work") or {}
+                edition_review = review.get("edition") or {}
                 writer.writerow({
                     "titre": item["title"], "segment": item["origin"],
                     "fournisseur": provider, "etat": value.get("status"),
@@ -682,6 +696,19 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
                         for comp in value.get("competing_details") or []
                     ),
                     "raison_controle_non_execute": value.get("review_not_run_reason") or "",
+                    "cible_marche": review.get("market_target", item.get("market_target")),
+                    "cible_langue": "fr" if item.get("market_target") == "FR_PRINT" else "",
+                    "cible_support": "print" if item.get("market_target") == "FR_PRINT" else "",
+                    "editions_declarees": " | ".join(review.get("edition_targets") or []),
+                    "formats_declares": " | ".join(review.get("format_hints") or []),
+                    "score_oeuvre_indicatif": work_review.get("score"),
+                    "etat_oeuvre": work_review.get("status"),
+                    "type_oeuvre_indice": work_review.get("type_evidence"),
+                    "score_edition_fr_indicatif": edition_review.get("score"),
+                    "etat_edition_fr": edition_review.get("status"),
+                    "signaux_edition": " | ".join(edition_review.get("signals") or []),
+                    "isbn_fr_papier_candidats": " | ".join(
+                        edition_review.get("french_print_isbns") or []),
                     "avertissement": first.get("warning") or "",
                 })
     return js, cs
@@ -698,12 +725,17 @@ def main(argv=None) -> int:
         parser.error("limit 1..50, detail-limit 0..20, alternate-limit 0..10")
     with v1.get_postgres_connection() as db:
         sample = v1.select_samples(db, args.limit)
+        sample = fr_policy.enrich_sample_targets(db, sample)
     print("Échantillon V2 :", len(sample), dict(Counter(x["origin"] for x in sample)))
+    print("Cible bibliographique :", dict(Counter(x["market_target"] for x in sample)))
+    print("FR_PRINT = hypothese pour la collection personnelle, non preuve d'edition française.")
     if args.dry_run:
         for i, item in enumerate(sample, 1):
-            print(f'{i:02d}. [{item["origin"]}] {item["title"]}')
+            editions = ", ".join(item.get("edition_targets") or []) or "non précisées"
+            print(f'{i:02d}. [{item["origin"]} / {item["market_target"]}] {item["title"]} — éditions : {editions}')
         return 0
-    print("Scrinis et MangaUpdates; uniquement recherches de titres; aucune ecriture SQL.")
+    print("Scrinis et MangaUpdates; seuls les TITRES sont transmis (ni éditions, ni quantités).")
+    print("Les scores oeuvre/édition sont des indices documentaires : jamais une validation.")
     report = evaluate(sample, detail_budget=args.detail_limit,
                       alternate_budget=args.alternate_limit)
     js, cs = save_report(report)
