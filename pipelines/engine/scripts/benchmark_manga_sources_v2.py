@@ -177,29 +177,48 @@ def rank(sample: dict, matches: list[dict]) -> dict:
                   and abs(c["score"] - first["score"]) < 0.05]
     status = "AMBIGUOUS" if contenders and order[first["evidence"]] > 0 else first["evidence"]
     reasons = ["EQUALLY_PLAUSIBLE_CANDIDATES"] if status == "AMBIGUOUS" else []
-    # Example: Wind Breaker (Manhwa) and Wind Breaker (NII Satoru)
-    # are separate works even though one has a perfectly matching title.
-    # Parenthesized qualifiers can denote different authors/editions.
+    # Language-qualified editions can be kept as distinct suggestions without
+    # declaring the parent manga's identity uncertain. They must never be
+    # merged into the French edition/volume inventory.
+    qualified = []
     if first["evidence"] == "EXACT_TITLE":
-        qualified = []
         for candidate in unique[1:]:
             match = re.fullmatch(r"(.+?)\s*\(([^)]{2,80})\)", candidate["title"])
             if not match:
                 continue
+            descriptor = v1.title_key(match.group(2))
+            if (re.fullmatch(
+                    r"(?:en|in|version)\s+(?:allemand|anglais|francais|espagnol|italien|"
+                    r"portugais|japonais|german|english|french|italian|portuguese|"
+                    r"spanish|japanese)", descriptor)):
+                continue
             prefix = v1.title_key(match.group(1))
             if prefix and prefix in wanted and candidate.get("id") != first.get("id"):
-                qualified.append(candidate["title"])
+                qualified.append(candidate)
         if qualified:
             status = "AMBIGUOUS"
             reasons.append("SAME_TITLE_DIFFERENT_QUALIFIED_WORK")
-    # IDs aren't final links; this is only an optional detail-fetch identifier.
-    return {"status": status, "selected_id": first.get("id"),
-            "candidates": unique[:MAX_CANDIDATES],
-            "candidate_count": len(unique),
-            "ambiguous_count": len(contenders) + (len(qualified) if "qualified" in locals() else 0)
-                if status == "AMBIGUOUS" else 0,
-            "disambiguation_reasons": reasons}
-
+    # If ambiguous, carry the explicitly conflicting candidates for a
+    # SIDE-BY-SIDE inspection, not to select a canonical edition or work.
+    # Never substitute a fuzzy unrelated suggestion for a real contender.
+    conflicts = []
+    if status == "AMBIGUOUS":
+        conflicts = [first]
+        for item in [*contenders, *qualified]:
+            if item not in conflicts:
+                conflicts.append(item)
+    return {
+        "status": status,
+        "selected_id": first.get("id"),
+        "candidates": unique[:MAX_CANDIDATES],
+        "candidate_count": len(unique),
+        "ambiguous_count": len(conflicts) - 1 if status == "AMBIGUOUS" else 0,
+        "disambiguation_reasons": reasons,
+        "review_candidates": [{
+            "id": item.get("id"), "title": item["title"],
+            "format": item.get("format")
+        } for item in conflicts[:3]]
+    }
 
 def validate_id(source: str, value: Any) -> str | None:
     if source not in SOURCES:
@@ -529,11 +548,40 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
                     judged["alternate_search_status"] = "OK"
                     judged["search_queries"] = [row["title"], alias]
             judged["detail_status"] = "NOT_REQUESTED"
-            # Do not use one arbitrarily selected candidate's details when
-            # the title matches several different works.
             if judged["status"] == "AMBIGUOUS":
-                judged["detail_status"] = "SKIPPED_AMBIGUOUS"
-            if remaining_details and judged["selected_id"] and judged["status"] in (
+                # The diagnostic may READ the two conflicting series, but
+                # never assigns the selected details to a canonical work.
+                # Require enough of the user's per-provider budget to compare
+                # every recorded contender (up to three), not half a pair.
+                candidates_to_review = [
+                    obj for obj in judged.get("review_candidates", [])
+                    if validate_id(provider, obj.get("id"))
+                ]
+                if (len(candidates_to_review) >= 2 and
+                        remaining_details >= len(candidates_to_review)):
+                    judged["competing_details"] = []
+                    for obj in candidates_to_review:
+                        remaining_details -= 1
+                        result = client.call(provider, "detail", identifier=obj["id"])
+                        evidence = {
+                            "id": obj["id"], "search_title": obj["title"],
+                            "search_format": obj.get("format"),
+                            "status": result["status"],
+                        }
+                        if result["status"] == "OK":
+                            evidence["details"] = result["data"]
+                        else:
+                            evidence["http_status"] = result.get("http_status")
+                            evidence["error_type"] = result.get("error_type")
+                        judged["competing_details"].append(evidence)
+                    judged["detail_status"] = "COMPARED_AMBIGUOUS"
+                else:
+                    judged["detail_status"] = "SKIPPED_AMBIGUOUS"
+                    judged["review_not_run_reason"] = (
+                        "INSUFFICIENT_DETAIL_BUDGET" if
+                        remaining_details < len(candidates_to_review)
+                        else "MISSING_CONFIRMED_PROVIDER_IDS")
+            elif remaining_details and judged["selected_id"] and judged["status"] in (
                     "EXACT_TITLE", "SAME_MAL_ID"):
                 remaining_details -= 1
                 detail = client.call(provider, "detail", identifier=judged["selected_id"])
@@ -556,6 +604,11 @@ def evaluate(sample: list[dict], *, client=None, detail_budget=DETAIL_BUDGET,
                                               for row in entries),
                              "with_numeric_id": sum(bool(row["sources"][provider].get("selected_id"))
                                                     for row in entries),
+                             "ambiguous_candidate_details_ok": sum(
+                                 item.get("status") == "OK"
+                                 for entry in entries
+                                 for item in entry["sources"][provider].get("competing_details", [])
+                             ),
                              "api_requests": client.counts[provider]}
     return {
         "format_version": 2, "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -580,6 +633,7 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
             "detail_etat", "titre_detail", "titres_alternatifs",
             "genres", "themes", "isbn_valides_candidats", "references_tomes",
             "editions", "isbn_papier_fr_candidats", "auteurs",
+            "fiches_concurrentes_a_verifier", "raison_controle_non_execute",
             "avertissement"])
         writer.writeheader()
         for item in report["entries"]:
@@ -612,6 +666,22 @@ def save_report(report: dict, directory: Path = REPORT_DIR) -> tuple[Path, Path]
                         b["isbn13"] for b in books if b.get("medium") == "print"
                         and b.get("lang") == "fr"),
                     "auteurs": " | ".join(detail.get("authors") or []),
+                    "fiches_concurrentes_a_verifier": " | ".join(
+                        str(comp.get("search_title") or "")[:90] +
+                        " [id=" + str(comp.get("id") or "") +
+                        ", " + str(comp.get("search_format") or "") + "] " +
+                        ("auteurs=" + ",".join(
+                            (comp.get("details") or {}).get("authors") or []
+                        )[:160] + " / editeur=" + ",".join(
+                            (comp.get("details") or {}).get("publishers") or []
+                        )[:160] + " / ISBN FR papier=" + ",".join(
+                            b["isbn13"] for b in (comp.get("details") or {}).get("book_references", [])
+                            if b.get("lang") == "fr" and b.get("medium") == "print"
+                        )[:160] if comp.get("status") == "OK" else
+                         "statut=" + str(comp.get("status")))
+                        for comp in value.get("competing_details") or []
+                    ),
+                    "raison_controle_non_execute": value.get("review_not_run_reason") or "",
                     "avertissement": first.get("warning") or "",
                 })
     return js, cs

@@ -17,8 +17,9 @@ L'outil propose :
 1. Un maximum de **50 œuvres** (priorité aux entrées en attente puis à la
    collection reconnue, enfin au catalogue) ;
 2. Un maximum de **12 fiches détaillées par fournisseur**, paramétrable de 0 à
-   20. Les fiches sont choisies uniquement quand un candidat a un identifiant
-   numérique exploitable et une correspondance par titre/MAL **non ambiguë** ;
+   20. Une correspondance non ambiguë lit sa fiche ; une ambiguïté peut
+   comparer les deux ou trois candidats plausibles, **sans les valider**, si
+   le budget restant suffit à lire toutes leurs fiches ;
 3. Un aperçu des titres sans requête externe ;
 4. Un accord explicite avant d'envoyer ces titres à Scrinis et MangaUpdates.
 
@@ -129,6 +130,49 @@ est invalidé automatiquement ; le cache MangaUpdates reste exploitable.
 Le prochain essai peut être réduit à **5 titres et 5 fiches par API**
 dans **A → 17**. Cette vérification permet de mesurer le nombre de fiches
 Scrinis effectivement accessibles et les ISBN papier français disponibles.
+
+## Quatrième résultat réel et traitement des ambiguïtés (21 octobre 2026)
+
+Sur les cinq premiers titres de mangathèque en attente :
+
+- **5/5 Scrinis** : identifiants \`public_n\` récupérés ; la lecture des
+  identifiants est désormais validée par une exécution locale.
+- **1/5 Scrinis** : fiche détaillée lue ; 4 autres avaient le statut
+  \`AMBIGUOUS\` et leurs détails étaient auparavant ignorés.
+- **Yakuza Zen**, Scrinis \`public_n=15661\` : 3 ISBN de tomes français
+  papier renseignés, 3 volumes français papier et 4 japonais papier,
+  auteur Gen Momoji et éditeur VEGA.
+- **MangaUpdates** : 3 titres exacts, 1 ambigu et 1 suggestion ; seulement
+  0 appels Internet grâce au cache local précédent.
+
+Le taux affiché de 20 % de titres Scrinis exacts **non ambigus** ne
+représente pas un taux de présence : les cinq titres ont un candidat exact,
+mais quatre sont classés ambigus, soit à cause d'homonymes, soit à cause
+d'une alerte trop large sur les qualificatifs de langue.
+
+La version suivante évite la fausse alerte pour \`Tokyo Ghoul
+(en allemand)\` : une édition linguistique alternative reste candidate
+mais ne provoque plus une collision d'œuvres sans autre indice.
+
+Pour les véritables ambiguïtés (les deux \`Wind Breaker\`, les deux
+\`Black Clover\`, et le manga + light novel \`Yu-Gi-Oh!\`), le moteur peut
+lire **au plus trois fiches concurrentes par œuvre**, à condition que le
+quota de fiches détaillées restant permette de consulter **toute la paire**
+et non un seul candidat au hasard.
+
+Le JSON garde alors dans \`competing_details\` les métadonnées de chaque
+candidat avec son ID, titre, auteur, éditeur, type et ISBN papier français
+éventuels ; le CSV expose les mêmes indices sous
+\`fiches_concurrentes_a_verifier\`. La rubrique
+\`raison_controle_non_execute\` indique le manque de quota/identifiant.
+
+**Jamais** de correspondance automatiquement confirmée ni de liaison
+à un manga, à une édition physique ou à la bibliothèque utilisateur.
+L'identité demeure \`AMBIGUOUS\` tant qu'il n'existe pas de preuve fiable.
+
+Si l'on veut examiner ces cinq titres avec toutes les ambiguïtés, définir
+**10 fiches détaillées par fournisseur** dans A → 17, en gardant
+5 œuvres. La limite reste de 20 fiches/fournisseur.
 
 ## Limites honnêtes
 
