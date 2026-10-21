@@ -1,4 +1,6 @@
-# Benchmark des fournisseurs mangas sur 50 œuvres
+# Benchmark historique V1 des fournisseurs mangas sur 50 œuvres
+
+> **Référence historique.** Le menu actif A → 16 redirige désormais vers la V2 (A → 17). Le module Python V1 reste dans le dépôt parce que la V2 importe certaines de ses fonctions.
 
 ## Objectif
 
@@ -35,7 +37,7 @@ d'un tel champ ne signifie pas qu'il n'existe pas dans la fiche détaillée.
 
 1. Récupérer la dernière version du dépôt par **mangadvisor.cmd → 3**,
    qui sauvegarde d'abord les données.
-2. Démarrer Docker Desktop. Ouvrir **mangadvisor.cmd → A → 16**.
+2. Démarrer Docker Desktop. Ouvrir **mangadvisor.cmd → A → 16 ou A → 17**. Ces deux entrées exécutent désormais le comparatif V2. Cette page décrit surtout le premier benchmark historique V1 ; pour les étapes actuelles, suivre [le guide V2](benchmark_sources_v2.md).
 3. Choisir **50 mangas** (ou un plus petit nombre pour la première exécution).
 4. Lire l'échantillon proposé **avant tout appel Internet** :
    - jusqu'à **25 titres en attente de rapprochement** dans la mangathèque,
