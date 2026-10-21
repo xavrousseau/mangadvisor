@@ -147,6 +147,22 @@ sous-dossier `complete_tenrai`. Le fichier `last_sync.json` reste un bilan,
 pas une archive des 85 776 mangas.
 
 
+### Enrichir directement les fiches MAL avec Scrinis FR — A → 20
+
+Après avoir chargé le socle international MAL dans PostgreSQL, le menu
+\`mangadvisor.cmd → A → 20\` enrichit réellement les titres affichés
+dans Mangadvisor. Les recherches Scrinis se font par lots reprenables,
+avec vérification indépendante de l'identité (MAL ID ou titre exact +
+auteur), d'une publication française papier avec ISBN, et de l'absence
+d'homonymie. Les preuves positives sont inscrites dans
+\`manga_title_alias\` et visibles dans les cartes/fiches du site.
+
+**Aucun manga canonique ni tome possédé n'est fusionné ou modifié.**
+Les cas incertains restent explicitement en revue, et le bilan indique
+le nombre exact de titres FR nouvellement créés.
+
+Documentation : [enrichissement FR direct depuis Scrinis](docs/04_product/enrichissement_fr_direct_scrinis.md).
+
 ### Préparation bibliographique sécurisée — A → 18
 
 Après la collecte V2, **A → 18** prépare un staging SQL des œuvres candidates,

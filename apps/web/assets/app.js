@@ -568,7 +568,7 @@ async function renderDetail(token,id){
      '<p class="muted tiny">'+e(state.lang==="fr"?
        "Titre français répertorié (œuvre, pas édition physique)":
        "French-language work title (not a verified book edition)")+' · '+
-       e(manga.title_fr_source==="TENRAI_MAL_TYPED"?"MyAnimeList / Tenrai":"Wikidata / MAL")+'</p>':'')+
+       e(manga.title_fr_source==="SCRINIS_FR_PRINT"?"Scrinis · édition FR papier référencée":manga.title_fr_source==="TENRAI_MAL_TYPED"?"MyAnimeList / Tenrai":"Wikidata / MAL")+'</p>':'')+
    '<div class="actions"><button class="btn btn-primary" data-action="scroll-save">＋ '+L(libraryItem?"inLibrary":"addLibrary")+'</button>'+
     '<button class="btn btn-soft" data-action="similar">✧ '+L("similar")+'</button>'+
  '<button class="btn btn-soft" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner un tome":"Scan a volume")+'</button></div></div></section>'+
