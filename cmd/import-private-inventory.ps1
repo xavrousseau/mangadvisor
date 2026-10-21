@@ -91,4 +91,4 @@ if ($result.status -ne "ok" -or $result.preserved_reading_notes_scores -ne $true
   throw "Impossible de certifier la preservation des donnees existantes."
 }
 Write-Host ("RESULTAT : {0} declarations ajoutees ; {1} a verifier." -f $result.created_declarations,$result.manual_review)
-Write-Host "Relance l'option 20 pour evaluer les recommandations avec la bibliotheque mise a jour."
+Write-Host "Utilise le menu A puis 4 pour tester les recommandations sans modifier ta mangatheque."
