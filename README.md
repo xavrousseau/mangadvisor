@@ -132,6 +132,14 @@ relations SQL ne sont pas vérifiés.
 
 Guide : [catalogue MAL complet](docs/04_product/catalogue_mal_complet.md).
 
+**Amélioration immédiatement visible après la mise à jour :** l'API utilise
+les libellés FR explicitement référencés par les données MAL ou reliés
+par Wikidata P4087, ainsi que les auteurs déjà présents dans
+`jikan_manga_source`. Le site les affiche sans écrire dans
+`manga.title` ou la mangathèque. Couverture réelle :
+`http://localhost:8000/catalogue/coverage` (adapter le port API .env).
+
+
 **Chemin historique respecté :** les pages sont enregistrées dans
 `data/raw/jikan/manga_page_1.json`, etc. A → 19 peut déplacer **sans réseau
 ni nouvelle écriture SQL** les pages déjà téléchargées dans l'ancien
