@@ -69,7 +69,7 @@ echo   13 - Recuperer les titres alternatifs FR, EN et JA
 echo   14 - Etendre le catalogue Tenrai (mangas et one-shots)
 echo   15 - Importer des fichiers bibliographiques BnF (candidats)
 echo   16 - Comparer les sources manga sur 50 titres (lecture seule)
-echo   17 - Comparatif V2 : editions, candidats et fiches detaillees
+echo   17 - Comparatif V2 : mangas FR papier et editions, scores distincts
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
