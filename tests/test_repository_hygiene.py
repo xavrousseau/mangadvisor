@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 RETIRED = (
     "_archive",
     "legacy",
+    "apps/ui",
+    "infra/docker/ui/Dockerfile",
     "cmd/archive-v0-8-temp-files.cmd",
     "cmd/audit-project-files.cmd",
     "cmd/run-jikan-catalog.cmd",
