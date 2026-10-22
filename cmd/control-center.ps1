@@ -45,21 +45,28 @@ function Ensure-Environment {
     # Creating fresh credentials is safe ONLY for a brand-new installation.
     # An existing persistent PostgreSQL volume could still contain the
     # user's complete inventory, even when all containers are stopped.
-    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-      throw "Fichier .env absent et Docker indisponible : impossible d'exclure une ancienne base. Aucune nouvelle cle generee."
+    $dockerAvailable=$null -ne (Get-Command docker -ErrorAction SilentlyContinue)
+    if ($dockerAvailable) {
+      & docker info --format "{{.ServerVersion}}" 1>$null 2>$null
+      $dockerAvailable=$LASTEXITCODE -eq 0
     }
-    & docker info --format "{{.ServerVersion}}" 1>$null 2>$null
-    Assert-Exit "Docker Desktop doit etre demarre avant de generer un nouveau .env"
-    $existing=@(& docker container inspect --format "{{.Id}}" mangadvisor_postgres 2>$null)
-    if ($LASTEXITCODE -eq 0 -and $existing.Count -gt 0) {
-      throw "Ancien PostgreSQL Mangadvisor detecte sans .env. Ne pas generer de nouveaux identifiants. Recuperer l'ancienne configuration avant toute mise a jour."
-    }
-    foreach ($volume in @("mangadvisor_mangadvisor_pgdata",
-                           "mangadvisor_mangadvisor_meili")) {
-      $existing=@(& docker volume inspect --format "{{.Name}}" $volume 2>$null)
+    if ($dockerAvailable) {
+      $existing=@(& docker container inspect --format "{{.Id}}" mangadvisor_postgres 2>$null)
       if ($LASTEXITCODE -eq 0 -and $existing.Count -gt 0) {
-        throw "Volume Docker $volume present sans .env : installation ancienne detectee. Recuperer la configuration d'origine avant de continuer."
+        throw "Ancien PostgreSQL Mangadvisor detecte sans .env. Recuperer l'ancienne configuration avant toute mise a jour."
       }
+      foreach ($volume in @("mangadvisor_mangadvisor_pgdata",
+                             "mangadvisor_mangadvisor_meili")) {
+        $existing=@(& docker volume inspect --format "{{.Name}}" $volume 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $existing.Count -gt 0) {
+          throw "Volume Docker $volume present sans .env : installation ancienne detectee. Recuperer la configuration d'origine."
+        }
+      }
+    } else {
+      # Still permit generating offline install settings (Windows setup/CI).
+      # Their compatibility with any old Docker volumes MUST be checked by
+      # library-backup.ps1 before the first update or database backup.
+      Write-Warning "Docker indisponible : nouvelle configuration non validee contre d'eventuels volumes existants."
     }
     if (!(Test-Path -LiteralPath $example)) { throw ".env.example introuvable." }
     $template=[IO.File]::ReadAllText($example,[Text.Encoding]::UTF8)
