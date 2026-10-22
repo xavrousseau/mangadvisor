@@ -126,7 +126,7 @@ function routeInfo(){
 function shell(){
   const active=routeInfo().view;
   document.documentElement.lang=state.lang;
-  document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="releases"?"discover":active==="not-found"?"discover":active);
+  document.title="Mangadvisor — "+(active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active));
   const navItems=[
     ["home","/","◈","home"],["discover","/discover","⌕","discover"],
     ["recommendations","/for-you","✧","forYou"],["library","/library","▤","library"],["releases","/releases","◷","releases"]
@@ -164,7 +164,7 @@ async function render(){
  // Keep the navigation and top bar mounted between routes: only the page changes.
  if(content && root.dataset.shellLang===state.lang && root.querySelector(".layout")){
    document.documentElement.lang=state.lang;
-   document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="releases"?"discover":active==="not-found"?"discover":active);
+   document.title="Mangadvisor — "+(active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active));
    root.querySelectorAll(".nav-link[data-go]").forEach(link=>{
      const selected=link.dataset.go===({home:"/",discover:"/discover",recommendations:"/for-you",library:"/library",releases:"/releases"}[active]||"");
      link.classList.toggle("active",selected);
