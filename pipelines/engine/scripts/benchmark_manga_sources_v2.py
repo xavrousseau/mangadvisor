@@ -352,7 +352,7 @@ def _scrinis_details(body: dict) -> dict:
                     edition.get("volume_count"), int) else None
             })
     refs = []
-    for volume in volumes[:100]:
+    for volume in volumes[:250]:
         if not isinstance(volume, dict):
             continue
         code = volume.get("isbn_13") or volume.get("isbn13") or volume.get("isbn")
@@ -395,11 +395,11 @@ def _scrinis_details(body: dict) -> dict:
         "genres": genres, "themes": themes, "demographics": demographies,
         "publishers": publishers[:12], "authors": authors,
         "editions": editions,
-        "book_references": refs[:20], "volume_items_seen": len(volumes),
-        "volume_records_scanned": min(len(volumes), 100),
-        "volume_scan_truncated": len(volumes) > 100,
+        "book_references": refs[:250], "volume_items_seen": len(volumes),
+        "volume_records_scanned": min(len(volumes), 250),
+        "volume_scan_truncated": len(volumes) > 250,
         "book_references_valid_in_scan": len(refs),
-        "book_references_truncated": len(refs) > 20 or len(volumes) > 100,
+        "book_references_truncated": len(refs) > 250 or len(volumes) > 250,
         "has_summary": bool(body.get("summary") or body.get("summaries")
                             or body.get("description") or body.get("synopsis")),
     }
@@ -478,7 +478,7 @@ class RateLimitedClient:
         # fresh supplier JSON; reuse MangaUpdates caches unchanged.
         cache_key = [provider, kind, query, identifier]
         if provider == "scrinis":
-            cache_key.append("scrinis_public_n_and_editions_v3")
+            cache_key.append("scrinis_full_volume_references_v4")
         key = hashlib.sha256(json.dumps(cache_key,
                                         ensure_ascii=False).encode("utf-8")).hexdigest()
         path = self.cache_dir / f"{key}.json"
