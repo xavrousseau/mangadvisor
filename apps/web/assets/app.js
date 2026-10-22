@@ -297,6 +297,20 @@ async function renderHome(token){
    if(!stillHere()||!target)return;
    const feature=document.querySelector("#home-featured-covers");
    if(feature && items.length){
+     const highlighted=items[0];
+     const highlightedId=Number(highlighted.manga_id||highlighted.id);
+     const heroCopy=document.querySelector(".hero-featured .hero-content");
+     if(heroCopy && Number.isSafeInteger(highlightedId) && highlightedId>0){
+       const genreLabels=(highlighted.genres||[]).slice(0,3).map(g=>'<span class="featured-genre">'+tr(g)+'</span>').join("");
+       const title=e(preferredMangaTitle(highlighted,state.lang));
+       const descriptor=stars(highlighted)+' · '+e(publication(state.lang,highlighted.status));
+       heroCopy.innerHTML='<div class="eyebrow">✦ '+e(state.lang==="fr"?"À L’AFFICHE DU CATALOGUE":"FEATURED FROM THE CATALOGUE")+'</div>'+
+        '<h1>'+title+'</h1><p class="featured-summary">'+e(state.lang==="fr"?"Une histoire à découvrir dans notre catalogue. Ouvre sa fiche pour explorer son univers et ses éditions.":"Explore this story and its editions in our catalogue.")+'</p>'+
+        '<div class="featured-genre-row">'+genreLabels+'</div><p class="featured-meta">'+descriptor+'</p>'+
+        '<div class="hero-actions"><button class="btn btn-primary" data-go="/manga/'+e(highlightedId)+'">'+e(state.lang==="fr"?"Découvrir ce manga":"Explore this manga")+' →</button>'+
+        '<button class="btn btn-ghost" data-go="/for-you">✧ '+L("getRecs")+'</button></div>';
+       document.querySelector(".hero-featured")?.classList.add("hero-has-feature");
+     }
      const artworks=items.slice(0,3).map(item=>{
        const src=coverUrl(urls[item.manga_id||item.id]);
        return src?'<img src="'+e(src)+'" alt="" loading="lazy" decoding="async">':'';
