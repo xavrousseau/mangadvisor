@@ -145,6 +145,18 @@ de données locales ou des réponses actuelles des fournisseurs.
 - [Contrôles bibliographiques](docs/04_product/bibliographic_validation_integrated.md)
 - [État de GitHub et tâches ouvertes](https://github.com/xavrousseau/mangadvisor/issues/71)
 
+## Travailler sur le code avec Codex
+
+Les consignes techniques destinées aux agents de développement se trouvent dans [AGENTS.md](AGENTS.md). Codex peut les lire lorsqu'il travaille dans ce dépôt. Ce fichier **n'autorise pas à lui seul l'accès GitHub**.
+
+1. Dans [Codex](https://chatgpt.com/codex), connecte ton compte GitHub et autorise l'accès au dépôt `xavrousseau/mangadvisor`.
+2. Crée et publie un environnement Codex Cloud associé à ce dépôt, ou ouvre le clone dans Codex local sur Windows (de préférence le dossier de test `mangadvisor-test`).
+3. Commence par demander : « Lis AGENTS.md et le README, audite le dépôt et propose la correction la plus prioritaire. Travaille sur une branche, exécute les tests applicables et prépare une pull request sans fusionner dans main. »
+
+**Important :** un environnement Codex Cloud n'a pas automatiquement accès à Docker Desktop, aux volumes ni aux fichiers privés de ton PC Windows. Les opérations sur la mangathèque réelle restent soumises à une validation locale et à une sauvegarde vérifiée. Les secrets et données personnelles ne doivent pas être copiés dans un environnement cloud.
+
+Pour la connexion et la préparation d'environnement, voir [la documentation officielle Codex Cloud](https://help.openai.com/fr-fr/articles/20001545-using-codex-cloud).
+
 ## Méthode de contribution
 
 `main` est la branche stable. Une évolution cohérente est développée
