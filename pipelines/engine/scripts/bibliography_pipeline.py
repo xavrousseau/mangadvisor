@@ -91,7 +91,17 @@ def load_work_evidence(conn: Any, manga_id: int) -> tuple[dict, list[dict], dict
                 """SELECT scrinis_public_n, work_evidence, author_evidence
                    FROM manga_scrinis_fr_fact WHERE manga_id=%s""", (manga_id,))
             fact = cur.fetchone()
-        return manga, candidates, fact, []
+        aliases = []
+        cur.execute("SELECT to_regclass('manga_title_alias') AS relation")
+        if cur.fetchone()["relation"]:
+            cur.execute(
+                "SELECT alias FROM manga_title_alias "
+                "WHERE manga_id=%s AND language_code='fr' "
+                "AND source_name IN "
+                "('SCRINIS_FR_PRINT','TENRAI_MAL_TYPED','WIKIDATA_P4087') "
+                "ORDER BY alias LIMIT 15", (manga_id,))
+            aliases = [r["alias"] for r in cur.fetchall()]
+        return manga, candidates, fact, aliases
 
 
 def select_ids(conn: Any, *, limit: int, manga_ids: list[int] | None) -> list[int]:
