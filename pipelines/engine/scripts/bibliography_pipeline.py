@@ -178,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Identifiants internes separes par des virgules")
     parser.add_argument("--pages", type=int, default=3)
     parser.add_argument("--skip-scrinis", action="store_true")
+    parser.add_argument("--details", action="store_true",
+                        help="Inclure les lignes ISBN dans le rapport JSON")
     parser.add_argument("--report-only", action="store_true",
                         help="Audit des candidats existants, aucune requete fournisseur")
     args = parser.parse_args(argv)
@@ -188,6 +190,12 @@ def main(argv: list[str] | None = None) -> int:
                            bnf=not args.report_only)
     except (ValueError, TypeError) as exc:
         parser.error(str(exc))
+    if not args.details:
+        for work in report["works"]:
+            cross = work["cross_source"]
+            if "isbn_correlations" in cross:
+                cross["isbn_correlations"] = []
+        report["detail_level"] = "summary; use --details for ISBN entries"
     print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
     # All-provider failure is an explicit failure, never hidden in summary.
     return 1 if report.get("bnf", {}).get("error", 0) == len(report["selected_ids"]) and report["selected_ids"] else 0
