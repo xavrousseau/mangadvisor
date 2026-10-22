@@ -225,11 +225,11 @@ class FrenchMatchingTests(unittest.TestCase):
                  "lang": "fr", "edition": "standard"}
                 for i in range(101)]})
         self.assertEqual(detail["volume_items_seen"], 101)
-        self.assertEqual(detail["volume_records_scanned"], 100)
-        self.assertEqual(detail["book_references_valid_in_scan"], 100)
+        self.assertEqual(detail["volume_records_scanned"], 101)
+        self.assertEqual(detail["book_references_valid_in_scan"], 101)
         self.assertEqual(len(detail["book_references"]), 20)
         self.assertTrue(detail["book_references_truncated"])
-        self.assertTrue(detail["volume_scan_truncated"])
+        self.assertFalse(detail["volume_scan_truncated"])
 
     def test_network_requests_remain_title_only(self):
         class Client:
