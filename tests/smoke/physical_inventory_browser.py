@@ -15,6 +15,8 @@ def main():
             errors=[]
             page.on("pageerror",lambda error:errors.append(str(error)))
             page.goto(BASE+"/library",wait_until="domcontentloaded",timeout=90000)
+            # Physical editions are a dedicated library tab, not the default series view.
+            page.locator('[data-action="library-view"][data-value="editions"]').click()
             workspace=page.locator("#physical-inventory-workspace")
             expect(workspace).to_be_visible(timeout=30000)
             expect(page.locator(".physical-inventory-stats")).to_be_visible(timeout=30000)
