@@ -258,3 +258,37 @@ body{background:var(--ux-canvas)}
  #library-editions-panel .physical-work{padding:14px}
  #library-editions-panel .physical-work-header h3{font-size:17px}
 }
+
+
+/* Collection v2 — four focused destinations and display preferences. */
+.library-view-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+.library-collection-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 15px;color:var(--muted);font-size:12px}
+.library-display-switch{display:flex;gap:3px;padding:3px;background:var(--surface);border:1px solid var(--border);border-radius:11px}
+.library-display-switch button{appearance:none;min-height:35px;padding:6px 12px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;font-weight:700}
+.library-display-switch button[aria-pressed="true"]{background:var(--accent-tint);color:var(--accent)}
+.library-results-list .manga-grid{grid-template-columns:1fr!important;gap:12px!important}
+.library-results-list .manga-card{display:grid;grid-template-columns:88px minmax(0,1fr);align-items:stretch;gap:15px;background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:13px!important;overflow:hidden!important}
+.library-results-list .manga-card .poster-btn{height:126px;aspect-ratio:auto!important;border-radius:0!important;box-shadow:none!important}
+.library-results-list .manga-card .manga-card-body{align-self:center;padding:12px 16px 12px 0!important}
+.library-results-list .manga-card .manga-card-title{font-size:17px!important}
+.library-results-list .manga-card .manga-card-meta{font-size:13px!important;white-space:normal}
+.library-wishlist-intro{padding:24px 26px;margin-bottom:22px;border:1px solid var(--border);border-radius:18px;background:linear-gradient(115deg,var(--surface),var(--surface2))}
+.library-wishlist-intro h2{font-size:clamp(24px,3vw,34px);margin:7px 0}
+.library-wishlist-intro p{color:var(--muted);font-size:13px;line-height:1.5;margin:0}
+#library-wishlist-results .manga-grid{grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:17px}
+#library-wishlist-results .manga-card{background:transparent;border:0;box-shadow:none}
+#library-wishlist-results .manga-card .poster-btn{aspect-ratio:2/3;border-radius:12px}
+#library-wishlist-results .manga-card-body{padding:10px 2px}
+#library-wishlist-results .empty{background:var(--surface)}
+@media(max-width:740px){
+ .library-view-tabs{grid-template-columns:repeat(4,minmax(0,1fr));gap:2px}
+ .library-view-tab{padding:7px 3px;font-size:10px;min-height:53px}
+ .library-collection-toolbar{margin-bottom:13px}
+ #library-wishlist-results .manga-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .library-wishlist-intro{padding:20px}
+ .library-results-list .manga-card{grid-template-columns:78px minmax(0,1fr);gap:12px}
+ .library-results-list .manga-card .poster-btn{height:115px}
+ .library-results-list .manga-card .manga-card-title{font-size:15px!important}
+ .library-results-list .manga-card .manga-card-body{padding:8px 10px 8px 0!important}
+}
+@media(max-width:370px){.library-view-tab{font-size:9px;letter-spacing:-.02em}}
