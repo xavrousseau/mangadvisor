@@ -97,7 +97,7 @@ def run():
             page.locator('[data-go="/for-you"]').first.click()
             expect(page).to_have_url(BASE+"/for-you")
             expect(page.locator('[data-action="generate-mood"]')).to_be_visible(timeout=30000)
-            page.locator('[data-action="rec-mode"][data-value="library"]:visible').click()
+            page.locator('[data-action="rec-mode"][data-value="library"]:visible').first.click()
             expect(page.locator("#rec-submit")).to_be_visible(timeout=30000)
             expect(page.locator("#rec-balance")).to_have_value("BALANCED")
             if device=="desktop":
