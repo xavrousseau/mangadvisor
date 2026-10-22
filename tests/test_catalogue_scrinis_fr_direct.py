@@ -139,7 +139,7 @@ class ScrinisDirectEnrichmentTests(unittest.TestCase):
         provider = Provider(search=candidates(extra=extra))
         outcome = mod.lookup_work(row(), provider)
         self.assertEqual(outcome["status"], "AMBIGUOUS")
-        self.assertEqual(len(provider.calls), 1)
+        self.assertEqual(len(provider.calls), 3)
 
     def test_author_disagreement_and_missing_author_require_review(self):
         mismatch = Provider(detail={"status": "OK", "data": scrinis_detail(author="Kubo Tite")})
