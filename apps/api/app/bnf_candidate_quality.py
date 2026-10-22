@@ -18,39 +18,68 @@ def normalized(value: Any) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def work_candidate_status(title: str, known_titles: list[str]) -> str:
-    """Flag obvious distinct works, not proof that remaining titles match.
+def _known_title_suffix(title: str, known_titles: list[str]) -> str | None:
+    """Find a boundary-safe suffix of a known title, longest alias first.
 
-    A root title ('Berserk') plus a prose suffix ('of gluttony') is different.
-    Exact roots, volume notations, parenthetical editions and bylines remain
-    plausible only; publications such as artbooks must be reviewed separately.
+    Only aliases already trusted by the caller may establish a title prefix.
+    A prefix match remains a *candidate*, not a verified work identity.
     """
     candidate = normalized(title)
     titles = sorted(
-        (normalized(t) for t in known_titles if len(normalized(t)) >= 3),
+        {normalized(t) for t in known_titles if len(normalized(t)) >= 3},
         key=len, reverse=True,
     )
     for root in titles:
         if candidate == root:
-            return "REVIEW_UNNUMBERED"
-        if not candidate.startswith(root):
-            continue
-        tail = candidate[len(root):]
-        if not tail or tail[0].isalnum():
-            continue
-        suffix = tail.strip(" .,:;/-")
-        if not suffix:
-            return "REVIEW_UNNUMBERED"
-        if re.match(r"^(of |des |de |du |and |et )", suffix):
-            return "REJECT_DIFFERENT_WORK"
-        if re.match(r"^(illustrations? file|art ?book|guide ?book|official guide|roman\b|novel\b)", suffix):
-            return "REVIEW_DERIVATIVE"
-        if re.match(r"^(tome\s*\d+|vol(?:ume)?\.?\s*\d+|t\.?\s*\d+|\d+\b)", suffix):
-            return "REVIEW_VOLUME_CANDIDATE"
-        if re.match(r"^\(?ed(?:ition|\.)?\b", suffix):
-            return "REVIEW_EDITION_CANDIDATE"
+            return ""
+        if candidate.startswith(root) and len(candidate) > len(root):
+            tail = candidate[len(root):]
+            if not tail[0].isalnum():
+                return tail.strip(" .,:;/-")
+    return None
+
+
+def work_candidate_status(title: str, known_titles: list[str]) -> str:
+    """Classify obvious off-topic and derivative titles without auto-linking."""
+    suffix = _known_title_suffix(title, known_titles)
+    if suffix is None:
+        return "REJECT_DIFFERENT_WORK"
+    if not suffix:
         return "REVIEW_UNNUMBERED"
-    return "REJECT_DIFFERENT_WORK"
+    # Derivative descriptions sometimes arrive after a colon or in brackets.
+    # Keep them visible for human review, never register them as ordinary tomes.
+    descriptor = suffix.strip(" ()[]{}-:;,.")
+    if re.search(
+        r"\\b(?:illustrations? file|art\\s?book|guide\\s?book|"
+        r"official guide|guide officiel|fan\\s?book|data\\s?book|"
+        r"roman|novel|color walk|character book|anime comics)\\b",
+        descriptor,
+    ):
+        return "REVIEW_DERIVATIVE"
+    if re.match(r"^(?:of |des |de |du |and |et )", descriptor):
+        return "REJECT_DIFFERENT_WORK"
+    if re.match(r"^(?:tome\\s*\\d+|vol(?:ume)?\\.?\\s*\\d+|t\\.?\\s*\\d+|\\d+\\b)", descriptor):
+        return "REVIEW_VOLUME_CANDIDATE"
+    if re.match(r"^ed(?:ition|\\.)?\\b", descriptor):
+        return "REVIEW_EDITION_CANDIDATE"
+    return "REVIEW_UNNUMBERED"
+
+
+def volume_from_known_title(title: str, known_titles: list[str]) -> int | None:
+    """Recognize bare tome numbers only after an explicit trusted work title.
+
+    For example 'One Piece 01' => 1; 'One Piece 2024' and 'One Piece 3D2Y'
+    deliberately yield no numbered volume. Never infer edition or ownership.
+    """
+    suffix = _known_title_suffix(title, known_titles)
+    if suffix is None or not suffix:
+        return None
+    match = re.match(
+        r"^(?:tome\\s*|vol(?:ume)?\\.?\\s*|t\\.?\\s*)?"
+        r"0*([1-9]\\d{0,2})(?=$|[\\s.,:;/()\\-])",
+        suffix,
+    )
+    return int(match.group(1)) if match else None
 
 
 def language_status(value: Any) -> str:
@@ -93,12 +122,18 @@ def classify_candidate(row: dict[str, Any], known_titles: list[str]) -> dict[str
     edition = edition_status(str(row.get("title_fr") or ""),
                              str(row.get("edition_kind_suggested") or "UNKNOWN"))
     volume = volume_from_title(str(row.get("title_fr") or ""))
+    if volume is None and work == "REVIEW_VOLUME_CANDIDATE":
+        volume = volume_from_known_title(str(row.get("title_fr") or ""), known_titles)
     eligible = work in {"REVIEW_VOLUME_CANDIDATE", "REVIEW_EDITION_CANDIDATE",
                         "REVIEW_UNNUMBERED"}
     return {
         "isbn13": row.get("isbn13"),
         "title_fr": row.get("title_fr"),
         "publisher_fr": row.get("publisher_fr"),
+        "author_fr": row.get("author_fr"),
+        "release_date_text": row.get("release_date_text"),
+        "source_name": row.get("source_name"),
+        "source_url": row.get("source_url"),
         "language_recorded": row.get("language_recorded"),
         "work_status": work,
         "language_status": lang,
