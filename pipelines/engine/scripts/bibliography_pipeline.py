@@ -145,6 +145,7 @@ def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,
     if scrinis and selected:
         # Existing routine saves ONLY independently verified French-title evidence.
         result["scrinis"] = run_scrinis(limit=len(selected), target_ids=selected)
+        result["scrinis"]["selection_note"] = ("0 selected means already-linked French aliases or recent attempts may have been skipped; not an API success check.")
     client = RateLimitedClient() if scrinis else None
     reports = []
     for manga_id in selected:
