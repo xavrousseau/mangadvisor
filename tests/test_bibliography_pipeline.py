@@ -160,6 +160,79 @@ class PipelineTests(unittest.TestCase):
             summary = json.loads(out.getvalue())
             self.assertNotIn("candidates", summary["works"][0])
 
+    def test_explicit_probe_cross_checks_isbn_without_confirming_edition(self):
+        from unittest.mock import Mock
+        candidate = {
+            "isbn13": "9782344067802", "work_status": "REVIEW_VOLUME_CANDIDATE",
+            "language_status": "FRENCH_DECLARED", "registration_ready": False,
+        }
+        work = {
+            "id": 49271, "source_mal_id": 116778, "title": "Chainsaw Man",
+            "title_english": "Chainsaw Man", "title_japanese": None,
+            "manga_type": "Manga", "mal_authors": ["Fujimoto, Tatsuki"],
+        }
+        result = {
+            "status": "MATCHED", "reason": "SOURCE_CONFIRMED",
+            "scrinis_id": "42", "work_evidence": "EXACT_TITLE_AUTHOR",
+            "author_evidence": "MATCH", "french_print_isbns": ["9782344067802"],
+            "book_references_truncated": True,
+        }
+        client = Mock()
+        with patch.object(pipeline, "lookup_work", return_value=result) as lookup:
+            diagnosis, cross = pipeline.probe_scrinis_work(work, [candidate], client)
+        lookup.assert_called_once()
+        self.assertEqual(diagnosis["source_public_id"], "42")
+        self.assertEqual(diagnosis["supplier_coverage"], "INCOMPLETE_SUPPLIER_DETAIL")
+        self.assertEqual(cross["correlation_counts"], {"ISBN_IN_BOTH_SOURCES": 1})
+        self.assertEqual(cross["status"], "COMPARED")
+        self.assertFalse(candidate["registration_ready"])
+        self.assertNotIn("confirmed_edition", diagnosis)
+
+    def test_explicit_probe_requires_verified_work(self):
+        from unittest.mock import Mock
+        with patch.object(pipeline, "lookup_work", return_value={
+            "status": "AMBIGUOUS", "reason": "MULTIPLE_PLAUSIBLE_WORKS"}):
+            diagnosis, cross = pipeline.probe_scrinis_work({
+                "id": 2, "source_mal_id": 13, "title": "One Piece",
+                "title_english": None, "title_japanese": None,
+            }, [], Mock())
+        self.assertEqual(diagnosis["status"], "AMBIGUOUS")
+        self.assertEqual(cross["status"], "NO_VERIFIED_SCRINIS_WORK")
+
+    def test_probe_mode_never_invokes_bnf_or_scrinis_writers(self):
+        fake_context = MagicMock()
+        fake_context.__enter__.return_value = MagicMock()
+        with patch.object(pipeline, "connect_database", return_value=fake_context), \\
+             patch.object(pipeline, "select_ids", return_value=[2, 3]), \\
+             patch.object(pipeline, "load_work_evidence", side_effect=lambda conn, mid: (
+                 {"id": mid, "source_mal_id": mid + 10, "title": "Berserk",
+                  "title_english": None, "title_japanese": None},
+                 [], None, [])), \\
+             patch.object(pipeline, "scrinis_selection_diagnostics", return_value={}), \\
+             patch.object(pipeline, "probe_scrinis_work", side_effect=[
+                 ({"status": "PROVIDER_ERROR", "reason": "SEARCH_NETWORK_ERROR"},
+                  {"status": "NO_VERIFIED_SCRINIS_WORK", "isbn_correlations": []}),
+             ]) as probe, \\
+             patch.object(pipeline, "run_bnf") as run_bnf, \\
+             patch.object(pipeline, "run_scrinis") as run_scrinis:
+            report = pipeline.run_pilot(manga_ids=[2, 3], bnf=False,
+                                        scrinis=False, probe_scrinis=True)
+        run_bnf.assert_not_called()
+        run_scrinis.assert_not_called()
+        probe.assert_called_once()
+        self.assertEqual(report["works"][1]["scrinis_probe"]["status"],
+                         "SKIPPED_PROVIDER_UNAVAILABLE")
+        self.assertEqual(report["confirmed_editions_written"], 0)
+        self.assertEqual(report["user_inventory_written"], 0)
+
+    def test_probe_mode_requires_explicit_target_and_no_writers(self):
+        with self.assertRaises(ValueError):
+            pipeline.run_pilot(bnf=False, scrinis=False, probe_scrinis=True)
+        with self.assertRaises(ValueError):
+            pipeline.run_pilot(manga_ids=[2], probe_scrinis=True)
+        with self.assertRaises(SystemExit):
+            pipeline.main(["--probe-scrinis", "--report-only", "--manga-ids", "2"])
+
     def test_skip_bnf_reuses_saved_candidates(self):
         import contextlib
         import io
