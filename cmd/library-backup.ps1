@@ -24,6 +24,147 @@ function Run-Docker([string[]]$CommandArgs, [string]$Message) {
   & docker @CommandArgs | Out-Null
   Assert-Ok $Message
 }
+function Container-Exists([string]$name) {
+  # Missing docker objects must not produce fatal NativeCommandError on PS 5.1.
+  $names=@(& docker container ls -a --format "{{.Names}}")
+  Assert-Ok "Liste des conteneurs Docker indisponible"
+  return ($names -contains $name)
+}
+function Installed-Setting([string]$container,[string]$key) {
+  # Docker keeps the original service configuration even while stopped.
+  # This reads it IN MEMORY only. Never print password values.
+  $entries=@(& docker container inspect --format '{{range .Config.Env}}{{println .}}{{end}}' $container)
+  Assert-Ok "Lecture de la configuration du conteneur impossible"
+  $prefix=$key+"="
+  $matches=@($entries | Where-Object { ([string]$_).StartsWith($prefix,[StringComparison]::Ordinal) })
+  if ($matches.Count -ne 1) {
+    throw "Variable $key absente ou dupliquee dans le conteneur $container. Aucune restauration de secret."
+  }
+  $value=([string]$matches[0]).Substring($prefix.Length)
+  if (-not $value -or $value.Contains("`n") -or $value.Contains("`r")) {
+    throw "Valeur $key non exploitable dans le conteneur $container."
+  }
+  return $value
+}
+function Config-Setting([string]$key) {
+  $lines=@(Get-Content -LiteralPath $envFile -Encoding UTF8 | Where-Object {
+    $_ -match ("^\s*" + [regex]::Escape($key) + "\s*=")
+  })
+  if ($lines.Count -ne 1) { throw "Configuration privee $key absente ou dupliquee." }
+  return ([string]$lines[0]).Split("=",2)[1].Trim().Trim("'").Trim('"')
+}
+function Assert-Managed-Container([string]$container,[string]$service) {
+  $format='{{index .Config.Labels "com.docker.compose.service"}}'
+  $actual=@(& docker container inspect --format $format $container)
+  Assert-Ok "Impossible de verifier le service Docker $container"
+  if ($actual.Count -ne 1 -or ([string]$actual[0]).Trim() -cne $service) {
+    throw "Conteneur $container inconnu ou non gere par Compose ($service attendu). Stop : aucun volume remplace."
+  }
+  $project=@(& docker container inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' $container)
+  Assert-Ok "Impossible de verifier le projet Docker"
+  if ($project.Count -ne 1 -or ([string]$project[0]).Trim() -cne "mangadvisor") {
+    throw "Le conteneur $container appartient a un autre projet. Sauvegarde annulee."
+  }
+}
+function Repair-Installed-Environment {
+  if (-not (Container-Exists $containerName)) {
+    throw "Le conteneur PostgreSQL $containerName est absent. Refus de creer une base vide pendant la sauvegarde. Verifier docker ps -a et les volumes."
+  }
+  Assert-Managed-Container $containerName "postgres"
+  $installed=@{}
+  foreach ($key in @("POSTGRES_DB","POSTGRES_USER","POSTGRES_PASSWORD")) {
+    $installed[$key]=Installed-Setting $containerName $key
+  }
+  $meiliName="mangadvisor_meilisearch"
+  if (Container-Exists $meiliName) {
+    Assert-Managed-Container $meiliName "meilisearch"
+    $installed["MEILI_MASTER_KEY"]=Installed-Setting $meiliName "MEILI_MASTER_KEY"
+  } else {
+    # A previously persisted Meilisearch index may depend on its old key.
+    $volumes=@(& docker volume ls --format "{{.Name}}")
+    Assert-Ok "Liste des volumes Docker indisponible"
+    if ($volumes -contains "mangadvisor_mangadvisor_meili") {
+      throw "Ancien volume Meilisearch present sans conteneur correspondant. Ne pas appliquer une nouvelle cle automatiquement."
+    }
+  }
+  $different=@($installed.Keys | Where-Object { (Config-Setting $_) -cne $installed[$_] } | Sort-Object)
+  if ($different.Count -eq 0) {
+    Write-Host "Configuration locale : identique aux conteneurs existants."
+    return
+  }
+  Write-Host ""
+  Write-Warning ("Le fichier .env differe des conteneurs existants pour : " + ($different -join ", "))
+  Write-Host "Cela peut arriver si .env a ete recree pendant que les volumes etaient preserves."
+  Write-Host "Les identifiants ne seront PAS affiches. Une copie de .env sera conservee dans backups/configuration."
+  if ($NonInteractive -or -not (Confirm-Repair "Restaurer la configuration des conteneurs existants dans .env ?")) {
+    throw "Configuration incoherente : restauration refusee. Aucune suppression de donnees ni de volumes."
+  }
+  $raw=[IO.File]::ReadAllText($envFile,[Text.Encoding]::UTF8)
+  $updated=$raw
+  foreach ($key in $different) {
+    $pattern="(?m)^" + [regex]::Escape($key) + "=.*$"
+    if ([regex]::Matches($updated,$pattern).Count -ne 1) {
+      throw "Configuration $key invalide : restauration annulee."
+    }
+    $updated=[regex]::Replace($updated,$pattern,
+      [System.Text.RegularExpressions.MatchEvaluator]{
+        param($m)
+        return $key+"="+$installed[$key]
+      })
+  }
+  $folder=Join-Path $backups "configuration"
+  if (-not (Test-Path -LiteralPath $folder)) {
+    New-Item -ItemType Directory -Path $folder -Force | Out-Null
+  }
+  $tag=(Get-Date -Format "yyyyMMdd_HHmmss") + "_" + ([guid]::NewGuid().ToString("N")).Substring(0,8)
+  $saved=Join-Path $folder (".env_before_recovery_" + $tag)
+  Copy-Item -LiteralPath $envFile -Destination $saved -ErrorAction Stop
+  # Write the replacement as a private temporary file on the same filesystem,
+  # then replace the original. Never output the contents to stdout or Git.
+  $temp=Join-Path $folder (".env_repaired_" + $tag)
+  try {
+    [IO.File]::WriteAllText($temp,$updated,(New-Object Text.UTF8Encoding($false)))
+    Copy-Item -LiteralPath $temp -Destination $envFile -Force -ErrorAction Stop
+  } catch {
+    Copy-Item -LiteralPath $saved -Destination $envFile -Force
+    throw "Impossible de restaurer .env : configuration initiale conservee. $($_.Exception.Message)"
+  } finally {
+    Remove-Item -LiteralPath $temp -ErrorAction SilentlyContinue
+  }
+  Write-Host ("Configuration des conteneurs restauree. Copie de securite : backups/configuration/" + (Split-Path -Leaf $saved))
+}
+function Confirm-Repair([string]$Question) {
+  $response=Read-Host "$Question (o/N)"
+  return $response -match '^(o|oui|y|yes)$'
+}
+function Prepare-Existing-Postgres {
+  # Never invoke 'compose up' before the CURRENT database is backed up:
+  # with changed secrets, Compose could recreate the old container.
+  Repair-Installed-Environment
+  $state=@(& docker container inspect --format "{{.State.Running}}" $containerName)
+  Assert-Ok "Etat de PostgreSQL illisible"
+  if ($state.Count -ne 1) { throw "Etat de PostgreSQL inattendu." }
+  if (([string]$state[0]).Trim() -cne "true") {
+    Write-Host "PostgreSQL est arrete. Redemarrage du conteneur existant, sans recreation."
+    Run-Docker @("start",$containerName) "Impossible de redemarrer PostgreSQL existant"
+  }
+  $pgUser=Installed-Setting $containerName "POSTGRES_USER"
+  $pgDb=Installed-Setting $containerName "POSTGRES_DB"
+  $ready=$false
+  for ($attempt=0; $attempt -lt 40; $attempt++) {
+    & docker exec $containerName pg_isready -U $pgUser -d $pgDb 1>$null 2>$null
+    if ($LASTEXITCODE -eq 0) { $ready=$true; break }
+    Start-Sleep -Seconds 2
+  }
+  if (-not $ready) { throw "PostgreSQL existant ne demarre pas. Lire ses logs Docker, ne supprimer aucun volume." }
+  # pg_isready alone does not prove that a newly recreated environment
+  # can authenticate against an OLD persisted PostgreSQL cluster.
+  $test=@(& docker exec $containerName sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"' 2>$null)
+  if ($LASTEXITCODE -ne 0 -or $test.Count -ne 1 -or ([string]$test[0]).Trim() -ne "1") {
+    throw "Identifiants du conteneur incompatibles avec la base PostgreSQL existante. Refus de la sauvegarde/mise a jour : recuperer les anciens identifiants."
+  }
+  Write-Host "PostgreSQL existant actif, configuration reconnue et connexion authentifiee."
+}
 function Db-Setting([string]$key) {
   $result=& docker exec $containerName printenv $key
   Assert-Ok "Configuration PostgreSQL $key indisponible"

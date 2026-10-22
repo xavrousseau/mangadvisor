@@ -42,6 +42,36 @@ function Config([string]$Key) {
 function Ensure-Environment {
   Say "Configuration privee et dossiers"
   if (!(Test-Path -LiteralPath $envFile)) {
+    # Creating fresh credentials is safe ONLY for a brand-new installation.
+    # An existing persistent PostgreSQL volume could still contain the
+    # user's complete inventory, even when all containers are stopped.
+    $dockerAvailable=$null -ne (Get-Command docker -ErrorAction SilentlyContinue)
+    if ($dockerAvailable) {
+      & docker info --format "{{.ServerVersion}}" 1>$null 2>$null
+      $dockerAvailable=$LASTEXITCODE -eq 0
+    }
+    if ($dockerAvailable) {
+      # Enumerate rather than inspect a non-existent object: under Windows
+      # PowerShell 5.1 stderr may terminate even with 2>$null.
+      $names=@(& docker container ls -a --format "{{.Names}}")
+      Assert-Exit "Lecture des conteneurs Docker impossible"
+      if ($names -contains "mangadvisor_postgres") {
+        throw "Ancien PostgreSQL Mangadvisor detecte sans .env. Recuperer l'ancienne configuration avant toute mise a jour."
+      }
+      $volumes=@(& docker volume ls --format "{{.Name}}")
+      Assert-Exit "Lecture des volumes Docker impossible"
+      foreach ($volume in @("mangadvisor_mangadvisor_pgdata",
+                             "mangadvisor_mangadvisor_meili")) {
+        if ($volumes -contains $volume) {
+          throw "Volume Docker $volume present sans .env : installation ancienne detectee. Recuperer la configuration d'origine."
+        }
+      }
+    } else {
+      # Still permit generating offline install settings (Windows setup/CI).
+      # Their compatibility with any old Docker volumes MUST be checked by
+      # library-backup.ps1 before the first update or database backup.
+      Write-Warning "Docker indisponible : nouvelle configuration non validee contre d'eventuels volumes existants."
+    }
     if (!(Test-Path -LiteralPath $example)) { throw ".env.example introuvable." }
     $template=[IO.File]::ReadAllText($example,[Text.Encoding]::UTF8)
     $pgSecret=Secret
