@@ -58,6 +58,9 @@ class DummyCursor:
             return {"source_key":"Inventaire!A29"}
         return None
     def fetchall(self):
+        if "FROM user_manga_inventory_declaration" in self.last_sql:
+            return ([self.db.existing] if isinstance(self.db.existing,dict)
+                    else list(self.db.existing or []))
         return self.db.candidates if "FROM manga m" in self.last_sql else []
 
 
@@ -173,16 +176,72 @@ class PendingResolutionTests(unittest.TestCase):
         self.assertEqual(declaration["main_volumes"],34)
         self.assertEqual(declaration["duplicate_copies"],0)
 
-    def test_existing_edition_and_not_interested_do_not_get_changed(self):
+    def test_existing_edition_requires_archive_and_consent(self):
+        from apps.api.app.inventory_import import PendingResolvePreview, PendingResolveConfirm
+        old={"edition_key":"deluxe", "entry_title":"Dragon Ball Deluxe",
+             "edition_declared":"Deluxe", "main_volumes":34,
+             "duplicate_copies":0, "other_editions_unknown":0}
+        db=DummyDb(existing=old)
+        endpoints=self.endpoints(db)
+        preview=endpoints["/inventory/pending/resolve/preview"](
+            PendingResolvePreview(source_key="Inventaire!A29",manga_id=15)
+        )
+        self.assertTrue(preview["same_edition_exists"])
+        self.assertEqual(preview["allowed_actions"],["MARK_DUPLICATE"])
+        self.assertEqual(preview["existing_declarations"][0]["main_volumes"],34)
+        endpoint=endpoints["/inventory/pending/resolve"]
+        args=dict(source_key="Inventaire!A29",manga_id=15,
+                  confirmation_token=preview["confirmation_token"],
+                  acknowledge_work_and_edition=True)
+        for params in [dict(resolution_mode="CREATE_DECLARATION",acknowledge_existing_inventory=True),
+                       dict(resolution_mode="MARK_DUPLICATE",acknowledge_existing_inventory=False)]:
+            with self.subTest(params=params), self.assertRaises(HTTPException):
+                endpoint(PendingResolveConfirm(**args,**params))
+        self.assertFalse(any("INSERT INTO" in q for q,_ in db.queries))
+        result=endpoint(PendingResolveConfirm(
+            **args,resolution_mode="MARK_DUPLICATE",
+            acknowledge_existing_inventory=True))
+        self.assertEqual(result["resolution_mode"],"MARK_DUPLICATE")
+        self.assertFalse(result["new_declaration_created"])
+        self.assertEqual(db.commits,1)
+        sqls=[q for q,_ in db.queries]
+        self.assertFalse(any("INSERT INTO user_manga_inventory_declaration" in q for q in sqls))
+        self.assertTrue(any("INSERT INTO user_manga_inventory_resolution" in q for q in sqls))
+        audit=next(p for q,p in db.queries if "INSERT INTO user_manga_inventory_resolution" in q)
+        self.assertEqual(audit["mode"],"MARK_DUPLICATE")
+        self.assertTrue(any("DELETE FROM user_manga_inventory_pending" in q for q in sqls))
+
+    def test_other_edition_requires_explicit_review_before_adding(self):
+        from apps.api.app.inventory_import import PendingResolvePreview, PendingResolveConfirm
+        existing={"edition_key":"pastel", "entry_title":"Dragon Ball Pastel",
+                  "edition_declared":"Pastel", "main_volumes":42,
+                  "duplicate_copies":0, "other_editions_unknown":0}
+        db=DummyDb(existing=existing)
+        endpoints=self.endpoints(db)
+        preview=endpoints["/inventory/pending/resolve/preview"](
+            PendingResolvePreview(source_key="Inventaire!A29",manga_id=15)
+        )
+        self.assertEqual(preview["allowed_actions"],["CREATE_DECLARATION","MARK_DUPLICATE"])
+        self.assertFalse(preview["same_edition_exists"])
+        result=endpoints["/inventory/pending/resolve"](PendingResolveConfirm(
+            source_key="Inventaire!A29",manga_id=15,
+            confirmation_token=preview["confirmation_token"],
+            acknowledge_work_and_edition=True,
+            acknowledge_existing_inventory=True,
+            resolution_mode="CREATE_DECLARATION"
+        ))
+        self.assertTrue(result["new_declaration_created"])
+        declaration=next(p for q,p in db.queries if "INSERT INTO user_manga_inventory_declaration" in q)
+        self.assertEqual(declaration["edition_key"],"deluxe")
+
+    def test_rejected_library_status_is_never_resolved(self):
         from apps.api.app.inventory_import import PendingResolvePreview
-        for condition in ({"existing":{"entry_title":"Already linked"}},
-                          {"rejected":{"library_status":"NOT_INTERESTED"}}):
-            db=DummyDb(**condition)
-            endpoint=self.endpoints(db)["/inventory/pending/resolve/preview"]
-            with self.assertRaises(HTTPException) as caught:
-                endpoint(PendingResolvePreview(source_key="Inventaire!A29",manga_id=15))
-            self.assertEqual(caught.exception.status_code,409)
-            self.assertFalse(any("INSERT INTO" in q for q,_ in db.queries))
+        db=DummyDb(rejected={"library_status":"NOT_INTERESTED"})
+        with self.assertRaises(HTTPException) as caught:
+            self.endpoints(db)["/inventory/pending/resolve/preview"](
+                PendingResolvePreview(source_key="Inventaire!A29",manga_id=15))
+        self.assertEqual(caught.exception.status_code,409)
+        self.assertFalse(any("INSERT INTO" in q for q,_ in db.queries))
 
     def test_pending_missing_and_missing_manga_stay_unchanged(self):
         from apps.api.app.inventory_import import PendingResolvePreview
