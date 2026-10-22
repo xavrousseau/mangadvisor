@@ -40,8 +40,8 @@ def run(page, size):
     page.route("**/api/collection/scan/confirm", confirm_new)
 
     page.goto(BASE + "/library", wait_until="domcontentloaded", timeout=60000)
-    expect(page.locator('[data-action="open-scanner"]')).to_be_visible(timeout=30000)
-    page.locator('[data-action="open-scanner"]').click()
+    expect(page.locator('[data-action="open-scanner"]:visible').first).to_be_visible(timeout=30000)
+    page.locator('[data-action="open-scanner"]:visible').first.click()
     expect(page.locator("#scan-dialog")).to_be_visible()
     expect(page.locator('[data-action="scan-confirm"]')).to_have_count(0)
 
@@ -102,7 +102,7 @@ def run(page, size):
 
     page.route("**/api/collection/scan/status/" + ISBN, status_known)
     page.route("**/api/collection/scan/confirm", confirm_known)
-    page.locator('[data-action="open-scanner"]').click()
+    page.locator('[data-action="open-scanner"]:visible').first.click()
     page.locator("#scan-isbn-input").fill(ISBN)
     page.locator('#scan-isbn-form button[type="submit"]').click()
     expect(page.locator(".scan-duplicate")).to_be_visible()

@@ -150,27 +150,33 @@ def upsert_jikan_manga_batch(conn: Connection, rows: list[dict[str, Any]]) -> in
     ON CONFLICT (mal_id)
     DO UPDATE SET
         source_name = EXCLUDED.source_name,
-        title = EXCLUDED.title,
-        title_english = EXCLUDED.title_english,
-        title_japanese = EXCLUDED.title_japanese,
-        synopsis = EXCLUDED.synopsis,
-        status = EXCLUDED.status,
-        chapters = EXCLUDED.chapters,
-        volumes = EXCLUDED.volumes,
-        score = EXCLUDED.score,
-        popularity = EXCLUDED.popularity,
-        rank = EXCLUDED.rank,
-        members = EXCLUDED.members,
-        favorites = EXCLUDED.favorites,
-        published_from = EXCLUDED.published_from,
-        published_to = EXCLUDED.published_to,
-        manga_type = EXCLUDED.manga_type,
-        genres_json = EXCLUDED.genres_json,
-        themes_json = EXCLUDED.themes_json,
-        demographics_json = EXCLUDED.demographics_json,
-        authors_json = EXCLUDED.authors_json,
-        serializations_json = EXCLUDED.serializations_json,
-        raw_json = EXCLUDED.raw_json,
+        title = COALESCE(NULLIF(BTRIM(EXCLUDED.title), ''), jikan_manga_source.title),
+        title_english = COALESCE(NULLIF(BTRIM(EXCLUDED.title_english), ''), jikan_manga_source.title_english),
+        title_japanese = COALESCE(NULLIF(BTRIM(EXCLUDED.title_japanese), ''), jikan_manga_source.title_japanese),
+        synopsis = COALESCE(NULLIF(BTRIM(EXCLUDED.synopsis), ''), jikan_manga_source.synopsis),
+        status = COALESCE(NULLIF(BTRIM(EXCLUDED.status), ''), jikan_manga_source.status),
+        chapters = COALESCE(EXCLUDED.chapters, jikan_manga_source.chapters),
+        volumes = COALESCE(EXCLUDED.volumes, jikan_manga_source.volumes),
+        score = COALESCE(EXCLUDED.score, jikan_manga_source.score),
+        popularity = COALESCE(EXCLUDED.popularity, jikan_manga_source.popularity),
+        rank = COALESCE(EXCLUDED.rank, jikan_manga_source.rank),
+        members = COALESCE(EXCLUDED.members, jikan_manga_source.members),
+        favorites = COALESCE(EXCLUDED.favorites, jikan_manga_source.favorites),
+        published_from = COALESCE(EXCLUDED.published_from, jikan_manga_source.published_from),
+        published_to = COALESCE(EXCLUDED.published_to, jikan_manga_source.published_to),
+        manga_type = COALESCE(NULLIF(BTRIM(EXCLUDED.manga_type), ''), jikan_manga_source.manga_type),
+        genres_json = CASE WHEN EXCLUDED.genres_json IS NULL OR EXCLUDED.genres_json = '[]'::jsonb
+            THEN jikan_manga_source.genres_json ELSE EXCLUDED.genres_json END,
+        themes_json = CASE WHEN EXCLUDED.themes_json IS NULL OR EXCLUDED.themes_json = '[]'::jsonb
+            THEN jikan_manga_source.themes_json ELSE EXCLUDED.themes_json END,
+        demographics_json = CASE WHEN EXCLUDED.demographics_json IS NULL OR EXCLUDED.demographics_json = '[]'::jsonb
+            THEN jikan_manga_source.demographics_json ELSE EXCLUDED.demographics_json END,
+        authors_json = CASE WHEN EXCLUDED.authors_json IS NULL OR EXCLUDED.authors_json = '[]'::jsonb
+            THEN jikan_manga_source.authors_json ELSE EXCLUDED.authors_json END,
+        serializations_json = CASE WHEN EXCLUDED.serializations_json IS NULL OR EXCLUDED.serializations_json = '[]'::jsonb
+            THEN jikan_manga_source.serializations_json ELSE EXCLUDED.serializations_json END,
+        raw_json = COALESCE(jikan_manga_source.raw_json, '{}'::jsonb) ||
+            jsonb_strip_nulls(EXCLUDED.raw_json),
         inserted_at = CURRENT_TIMESTAMP;
     """
 

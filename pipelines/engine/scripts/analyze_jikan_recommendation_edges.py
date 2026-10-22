@@ -14,7 +14,7 @@ from load.postgres_loader import get_postgres_connection  # noqa: E402
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-REPORT_DIR = PROJECT_ROOT / "docs" / "reports"
+REPORT_DIR = PROJECT_ROOT / "data" / "logs" / "diagnostics"
 REPORT_PATH = REPORT_DIR / "jikan_recommendation_edges_diagnostic.md"
 
 

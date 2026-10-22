@@ -73,6 +73,20 @@ def main():
     }
     verify_modes("/recommendations/library", library_params, all_known)
 
+    # The three original user goals must all remain operational against the
+    # disposable catalogue. None may recommend a series already in the library,
+    # whatever its current reading/ownership status.
+    for goal in ("SIMILAR_SAFE", "READ_NEXT", "SHORT_FINISHED"):
+        response = post("/recommendations/library", {
+            **library_params, "recommendation_goal":goal, "limit":20,
+            "recommendation_balance":"CLOSE",
+        })
+        assert response["recommendations"], (goal, response)
+        ids = [m["id"] for m in response["recommendations"]]
+        assert len(ids) == len(set(ids)), (goal, ids)
+        assert not set(ids).intersection(all_known), (goal, ids, all_known)
+        print(f"OK library goal {goal}: {len(ids)} distinct suggestions, known manga excluded")
+
     similar = get("/recommendations/similar",title="Naruto",limit=20)
     assert all(m["id"] not in all_known for m in similar["recommendations"]), similar
     print("OK: exclusion des titres déjà dans la bibliothèque dans les trois moteurs.")

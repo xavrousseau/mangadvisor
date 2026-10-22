@@ -2,12 +2,6 @@
 import unittest
 from unittest.mock import patch
 
-from apps.ui.app.discovery import (
-    PAGE_SIZE,
-    GENRES,
-    normalize_search,
-    paginated_catalog,
-)
 from apps.api.app.main import list_mangas
 
 
@@ -46,23 +40,6 @@ class FakeConnection:
 
 
 class DiscoveryTests(unittest.TestCase):
-    def test_query_normalization(self):
-        self.assertEqual(normalize_search("  Vinland   Saga  "), "Vinland Saga")
-        self.assertEqual(normalize_search(" \n "), "")
-        self.assertEqual(len(normalize_search("A" * 200)), 120)
-
-    def test_gallery_pagination_boundary(self):
-        items = [{"id": i} for i in range(PAGE_SIZE + 1)]
-        visible, has_next = paginated_catalog(items)
-        self.assertEqual(len(visible), PAGE_SIZE)
-        self.assertTrue(has_next)
-        self.assertFalse(paginated_catalog(items[:PAGE_SIZE])[1])
-        self.assertEqual(paginated_catalog([]), ([], False))
-
-    def test_all_genre_values_are_real_filter_values(self):
-        self.assertIsNone(GENRES["Tous les genres"])
-        self.assertEqual(GENRES["Aventure"], "Adventure")
-
     def test_api_combines_filters_with_parenthesized_search(self):
         conn = FakeConnection([{"id": 123, "title": "Naruto"}])
         with patch("apps.api.app.main.get_connection", return_value=conn):

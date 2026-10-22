@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","BibliographyPilot","BibliographyAcceptance","CatalogueLifecycle","Wikidata","LibraryEnrichment","SearchIndex","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -128,16 +128,13 @@ function Start-Application([bool]$Build=$true) {
   Say "Demarrage des services Mangadvisor"
   Ensure-Environment
   Check-Docker
-  # Turn off the old 8502 Streamlit UI, keeping data volumes untouched.
-  # The user-friendly stack has no Streamlit service at all.
-  # Retire an existing 8502 legacy container without removing its data or
-  # touching the PostgreSQL/Meilisearch volumes.
-  $devCompose=Join-Path $root "infra\compose\docker-compose.dev.yml"
-  $legacyArgs=@("compose","--env-file",$envFile,
-      "-f",(Join-Path $root "infra\compose\docker-compose.yml"),
-      "-f",$devCompose,"--profile","legacy")
-  Run "docker" ($legacyArgs+@("stop","ui")) "Impossible d'arreter l'ancienne interface"
-  Run "docker" ($legacyArgs+@("rm","-f","ui")) "Impossible de retirer l'ancien conteneur UI"
+  # Retire a container left by old installations WITHOUT removing volumes.
+  # The legacy Compose service no longer exists in the maintained repository.
+  $oldUi=(& docker container ls -a --format "{{.Names}}" 2>$null |
+    Where-Object { $_ -eq "mangadvisor_ui" })
+  if ($oldUi) {
+    Run "docker" @("rm","-f","mangadvisor_ui") "Impossible de retirer l'ancien conteneur UI"
+  }
   $args=@("up","-d")
   if ($Build) { $args+=@("--build") }
   Compose $args
@@ -267,6 +264,9 @@ function Load-Catalogue {
   $catalogCount=Get-Count "manga"
   Write-Host "Notices fournisseur : $sourceCount ; mangas dans le catalogue : $catalogCount"
   if ($catalogCount -eq 0) { throw "Catalogue vide : chargement Tenrai invalide." }
+  try { Reindex-Manga-Search } catch {
+    Write-Warning ("Recherche SQL disponible ; index Meilisearch non actualise : " + $_.Exception.Message)
+  }
 }
 function Enrich-Catalogue-French-Scrinis {
   Say "Enrichir le catalogue MAL existant avec Scrinis FR (titres visibles)"
@@ -378,6 +378,9 @@ function Load-Complete-MAL-Catalogue {
     }
     if ($complete) {
       Write-Host "Catalogue MAL complet deja valide : aucune reinitialisation."
+      try { Reindex-Manga-Search } catch {
+        Write-Warning ("Recherche SQL disponible ; index Meilisearch non actualise : " + $_.Exception.Message)
+      }
       return
     }
     if (!(Confirm "Installer le catalogue public MAL complet (premiere installation) ?" $true)) {
@@ -422,6 +425,9 @@ function Load-Complete-MAL-Catalogue {
   Write-Host ("Pages brutes Jikan : " + $jikanDirectory)
   Write-Host "Rapport de suivi : data\logs\catalogue_complete\last_sync.json"
   Write-Host "Fiches de ta mangatheque et relations existantes conservees."
+  try { Reindex-Manga-Search } catch {
+    Write-Warning ("Recherche SQL disponible ; index Meilisearch non actualise : " + $_.Exception.Message)
+  }
 }
 function Load-Extended-Catalogue {
   Say "Catalogue Tenrai etendu : progression jusqu'a la derniere page"
@@ -518,31 +524,6 @@ function Benchmark-Catalogue-Sources-V2 {
            "--limit",[string]$count,"--detail-limit",[string]$details)
   Write-Host ("Rapports CSV et JSON V2 : " + (Join-Path $root "data\logs\catalog_sources"))
 }
-function Benchmark-Catalogue-Sources {
-  Say "Comparatif de 50 mangas : Scrinis et MangaUpdates (lecture seule)"
-  Ensure-Environment
-  Check-Docker
-  Compose @("up","-d","postgres","meilisearch","api")
-  Wait-Postgres
-  $null=Wait-Health
-  $null=Get-Count "manga"
-  $count=Ask-Number "Nombre de mangas a comparer (max 50)" 50 50
-  Write-Host "Selection : entrees de mangatheque en attente, oeuvres possedees, autres mangas."
-  Write-Host "L'outil va afficher la selection sans aucun appel Internet."
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count,"--dry-run")
-  Write-Host "Si tu confirmes, seuls les TITRES des oeuvres seront transmis aux deux API."
-  Write-Host "Les quantites, les lectures, les notes, les sources privees et les ISBN ne seront pas transmis."
-  Write-Host "Resultats locaux uniquement, aucune ecriture PostgreSQL."
-  Write-Host "Quota Scrinis : maximum 15 appels par minute sans cle (pause 4,5 s)."
-  if (!(Confirm "Lancer maintenant les recherches publiques sur ces titres ?" $false)) {
-    Write-Host "Comparatif annule : aucune requete publique envoyee."
-    return
-  }
-  Engine @("pipelines/engine/scripts/benchmark_manga_sources.py","--limit",[string]$count)
-  $reportDir=Join-Path $root "data\logs\catalog_sources"
-  Write-Host ("Rapports CSV et JSON disponibles dans : " + $reportDir)
-  Write-Host "Aucun resultat n'est associe automatiquement a ta mangatheque."
-}
 function Import-BnF-Bulk {
   Say "Importer des lots bibliographiques officiels BnF (zone de candidats)"
   Ensure-Environment
@@ -579,6 +560,81 @@ function Import-BnF-Bulk {
   Engine @("pipelines/engine/scripts/bnf_bulk_import.py")
   Write-Host "Notices BnF candidates importees ; edition et tome non confirmes."
 }
+function Run-Bibliography-Pilot {
+  Say "Pilote bibliographique BnF et Scrinis - candidats uniquement"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  Write-Host "Lot borne a 10 mangas. Recherche BnF 3 pages par titre."
+  Write-Host "Les ISBN croises BnF/Scrinis ne sont PAS des editions confirmees."
+  Write-Host "Seules les notices candidates BnF et alias FR verifies Scrinis sont enregistres."
+  Write-Host "La mangatheque, les volumes declares et les editions confirmees restent intacts."
+  $limit=Ask-Number "Combien de mangas traiter (maximum 10) ?" 5 10
+  if (!(Confirm "Lancer ce pilote avec une sauvegarde prealable ?" $false)) {
+    Write-Host "Aucun traitement lance."
+    return
+  }
+  Backup
+  Engine @("-m","pipelines.engine.scripts.bibliography_pipeline","--limit",[string]$limit)
+}
+
+function Run-Bibliography-Acceptance {
+  Say "Recette complete bibliographique : 3 mangas en bac a sable"
+  Check-Docker
+  $sandbox=Join-Path $root ".env.sandbox"
+  if (!(Test-Path -LiteralPath $sandbox -PathType Leaf)) {
+    throw "La configuration .env.sandbox manque. Aucune base standard ne sera utilisee a sa place."
+  }
+  $base=Join-Path $root "infra\compose\docker-compose.yml"
+  $sandboxCompose=Join-Path $root "infra\compose\docker-compose.sandbox.yml"
+  if (!(Test-Path -LiteralPath $base) -or
+      !(Test-Path -LiteralPath $sandboxCompose)) {
+    throw "Configuration Compose de bac a sable introuvable."
+  }
+  $common=@("compose","--env-file",$sandbox,"-f",$base,"-f",$sandboxCompose)
+  $outDir=Join-Path $root "data\logs\bibliography_validation"
+  if (!(Test-Path -LiteralPath $outDir)) {
+    New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+  }
+  $stamp=Get-Date -Format "yyyyMMdd_HHmmss"
+  $summary=Join-Path $outDir ("bnf_candidates_" + $stamp + ".json")
+  $live=Join-Path $outDir ("scrinis_probe_" + $stamp + ".json")
+  $selected="49271,11,51119"
+  Write-Host "Cibles : Chainsaw Man, One Piece, Solo Leveling (IDs locaux $selected)."
+  Write-Host "1) Relire tous les ISBN BnF deja collectes ; aucun appel BnF."
+  Write-Host "2) Interroger Scrinis une fois, sans ecriture en base ni contournement permanent des cooldowns."
+  Write-Host "Seul le cache de reponses publiques peut etre actualise."
+  Write-Host "Aucune edition ou possession ne sera attribuee automatiquement."
+  if (!(Confirm "Lancer ces deux diagnostics dans la sandbox uniquement ?" $false)) {
+    Write-Host "Recette annulee ; aucune interrogation lancee."
+    return
+  }
+  & docker @common up -d postgres meilisearch
+  Assert-Exit "Demarrage de la sandbox impossible"
+  # The sandbox does not bind-mount pipeline sources. Rebuild the ephemeral
+  # engine image so GitHub updates cannot silently use stale Python code.
+  & docker @common build engine
+  Assert-Exit "Construction du moteur actualise impossible"
+  $python=@("run","--rm","-T","-e","POSTGRES_DB=mangadvisor_realtest",
+            "engine","python","-m","pipelines.engine.scripts.bibliography_pipeline",
+            "--manga-ids",$selected,"--details")
+  $offline=@($common)+@($python)+@("--report-only")
+  Say "Rapport detaille BnF, sans appel externe"
+  $output=@(& docker @offline)
+  Assert-Exit "Lecture bibliographique BnF en sandbox"
+  $utf8=New-Object Text.UTF8Encoding($false)
+  [IO.File]::WriteAllText($summary,($output -join [Environment]::NewLine)+[Environment]::NewLine,$utf8)
+  Write-Host ("Rapport BnF : " + $summary)
+  $probe=@($common)+@($python)+@("--probe-scrinis")
+  Say "Sonde Scrinis reelle, sans ecriture SQL"
+  $output=@(& docker @probe)
+  Assert-Exit "Sonde Scrinis en sandbox"
+  [IO.File]::WriteAllText($live,($output -join [Environment]::NewLine)+[Environment]::NewLine,$utf8)
+  Write-Host ("Rapport Scrinis : " + $live)
+  Write-Host "Recette terminee. Transmets ces deux JSON pour examen des correspondances."
+}
+
 function Enrich-BnF {
   Say "Enrichissement progressif depuis le catalogue BnF"
   Ensure-Environment
@@ -651,6 +707,17 @@ function Enrich-My-Library {
   if (-not $useBnf) { $argsList+=@("--skip-bnf") }
   Compose $argsList
   Write-Host "Bilan ci-dessus : consulte les fiches mangas et les candidats ISBN."
+}
+function Reindex-Manga-Search {
+  Say "Index de recherche multilingue Meilisearch"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  $null=Wait-Health
+  Write-Host "Index public : titres FR/EN/JA, alias verifies, genres. Aucune donnee personnelle."
+  Write-Host "PostgreSQL reste la source unique ; construction d'un index temporaire puis permutation."
+  Compose @("exec","-T","api","python","-m","apps.api.app.search_index")
+  Write-Host "Index Meilisearch actualise. En cas de panne, la recherche SQL reste disponible."
 }
 function Load-Recommendations {
   Say "Recommandations communautaires (Tenrai)"
@@ -835,6 +902,7 @@ function Update {
   }
   Initialize-Database
   Start-Application
+  Write-Host "Apres une mise a jour du catalogue, relancer la recherche intelligente via A -> 22."
   Diagnostic
   Write-Host "Mise a jour terminee. Fichiers personnels et volumes conserves."
 }
@@ -888,7 +956,7 @@ try {
     "Inventory"       { Inventory }
     "BnF"             { Enrich-BnF }
     "BnFBulk"         { Import-BnF-Bulk }
-    "SourcesBenchmark" { Benchmark-Catalogue-Sources }
+    "SourcesBenchmark" { Benchmark-Catalogue-Sources-V2 }
     "SourcesBenchmarkV2" { Benchmark-Catalogue-Sources-V2 }
     "BibliographicStaging" { Prepare-Bibliographic-Staging }
     "Wikidata"        { Enrich-Wikidata }
@@ -898,8 +966,11 @@ try {
     "CatalogueExtended" { Load-Extended-Catalogue }
     "CompleteMALCatalogue" { Load-Complete-MAL-Catalogue }
     "CatalogueFrenchScrinis" { Enrich-Catalogue-French-Scrinis }
+    "BibliographyPilot" { Run-Bibliography-Pilot }
+    "BibliographyAcceptance" { Run-Bibliography-Acceptance }
     "CatalogueLifecycle" { Manage-Catalogue-Lifecycle }
     "Recommendations" { Load-Recommendations }
+    "SearchIndex"     { Reindex-Manga-Search }
     "Network"         { Network }
     "Diagnostic"      { Diagnostic }
     "Update"          { Update }

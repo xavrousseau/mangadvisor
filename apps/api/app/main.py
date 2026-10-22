@@ -6,6 +6,9 @@ from fastapi import FastAPI, HTTPException, Query
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 from apps.api.app.localization import SynopsisTranslationRequest, localized_synopsis
+from apps.api.app.library_xlsx import xlsx_to_library_csv
+from apps.api.app.library_templates import reading_template_csv, reading_template_xlsx_base64
+from apps.api.app.search_index import search_ids as meili_search_ids
 from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
 from apps.api.app.library_seed_selection import (
@@ -312,6 +315,18 @@ def list_mangas(
         )
         params["q"] = f"%{q}%"
 
+    # Only title-only searches use the fuzzy index: PostgreSQL still owns
+    # filtering and complete manga records. A missing/stale index falls back
+    # to the existing SQL ILIKE query. Skip deep pagination and combined
+    # filters until those facets are indexed and pagination is reconciled.
+    search_ranked = None
+    if q and not genre and not only_finished and offset + limit <= 500:
+        search_ranked = meili_search_ids(q, limit=500)
+        if search_ranked:
+            conditions[-1] = "m.id = ANY(%(search_ids)s::int[])"
+            params.pop("q", None)
+            params["search_ids"] = search_ranked
+
     if genre:
         conditions.append(
             """EXISTS (
@@ -401,6 +416,7 @@ def list_mangas(
             m.published_to
 
         ORDER BY
+            {"array_position(%(search_ids)s::int[],m.id)," if search_ranked else ""}
             m.popularity ASC NULLS LAST,
             CASE
                 WHEN m.manga_type = 'Manga' THEN 0
@@ -1265,6 +1281,27 @@ def find_manga_for_import(
     cur.execute(sql, {"title": title})
     matches = cur.fetchall()
     return matches[0] if len(matches) == 1 else None
+
+
+@app.get("/library/import/template")
+def get_reading_library_template(format: Literal["csv", "xlsx"] = "csv") -> dict[str, str]:
+    """Public example files only: never read personal library information."""
+    if format == "xlsx":
+        return {"filename": "modele_bibliotheque_mangadvisor.xlsx",
+                "content_base64": reading_template_xlsx_base64(),
+                "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    return {"filename": "modele_bibliotheque_mangadvisor.csv",
+            "content": reading_template_csv(), "mime_type": "text/csv"}
+
+
+class LibraryXlsxConversionRequest(BaseModel):
+    content_base64: str = Field(..., min_length=8, max_length=700_000)
+
+
+@app.post("/library/import/xlsx/convert")
+def convert_reading_library_xlsx(payload: LibraryXlsxConversionRequest) -> dict[str, str]:
+    """Convert only; no DB access, edits or personal inventory mutations."""
+    return {"csv_content": xlsx_to_library_csv(payload.content_base64)}
 
 
 @app.post("/library/import/csv")

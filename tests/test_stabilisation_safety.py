@@ -3,18 +3,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from pipelines.engine.scripts import run_jikan_pipeline
+from pipelines.engine.scripts import load_jikan_recommendations_to_postgres
 
 ROOT=Path(__file__).resolve().parents[1]
 
 
 class StabilisationSafetyTests(unittest.TestCase):
-    def test_legacy_reset_is_refused_before_any_file_or_database_operation(self):
-        with patch("sys.argv",["run_jikan_pipeline.py","--reset-db"]):
-            with patch.object(run_jikan_pipeline,"run_python_script") as launch:
-                with self.assertRaisesRegex(ValueError,"desactive"):
-                    run_jikan_pipeline.main()
-                launch.assert_not_called()
+    def test_legacy_jikan_orchestrator_is_absent(self):
+        self.assertFalse((ROOT / "pipelines/engine/scripts/run_jikan_pipeline.py").exists())
+
+    def test_recommendation_reset_is_refused_before_database_connection(self):
+        with patch("sys.argv", ["load_jikan_recommendations_to_postgres.py", "--reset"]):
+            with patch.object(load_jikan_recommendations_to_postgres, "get_postgres_connection") as connect:
+                with self.assertRaisesRegex(ValueError, "desactive"):
+                    load_jikan_recommendations_to_postgres.main()
+                connect.assert_not_called()
 
     def test_catalogue_refresh_can_go_beyond_ten_thousand_manga(self):
         source = (ROOT/"cmd/control-center.ps1").read_text("utf-8")

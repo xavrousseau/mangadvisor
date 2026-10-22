@@ -13,7 +13,7 @@ def chat(page,message):
 
 def run(page,device):
     page.goto(BASE+"/for-you",wait_until="domcontentloaded",timeout=60000)
-    page.locator('[data-action="rec-mode"][data-value="advisor"]').click()
+    page.locator('[data-action="rec-mode"][data-value="advisor"]:visible').first.click()
     expect(page.locator(".advisor-studio")).to_be_visible(timeout=20000)
     expect(page.locator(".advisor-suggestion")).to_have_count(4)
     # From zero history, the example prompt uses actual positive-library tags.
@@ -72,9 +72,12 @@ def run(page,device):
     expect(page.locator(".advisor-suggestion")).to_have_count(4)
     expect(page.locator(".advisor-card")).to_have_count(0)
     # Previous recommendation modes remain accessible.
-    page.locator('[data-action="rec-mode"][data-value="mood"]').click()
+    page.locator('[data-action="rec-mode"][data-value="mood"]:visible').first.click()
+    # The UX now intentionally keeps advanced mood filters collapsed.
+    # Expand the native details widget before asserting its controls.
+    page.locator(".mood-advanced > summary").click()
     expect(page.locator("#mood-length")).to_be_visible()
-    page.locator('[data-action="rec-mode"][data-value="advisor"]').click()
+    page.locator('[data-action="rec-mode"][data-value="advisor"]:visible').first.click()
     expect(page.locator("#advisor-message")).to_be_visible()
 
 if __name__=="__main__":

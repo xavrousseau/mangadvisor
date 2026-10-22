@@ -72,3 +72,40 @@ test("empty draft adds no fake selected manga",()=>{
  assert.match(html,/Aucun résultat/);
  assert.doesNotMatch(html,/pending-match-confirm/);
 });
+
+test("already counted manga requires an explicit archival decision and review",()=>{
+ const html=inventoryResolverMarkup({
+  ...base,reviewMode:"",review:{
+   source:pending,manga,edition_key:"deluxe",
+   confirmation_token:"a".repeat(64),
+   same_edition_exists:true,
+   allowed_actions:["MARK_DUPLICATE"],
+   existing_declarations:[{
+     edition_key:"deluxe",edition_declared:"Deluxe",entry_title:"Dragon Ball",
+     main_volumes:34,duplicate_copies:0,other_editions_unknown:0
+   }]
+  }
+ },{escape,lang:"fr"});
+ assert.match(html,/id="pending-match-mode"/);
+ assert.match(html,/value="MARK_DUPLICATE"/);
+ assert.doesNotMatch(html,/value="CREATE_DECLARATION"/);
+ assert.match(html,/id="pending-match-existing-ack"/);
+ assert.match(html,/Déclarations déjà enregistrées/);
+ assert.match(html,/34 tomes/);
+ assert.match(html,/data-action="pending-match-confirm" disabled/);
+});
+test("two separate physical editions remain available for deliberate association",()=>{
+ const html=inventoryResolverMarkup({
+  ...base,reviewMode:"",review:{
+   source:pending,manga,edition_key:"deluxe",
+   allowed_actions:["CREATE_DECLARATION","MARK_DUPLICATE"],
+   existing_declarations:[{
+     edition_key:"pastel",edition_declared:"Pastel",entry_title:"Dragon Ball",
+     main_volumes:42,duplicate_copies:0,other_editions_unknown:0
+   }]
+  }
+ },{escape,lang:"fr"});
+ assert.match(html,/Pastel/);
+ assert.match(html,/value="CREATE_DECLARATION"/);
+ assert.match(html,/value="MARK_DUPLICATE"/);
+});

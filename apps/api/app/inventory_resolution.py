@@ -34,10 +34,11 @@ FROM manga m WHERE m.id=%(manga_id)s
 """
 
 EXISTING_SQL = """
-SELECT entry_title,main_volumes,edition_declared
+SELECT edition_key,entry_title,main_volumes,duplicate_copies,
+       other_editions_unknown,edition_declared
 FROM user_manga_inventory_declaration
 WHERE user_id=%(user_id)s AND manga_id=%(manga_id)s
-      AND edition_key=%(edition_key)s
+ORDER BY edition_key
 """
 
 REJECTED_SQL = """
@@ -53,7 +54,10 @@ def edition_key_for_pending(pending: dict[str, Any]) -> str:
     return raw.casefold() if raw else UNSPECIFIED
 
 
-def _review_token(pending: dict[str, Any], manga: dict[str, Any], user_id: int) -> str:
+def _review_token(
+    pending: dict[str, Any], manga: dict[str, Any], user_id: int,
+    existing: list[dict[str, Any]] | None = None,
+) -> str:
     # Includes both immutable original claim hash and current catalogue identity.
     # The token is stale if title, source MAL ID, or pending claim changes.
     input_data = {
@@ -66,6 +70,7 @@ def _review_token(pending: dict[str, Any], manga: dict[str, Any], user_id: int) 
         "title_japanese": manga.get("title_japanese"),
         "source_mal_id": manga.get("source_mal_id"),
         "edition_key": edition_key_for_pending(pending),
+        "existing_editions": existing or [],
     }
     return hashlib.sha256(json.dumps(
         input_data,ensure_ascii=False,sort_keys=True,separators=(",",":")
@@ -84,15 +89,9 @@ def _load_review(cur: Any, user_id: int, source_key: str, manga_id: int,
     if not manga:
         raise HTTPException(status_code=404, detail="Manga selectionne introuvable dans le catalogue.")
     key = edition_key_for_pending(pending)
-    cur.execute(EXISTING_SQL, {
-        "user_id": user_id, "manga_id": manga_id, "edition_key": key
-    })
-    if cur.fetchone():
-        raise HTTPException(
-            status_code=409,
-            detail="Cette oeuvre et cette edition sont deja declarees. "
-                   "Aucune quantite n'a ete fusionnee ni remplacee.",
-        )
+    cur.execute(EXISTING_SQL, {"user_id": user_id, "manga_id": manga_id})
+    existing = list(cur.fetchall())
+    same_edition = any(row["edition_key"] == key for row in existing)
     cur.execute(REJECTED_SQL, {"user_id":user_id, "manga_id":manga_id})
     if cur.fetchone():
         raise HTTPException(status_code=409,
@@ -106,9 +105,21 @@ def _load_review(cur: Any, user_id: int, source_key: str, manga_id: int,
         )},
         "manga": dict(manga),
         "edition_key": key,
-        "confirmation_token": _review_token(pending, manga, user_id),
-        "notice": "Vérifie l'œuvre ET l'édition indiquée par ton inventaire. "
-                  "Aucun ISBN ni tome exact n'est attribué.",
+        "existing_declarations": existing,
+        "same_edition_exists": same_edition,
+        "allowed_actions": (
+            ["MARK_DUPLICATE"] if same_edition else
+            ["CREATE_DECLARATION", "MARK_DUPLICATE"] if existing else
+            ["CREATE_DECLARATION"]
+        ),
+        "confirmation_token": _review_token(pending, manga, user_id, existing),
+        "notice": (
+            "Compare les déclarations existantes avant de décider de créer "
+            "une nouvelle édition ou d'archiver un doublon."
+            if existing else
+            "Vérifie l'œuvre ET l'édition indiquée par ton inventaire. "
+            "Aucun ISBN ni tome exact n'est attribué."
+        ),
         "_pending": dict(pending),
     }
 
@@ -240,32 +251,46 @@ def create_pending_resolution_router(
                 pending = review["_pending"]
                 manga = review["manga"]
                 edition_key = review["edition_key"]
-                cur.execute("""
-                    INSERT INTO user_manga_inventory_declaration (
-                        user_id,manga_id,edition_key,edition_declared,entry_title,
-                        source_reference,format_hint,main_volumes,
-                        duplicate_copies,other_editions_unknown
-                    ) VALUES (
-                        %(user_id)s,%(manga_id)s,%(edition_key)s,
-                        %(edition_declared)s,%(entry_title)s,
-                        %(source_reference)s,%(format_hint)s,%(main_volumes)s,
-                        %(duplicate_copies)s,%(other_editions_unknown)s
+                mode = payload.resolution_mode
+                if mode not in review["allowed_actions"]:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Cette édition figure déjà dans la collection. "
+                               "Aucun tome ne sera ajouté : utilise l'archivage du doublon."
                     )
-                    ON CONFLICT (user_id,manga_id,edition_key) DO NOTHING
-                    RETURNING manga_id
-                """, {
-                    "user_id": user_id,
-                    "manga_id": manga["id"],
-                    "edition_key": edition_key,
-                    **{name:pending[name] for name in (
-                        "edition_declared","entry_title","source_reference",
-                        "format_hint","main_volumes","duplicate_copies",
-                        "other_editions_unknown"
-                    )},
-                })
-                if not cur.fetchone():
-                    raise HTTPException(status_code=409,
-                        detail="Cette oeuvre et cette edition viennent deja d'etre liees.")
+                if review["existing_declarations"] and not payload.acknowledge_existing_inventory:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Confirme explicitement la comparaison avec les tomes "
+                               "déjà déclarés dans la mangathèque."
+                    )
+                if mode == "CREATE_DECLARATION":
+                    cur.execute("""
+                        INSERT INTO user_manga_inventory_declaration (
+                            user_id,manga_id,edition_key,edition_declared,entry_title,
+                            source_reference,format_hint,main_volumes,
+                            duplicate_copies,other_editions_unknown
+                        ) VALUES (
+                            %(user_id)s,%(manga_id)s,%(edition_key)s,
+                            %(edition_declared)s,%(entry_title)s,
+                            %(source_reference)s,%(format_hint)s,%(main_volumes)s,
+                            %(duplicate_copies)s,%(other_editions_unknown)s
+                        )
+                        ON CONFLICT (user_id,manga_id,edition_key) DO NOTHING
+                        RETURNING manga_id
+                    """, {
+                        "user_id": user_id,
+                        "manga_id": manga["id"],
+                        "edition_key": edition_key,
+                        **{name:pending[name] for name in (
+                            "edition_declared","entry_title","source_reference",
+                            "format_hint","main_volumes","duplicate_copies",
+                            "other_editions_unknown"
+                        )},
+                    })
+                    if not cur.fetchone():
+                        raise HTTPException(status_code=409,
+                            detail="Cette oeuvre et cette edition viennent deja d'etre liees.")
                 # Preserve source row and checksum before consuming the pending
                 # record; never delete pending before both inserts succeed.
                 audited = {key:value for key,value in pending.items()
@@ -273,10 +298,10 @@ def create_pending_resolution_router(
                 cur.execute("""
                     INSERT INTO user_manga_inventory_resolution (
                         user_id,source_key,manga_id,edition_key,
-                        original_declaration,original_sha256
+                        original_declaration,original_sha256,resolution_mode
                     ) VALUES (
                         %(user_id)s,%(source_key)s,%(manga_id)s,%(edition_key)s,
-                        %(original)s::jsonb,%(original_sha256)s
+                        %(original)s::jsonb,%(original_sha256)s,%(mode)s
                     )
                     ON CONFLICT (user_id,source_key) DO NOTHING
                     RETURNING source_key
@@ -287,6 +312,7 @@ def create_pending_resolution_router(
                     "edition_key":edition_key,
                     "original":json.dumps(audited,ensure_ascii=False,default=str),
                     "original_sha256":pending["content_sha256"],
+                    "mode":mode,
                 })
                 if not cur.fetchone():
                     raise HTTPException(status_code=409,
@@ -306,6 +332,8 @@ def create_pending_resolution_router(
             conn.commit()
         return {
             "status":"confirmed",
+            "resolution_mode":mode,
+            "new_declaration_created":mode=="CREATE_DECLARATION",
             "source_key":payload.source_key,
             "manga_id":manga["id"],
             "catalog_title":manga["title"],

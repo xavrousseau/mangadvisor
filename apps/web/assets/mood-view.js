@@ -18,7 +18,8 @@ export function moodFormMarkup(draft,L,e){
    '" aria-pressed="'+(draft.mood===value)+'" data-action="mood-select" data-mood="'+value+'">'+
    '<span class="mood-choice-icon" aria-hidden="true">'+icon+'</span><strong>'+L(key)+'</strong></button>').join("")+
   '</div>'+
-  '<div class="mood-controls">'+
+  '<details class="mood-advanced"><summary>'+ (draft.lang==="en"?"Fine-tune my search":"Affiner ma recherche") +'</summary><div class="mood-controls">'+
+
     '<div class="field"><label for="mood-length">'+L("moodLength")+'</label><select id="mood-length" class="select">'+
     MOOD_LENGTHS.map(([value,key])=>
       '<option value="'+value+'"'+(draft.length===value?' selected':'')+'>'+L(key)+'</option>').join("")+'</select></div>'+
@@ -26,7 +27,7 @@ export function moodFormMarkup(draft,L,e){
       '<input id="mood-min-score" class="input" type="number" step="0.1" min="0" max="10" value="'+e(draft.minScore)+'"></div>'+
     '<label class="check"><input type="checkbox" id="mood-finished"'+(draft.onlyFinished?' checked':'')+'>'+L("finishedOnly")+'</label>'+
     '<label class="check"><input type="checkbox" id="mood-personal"'+(draft.useLibrary?' checked':'')+'>'+L("moodUseLibrary")+'</label>'+
-  '</div><p class="mood-disclaimer">'+L("moodEvidenceHelp")+'</p>'+
+  '</div></details><p class="mood-disclaimer">'+L("moodEvidenceHelp")+'</p>'+
   '<button class="btn btn-primary mood-submit" type="button" id="rec-submit" data-action="generate-mood">✧ '+L("moodFind")+' →</button>'+
   '</div>';
 }

@@ -110,7 +110,7 @@ class TestTitleDiscovery(unittest.TestCase):
         self.assertEqual(found["search_scope"],"requested_title_search_page")
         self.assertFalse(found["exhaustive"])
         self.assertFalse(found["items"][0]["manga_match_verified"])
-        for start in (0,2,61,999999):
+        for start in (0,2,201,999999):
             with self.assertRaises(ValueError):
                 search_bnf_by_title("Monster",start_record=start)
 

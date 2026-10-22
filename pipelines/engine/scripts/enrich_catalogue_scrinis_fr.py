@@ -197,8 +197,44 @@ def lookup_work(item: dict, client: Any) -> dict:
             break
     if decision is None:
         return {"status": "NO_MATCH", "reason": "NO_SEARCH_TERMS"}
+    reviewed_detail = None
     if decision["status"] == "AMBIGUOUS":
-        return {"status": "AMBIGUOUS", "reason": "MULTIPLE_PLAUSIBLE_WORKS"}
+        # Inspect competing exact-title candidates only when the entire set
+        # fits the bounded review. An incomplete candidate set cannot win.
+        choices = decision.get("review_candidates") or []
+        if decision.get("ambiguous_count", 0) + 1 > len(choices) or len(choices) > 3:
+            return {"status": "AMBIGUOUS", "reason": "UNBOUNDED_COMPETING_WORKS"}
+        plausible = []
+        for option in choices:
+            found = next((c for c in decision.get("candidates") or []
+                          if str(c.get("id")) == str(option.get("id"))), None)
+            if not found or not found.get("id"):
+                return {"status": "AMBIGUOUS", "reason": "INCOMPLETE_COMPETING_CANDIDATES"}
+            other_mal = found.get("mal_id")
+            if other_mal is not None and str(other_mal).isdigit() and (
+                    int(other_mal) != int(item["mal_id"])):
+                continue
+            response = client.call("scrinis", "detail", identifier=str(found["id"]))
+            if response.get("status") != "OK":
+                if provider_failure(response):
+                    return {"status": "PROVIDER_ERROR",
+                            "reason": "COMPETING_DETAIL_PROVIDER_UNAVAILABLE"}
+                return {"status": "AMBIGUOUS", "reason": "COMPETING_DETAIL_UNAVAILABLE"}
+            detail = response.get("data") or {}
+            if detail.get("status") != "OK" or str(detail.get("id")) != str(found["id"]):
+                return {"status": "AMBIGUOUS", "reason": "COMPETING_DETAIL_ID_MISMATCH"}
+            if not japanese_work_type_matches(item, {
+                    **detail, "work_type": detail.get("work_type") or found.get("format")}):
+                continue
+            author = compare_authors(item.get("mal_authors") or [], detail.get("authors") or [])
+            if author == "MATCH" and french_print_isbns(detail):
+                plausible.append((found, response))
+        if len(plausible) != 1:
+            return {"status": "AMBIGUOUS",
+                    "reason": "COMPETING_WORKS_UNRESOLVED_BY_AUTHORS"}
+        chosen, reviewed_detail = plausible[0]
+        decision = {"status": chosen["evidence"], "candidates": [chosen]}
+
     if decision["status"] not in ("SAME_MAL_ID", "EXACT_TITLE"):
         return {"status": "NO_MATCH", "reason": "NO_EXACT_WORK_EVIDENCE"}
     selected = decision.get("candidates") or []
@@ -213,7 +249,7 @@ def lookup_work(item: dict, client: Any) -> dict:
     if external_mal is not None and str(external_mal).isdigit() and (
             int(external_mal) != int(item["mal_id"])):
         return {"status": "MAL_ID_CONFLICT", "reason": "SUPPLIER_MAL_ID_DIFFERENT"}
-    detail_result = client.call("scrinis", "detail", identifier=first["id"])
+    detail_result = reviewed_detail or client.call("scrinis", "detail", identifier=first["id"])
     if detail_result.get("status") != "OK":
         status = "PROVIDER_ERROR" if provider_failure(detail_result) else "DETAIL_UNAVAILABLE"
         return {"status": status,
@@ -234,6 +270,8 @@ def lookup_work(item: dict, client: Any) -> dict:
         return {"status": "NEEDS_AUTHOR_REVIEW", "reason": "EXACT_TITLE_WITHOUT_AUTHOR_CORROBORATION"}
     isbns = french_print_isbns(detail)
     if not isbns:
+        if detail.get("book_references_truncated"):
+            return {"status": "DETAIL_UNAVAILABLE", "reason": "INCOMPLETE_DETAIL_NO_FR_PRINT_ISBN"}
         return {"status": "NO_FR_PRINT_ISBN", "reason": "NO_VERIFIED_FRENCH_PRINT_ISBN_IN_FETCHED_DETAIL"}
     title = str(detail.get("title") or "").strip()
     if len(title) < 2 or len(title) > 200:
@@ -246,6 +284,10 @@ def lookup_work(item: dict, client: Any) -> dict:
         "scrinis_id": str(first["id"]), "mal_id": int(item["mal_id"]),
         "work_evidence": "SAME_MAL_ID" if same_mal else "EXACT_TITLE_AUTHOR",
         "author_evidence": author_check, "isbn_count": len(isbns),
+        # In-memory read-only evidence used by the explicit bibliography probe.
+        # The existing SQL saver ignores these extra fields.
+        "french_print_isbns": isbns,
+        "book_references_truncated": bool(detail.get("book_references_truncated")),
         "url": "https://scrin.is/api/v1/series/" + str(first["id"]),
         "manga_id": int(item["id"]),
         "alias_key": alias_key,

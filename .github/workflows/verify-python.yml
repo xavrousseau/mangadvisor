@@ -18,10 +18,10 @@ jobs:
           python-version: "3.11"
       - name: Installer les dépendances API
         run: python -m pip install -r apps/api/requirements.txt
-      - name: Installer les dépendances UI
-        run: python -m pip install -r apps/ui/requirements.txt
+      - name: Installer les dépendances de collecte utilisées par les tests
+        run: python -m pip install -r pipelines/engine/requirements.txt
       - name: Vérifier la syntaxe Python
-        run: python -m compileall -q apps/api apps/ui pipelines/engine tests tools
+        run: python -m compileall -q apps/api pipelines/engine tests tools
       - name: Auditer chaque fichier suivi et les contrats Docker/Web/SQL
         run: python tools/audit_repository.py --strict
       - name: Verifier la syntaxe de tous les modules web

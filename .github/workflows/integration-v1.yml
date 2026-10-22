@@ -41,11 +41,10 @@ jobs:
           fi
           $BASE --profile ai config --services | grep -Fx ollama
           $BASE config --services | grep -Fx web
-          if $BASE config --services | grep -Fx ui; then
-            echo "Legacy Streamlit must not start by default"
+          if $BASE --profile legacy config --services | grep -Fx ui; then
+            echo "Retired Streamlit service must not be present even with legacy profile"
             exit 1
           fi
-          $BASE --profile legacy config --services | grep -Fx ui
 
       - name: Démarrer PostgreSQL et Meilisearch
         run: |
@@ -75,10 +74,10 @@ jobs:
               psql -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci < "$file"
           done
 
-      - name: Construire le site principal et la UI Streamlit pour tests uniquement
+      - name: Construire uniquement API et site Web principal
         run: |
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.dev.yml --profile legacy up --build -d api ui web
+            -f infra/compose/docker-compose.dev.yml up --build -d api web
 
       - name: Tester les vraies requêtes SQL via HTTP
         run: |
@@ -132,6 +131,21 @@ jobs:
               translation=json.load(response)
           assert 'text' in translation and translation['translated'] is False,translation
           print('OK : catalogue, filtres, couvertures, bibliothèque, fiche, traduction FR/EN et TROIS moteurs de recommandations.')
+          PY
+
+      - name: Indexer le catalogue public et verifier une recherche avec faute
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api \
+            python -m apps.api.app.search_index
+          python - <<'PY'
+          import json,urllib.request
+          with urllib.request.urlopen("http://127.0.0.1:8000/mangas?q=Narutoo&limit=13",timeout=20) as response:
+              result=json.load(response)
+          assert any(item["title"]=="Naruto" for item in result["items"]),result
+          print("Meilisearch real typo-tolerant search OK, PostgreSQL manga records intact")
           PY
 
       - name: Valider le lot BnF en SQL reel sans associations automatiques
@@ -407,7 +421,7 @@ jobs:
 
       - name: Installer Playwright Chromium
         run: |
-          python -m pip install playwright requests pillow
+          python -m pip install playwright requests pillow openpyxl
           python -m playwright install --with-deps chromium
 
       # The advisor's synthetic French edition is tested before browser feedback
@@ -424,8 +438,11 @@ jobs:
       - name: Valider le conseiller conversationnel sur ordinateur et mobile
         run: python tests/smoke/advisor_browser.py
 
-      - name: Contrôler Streamlit ordinateur et mobile
+      - name: Contrôler l'interface Web ordinateur et mobile
         run: python tests/smoke/browser_smoke.py
+
+      - name: Valider le nouvel import de bibliothèque CSV/XLSX sur navigateur et base CI jetable
+        run: python tests/smoke/reading_library_browser.py
 
       - name: Valider le scanner ISBN sur ordinateur et mobile
         run: python tests/smoke/isbn_camera_browser.py
@@ -618,6 +635,10 @@ jobs:
               confirmed=api("/inventory/pending/resolve",{
                   **query,"confirmation_token":reviewed["confirmation_token"],
                   "acknowledge_work_and_edition":True,
+                  "resolution_mode":"CREATE_DECLARATION",
+                  # An existing *different* physical edition may already be
+                  # present; this CI test deliberately acknowledges the review.
+                  "acknowledge_existing_inventory":True,
               })
               assert confirmed["status"]=="confirmed",confirmed
               assert confirmed["edition_declared"]==edition,confirmed
@@ -626,11 +647,63 @@ jobs:
               assert not confirmed["reading_status_modified"],confirmed
               assert not confirmed["progress_modified"],confirmed
 
+          # The same Deluxe edition offered twice must be archived,
+          # not counted as 34 extra physical volumes.
+          duplicate_key=prefix+"already-counted"
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                    INSERT INTO user_manga_inventory_pending
+                    (user_id,source_key,entry_title,source_reference,
+                     work_declared,edition_declared,format_hint,
+                     main_volumes,duplicate_copies,other_editions_unknown,
+                     review_status,candidate_ids,content_sha256)
+                    VALUES (1,%s,%s,%s,%s,'Deluxe CI','FORMAT_TO_VERIFY',
+                            34,0,0,'REVIEW_MISSING',ARRAY[]::integer[],%s)
+                  """,(duplicate_key,manga_title+" (duplicate CI)",duplicate_key,
+                       manga_title,"e"*64))
+              conn.commit()
+          dupe_query={"source_key":duplicate_key,"manga_id":manga_id}
+          dupe_preview=api("/inventory/pending/resolve/preview",dupe_query)
+          assert dupe_preview["same_edition_exists"],dupe_preview
+          assert dupe_preview["allowed_actions"]==["MARK_DUPLICATE"],dupe_preview
+          try:
+              api("/inventory/pending/resolve",{
+                  **dupe_query,
+                  "confirmation_token":dupe_preview["confirmation_token"],
+                  "acknowledge_work_and_edition":True,
+                  "resolution_mode":"MARK_DUPLICATE",
+              })
+              raise AssertionError("Archiving without comparison unexpectedly accepted")
+          except urllib.error.HTTPError as exc:
+              assert exc.code==422,exc
+          dupe_confirm=api("/inventory/pending/resolve",{
+              **dupe_query,
+              "confirmation_token":dupe_preview["confirmation_token"],
+              "acknowledge_work_and_edition":True,
+              "resolution_mode":"MARK_DUPLICATE",
+              "acknowledge_existing_inventory":True,
+          })
+          assert dupe_confirm["status"]=="confirmed",dupe_confirm
+          assert not dupe_confirm["new_declaration_created"],dupe_confirm
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                    SELECT main_volumes FROM user_manga_inventory_declaration
+                    WHERE user_id=1 AND manga_id=%s AND edition_key='deluxe ci'
+                  """,(manga_id,))
+                  assert cur.fetchone()["main_volumes"]==34
+                  cur.execute("""
+                    SELECT resolution_mode FROM user_manga_inventory_resolution
+                    WHERE user_id=1 AND source_key=%s
+                  """,(duplicate_key,))
+                  assert cur.fetchone()["resolution_mode"]=="MARK_DUPLICATE"
+
           after=snapshot()
           assert after[:3]==before[:3],(before,after)
           assert after[3]==before[3]+2,(before,after)
           assert after[4]==before[4],(before,after)
-          assert after[5]==before[5]+2,(before,after)
+          assert after[5]==before[5]+3,(before,after)
           with get_connection() as conn:
               with conn.cursor() as cur:
                   cur.execute("""
@@ -647,7 +720,7 @@ jobs:
                     SELECT COUNT(*)::int AS n FROM user_manga_inventory_resolution
                     WHERE user_id=1 AND source_key LIKE %s
                   """,(prefix+"%",))
-                  assert cur.fetchone()["n"]==2
+                  assert cur.fetchone()["n"]==3
                   cur.execute("""
                     DELETE FROM user_manga_inventory_resolution
                     WHERE user_id=1 AND source_key LIKE %s
@@ -659,7 +732,7 @@ jobs:
                   """,(manga_id,))
               conn.commit()
           assert snapshot()==before,(snapshot(),before)
-          print("2 editions distinctes, validation manuelle, audit, droits et nettoyage : OK")
+          print("2 editions distinctes, archivage sans double compte, consentements et audit SQL : OK")
           PY
 
       - name: Verifier les recherches multilingues et le rapprochement manuel (SQL reel)
@@ -787,4 +860,4 @@ jobs:
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
             -f infra/compose/docker-compose.dev.yml ps
           docker compose --env-file .env -f infra/compose/docker-compose.yml \
-            -f infra/compose/docker-compose.dev.yml logs --tail=160 api ui postgres
+            -f infra/compose/docker-compose.dev.yml logs --tail=160 api web postgres

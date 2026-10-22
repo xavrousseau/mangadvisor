@@ -203,6 +203,37 @@ class BenchmarkV2Tests(unittest.TestCase):
         self.assertEqual(sess.post.call_args.kwargs["json"],
                          {"search": "One Piece", "perpage": 8})
 
+    def test_streamed_scrinis_metadata_accepts_large_but_bounded_detail(self):
+        import requests
+        sess = FakeSession()
+        response = requests.Response()
+        response.status_code = 200
+        # 2.6 MB exceeds the old 2.5 MB cap, yet is safely below the new cap.
+        response._content = json.dumps({
+            "public_n": 3014, "titles": {"primary": "One Piece"},
+            "summary": "x" * 2_600_000,
+        }).encode()
+        response._content_consumed = True
+        sess.get.return_value = response
+        result = v2.request_public("scrinis", "detail", sess, identifier="3014")
+        self.assertEqual(result["status"], "OK")
+        self.assertEqual(result["data"]["id"], "3014")
+        self.assertNotIn("summary", result["data"])
+        self.assertEqual(sess.get.call_args.kwargs["stream"], True)
+        self.assertTrue(response.raw.closed if response.raw is not None else True)
+
+    def test_streamed_response_stops_at_a_configured_byte_budget(self):
+        import requests
+        sess = FakeSession()
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b"x" * 1000
+        response._content_consumed = True
+        sess.get.return_value = response
+        with patch.object(v2, "MAX_DETAIL_RESPONSE", 300):
+            result = v2.request_public("scrinis", "detail", sess, identifier="3014")
+        self.assertEqual(result["status"], "RESPONSE_TOO_LARGE")
+
     def test_rate_delay_applies_to_details_too_and_cache_reuses_responses(self):
         sess = FakeSession()
         sess.get.return_value.status_code = 200

@@ -8,6 +8,7 @@ No user library, reading progress, canonical manga or confirmed ISBN is written.
 from __future__ import annotations
 
 import argparse
+from functools import partial
 import os
 import re
 import time
@@ -20,14 +21,14 @@ from fastapi import APIRouter, HTTPException
 from apps.api.app.collection import (
     BNF_SOURCE, EDITION_KINDS, isbn13_normalize, safe_bnf_ark,
 )
-from apps.api.app.edition_discovery import search_bnf_by_title
+from apps.api.app.edition_discovery import search_bnf_title_pages
 from apps.api.app.edition_enrichment import select_search_titles, title_clue
 
 SOURCE = "BNF_SRU"
 MAX_BATCH = 25
 DEFAULT_BATCH = 10
 REQUEST_DELAY = 1.25
-MAX_CANDIDATES_PER_MANGA = 40
+MAX_CANDIDATES_PER_MANGA = 120
 
 # Additive and idempotent. Separate from manga_fr_edition by design.
 # There is NO foreign-key insert into user_manga_volume or library tables.
@@ -202,7 +203,7 @@ def run_batch(
     connection_factory: Callable[..., Any],
     *, limit: int = DEFAULT_BATCH,
     refresh: bool = False,
-    search: Callable[[str], dict[str, Any]] = search_bnf_by_title,
+    search: Callable[[str], dict[str, Any]] = search_bnf_title_pages,
     sleep: Callable[[float], Any] = time.sleep,
     target_ids: list[int] | None = None,
 ) -> dict[str, int]:
@@ -243,11 +244,13 @@ def run_batch(
                 except (HTTPException, TimeoutError, OSError, ValueError):
                     errors += 1
             candidates = normalize_candidates(titles, results)
+            # A capped staging batch is incomplete even if the SRU record pages ended.
+            candidate_cap_reached = len(candidates) >= MAX_CANDIDATES_PER_MANGA
             if not titles:
                 status = "SKIPPED"
             elif errors == len(titles):
                 status = "ERROR"
-            elif errors:
+            elif errors or candidate_cap_reached or any(payload.get("page_limit_reached", False) for _, payload in results):
                 status = "PARTIAL"
             else:
                 status = "CHECKED" if candidates else "EMPTY"
@@ -318,6 +321,10 @@ def create_bnf_catalog_router(connection_factory: Callable[..., Any]) -> APIRout
 def cli_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Recherche BnF non destructive, par petits lots.")
     parser.add_argument("--limit", type=int, default=DEFAULT_BATCH)
+    parser.add_argument("--pages", type=int, default=3,
+                        help="Pages BnF par titre : 1 a 10 (plus de 3 : manga cible obligatoire).")
+    parser.add_argument("--manga-id", type=int, default=None,
+                        help="Limiter la recherche a un manga interne precis.")
     parser.add_argument("--refresh", action="store_true",
                         help="Rechercher même les mangas déjà analysés récemment.")
     args = parser.parse_args(argv)
@@ -325,7 +332,16 @@ def cli_main(argv: list[str] | None = None) -> int:
         parser.error(f"--limit doit être entre 1 et {MAX_BATCH}")
     print("Mangadvisor : enrichissement BnF (candidats UNIQUEMENT).", flush=True)
     print("Ni la mangathèque, ni les éditions confirmées ne sont modifiées.", flush=True)
-    stats = run_batch(connect_database, limit=args.limit, refresh=args.refresh)
+    if args.manga_id is not None and args.manga_id <= 0:
+        parser.error("--manga-id doit etre un identifiant positif.")
+    if not 1 <= args.pages <= 10:
+        parser.error("--pages doit etre entre 1 et 10.")
+    if args.pages > 3 and args.manga_id is None:
+        parser.error("--pages superieur a 3 exige --manga-id pour limiter les appels BnF.")
+    search = partial(search_bnf_title_pages, max_pages=args.pages)
+    stats = run_batch(connect_database, limit=args.limit, refresh=args.refresh,
+                      target_ids=[args.manga_id] if args.manga_id is not None else None,
+                      search=search)
     print("Bilan :", ", ".join(f"{key}={value}" for key, value in stats.items()), flush=True)
     if stats["selected"] and stats["error"] == stats["selected"]:
         print("ECHEC : toutes les recherches BnF ont échoué. "

@@ -40,6 +40,9 @@ def snapshot() -> dict[str,str]:
         "canonical_ids":"""SELECT COALESCE(string_agg(
             id::text || '=' || source_mal_id::text, ',' ORDER BY source_mal_id
         ),'') FROM manga;""",
+        "canonical_titles":"""SELECT COALESCE(string_agg(
+            source_mal_id::text || '=' || title, ',' ORDER BY source_mal_id
+        ),'') FROM manga;""",
         "library":"""SELECT COALESCE(string_agg(
             manga_id::text || '=' || library_status, ',' ORDER BY manga_id
         ),'') FROM user_manga_library;""",
@@ -62,6 +65,7 @@ def main():
     # Fresh source JSON for one existing synthetic manga; no user information.
     sql("""
         UPDATE jikan_manga_source SET
+            title='', title_english='',
             genres_json='[{"name":"Adventure"},{"name":"Mystery"}]'::jsonb,
             themes_json='[{"name":"Psychological"}]'::jsonb,
             demographics_json='[{"name":"Seinen"}]'::jsonb
@@ -74,21 +78,11 @@ def main():
         "sql/schema/005_build_theme_demographic_from_jikan.sql",
     ]
     for iteration in (1,2):
-        if iteration == 1:
-            # The actual SQL scripts, as used by legacy Windows maintenance.
-            for filename in scripts:
-                sql((ROOT/filename).read_text(encoding="utf-8"))
-        else:
-            # Exercise the exact Python entry point used by option 12 Jikan.
-            # The API container has psycopg and the dev volume maps the repo.
-            subprocess.run(
-                COMPOSE + ["exec","-T","api","python","-c",
-                    "from pipelines.engine.scripts.run_jikan_pipeline "
-                    "import refresh_canonical_catalog; refresh_canonical_catalog()"],
-                check=True,cwd=ROOT,timeout=80,
-            )
+        # Repeat exactly the supported additive SQL in an isolated CI database.
+        for filename in scripts:
+            sql((ROOT / filename).read_text(encoding="utf-8"))
         after=snapshot()
-        for key in ("canonical_ids","library","editions","reading"):
+        for key in ("canonical_ids","canonical_titles","library","editions","reading"):
             assert before[key]==after[key],(iteration,key,before[key],after[key])
         for key in ("genres","themes","demographics"):
             assert int(after[key])>=int(before[key]),(iteration,key,before[key],after[key])
@@ -97,7 +91,7 @@ def main():
         else:
             for key in ("genres","themes","demographics"):
                 assert after[key]==first[key],(iteration,key,first[key],after[key])
-    print("OK: SQL rebuild x2, stable manga IDs, library/ISBN/reading untouched; joins additive and idempotent.")
+    print("OK: SQL rebuild x2, blank source title ignored, stable manga IDs, library/ISBN/reading untouched; joins additive and idempotent.")
 
 
 if __name__=="__main__":

@@ -22,13 +22,13 @@ SELECT
     synopsis, status, chapters, volumes, score, popularity, rank,
     members, favorites, published_from, published_to, manga_type
 FROM jikan_manga_source
-WHERE title IS NOT NULL
+WHERE NULLIF(BTRIM(title), '') IS NOT NULL
 ON CONFLICT (source_mal_id) DO UPDATE SET
     -- Preserve manga.id, all existing user associations and other sources.
     source_name = EXCLUDED.source_name,
-    title = EXCLUDED.title,
-    title_english = COALESCE(EXCLUDED.title_english, manga.title_english),
-    title_japanese = COALESCE(EXCLUDED.title_japanese, manga.title_japanese),
+    title = COALESCE(NULLIF(BTRIM(EXCLUDED.title), ''), manga.title),
+    title_english = COALESCE(NULLIF(BTRIM(EXCLUDED.title_english), ''), manga.title_english),
+    title_japanese = COALESCE(NULLIF(BTRIM(EXCLUDED.title_japanese), ''), manga.title_japanese),
     synopsis = COALESCE(EXCLUDED.synopsis, manga.synopsis),
     status = COALESCE(EXCLUDED.status, manga.status),
     chapters = COALESCE(EXCLUDED.chapters, manga.chapters),

@@ -1,4 +1,6 @@
-# Mangadvisor 4.0 — Centre de pilotage Windows
+# Mangadvisor 4.0 — Centre de pilotage Windows (historique)
+
+> **Guide historique des numéros de menu.** Les choix peuvent avoir changé depuis cette version : utiliser le [README courant](../../README.md) et le menu réel `mangadvisor.cmd` comme références pour l'installation et les options avancées. Cette page est conservée pour retracer les anciens parcours.
 
 **Objectif : tout faire depuis le seul fichier mangadvisor.cmd**, sans installer Python localement ni taper des commandes SQL, Docker ou PowerShell. Docker Desktop est requis. Git pour Windows est facultatif (utile pour les mises à jour d'un clone Git).
 

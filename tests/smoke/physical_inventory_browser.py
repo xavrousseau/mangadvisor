@@ -15,6 +15,8 @@ def main():
             errors=[]
             page.on("pageerror",lambda error:errors.append(str(error)))
             page.goto(BASE+"/library",wait_until="domcontentloaded",timeout=90000)
+            # Physical editions are a dedicated library tab, not the default series view.
+            page.locator('[data-action="library-view"][data-value="editions"]').click()
             workspace=page.locator("#physical-inventory-workspace")
             expect(workspace).to_be_visible(timeout=30000)
             expect(page.locator(".physical-inventory-stats")).to_be_visible(timeout=30000)
@@ -46,7 +48,14 @@ def main():
             expect(page.locator(".inventory-match-review")).to_contain_text("Inconnu de CI")
             expect(page.locator(".inventory-match-review")).to_contain_text("Demo CI 16")
             expect(page.locator('[data-action="pending-match-confirm"]')).to_be_disabled()
+            # This work has physical editions X and Y already recorded. The
+            # owner must compare existing books AND explicitly choose an action.
+            expect(page.locator("#pending-match-mode")).to_be_visible()
             page.locator("#pending-match-ack").check()
+            expect(page.locator('[data-action="pending-match-confirm"]')).to_be_disabled()
+            page.locator("#pending-match-mode").select_option("MARK_DUPLICATE")
+            expect(page.locator('[data-action="pending-match-confirm"]')).to_be_disabled()
+            page.locator("#pending-match-existing-ack").check()
             expect(page.locator('[data-action="pending-match-confirm"]')).to_be_enabled()
             # Do not confirm in this browser smoke: original pending claims
             # and the subsequent CI fixtures must remain unchanged.
