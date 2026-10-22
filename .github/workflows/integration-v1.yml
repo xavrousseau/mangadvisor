@@ -867,6 +867,39 @@ jobs:
           test "$HTTP" = "401" || { echo "Expected rejection of invalid password, got $HTTP"; exit 1; }
           echo "Mobile HTTPS: trusted local root, correct IP certificate and authentication OK"
 
+      - name: Recuperer un PostgreSQL CI sans conteneur depuis son volume historique
+        shell: bash
+        run: |
+          set -euo pipefail
+          # WARNING: this entire step runs ONLY on disposable GitHub CI
+          # PostgreSQL and never against a user's Docker Desktop.
+          BEFORE="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
+          docker volume inspect mangadvisor_mangadvisor_pgdata >/dev/null
+          docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml stop api web postgres
+          docker rm mangadvisor_postgres
+          if pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup -NonInteractive; then
+            echo "Recovery created a container without consent"
+            exit 1
+          fi
+          if docker ps -a --format '{{.Names}}' | grep -Fx 'mangadvisor_postgres'; then
+            echo "Noninteractive recovery recreated PostgreSQL"
+            exit 1
+          fi
+          printf 'RECUPERER\n' | pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup
+          docker volume inspect mangadvisor_mangadvisor_pgdata >/dev/null
+          AFTER="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
+          test "$BEFORE" = "$AFTER" || { echo "Le catalogue a ete modifie pendant le rattachement."; exit 1; }
+          docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d api web
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health | grep -q '"status":"ok"'; then
+              echo "PostgreSQL historique rattache, sauvegarde verifiee, API active, catalogue inchange."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API indisponible apres reprise du conteneur."
+          exit 1
+
       - name: Captures d'écran et diagnostic
         if: always()
         uses: actions/upload-artifact@v4
