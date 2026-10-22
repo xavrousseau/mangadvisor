@@ -76,6 +76,7 @@ echo   20 - Enrichir les titres FR du catalogue via Scrinis (direct)
 echo   21 - Catalogue vivant : nouveautes et veille automatique
 echo   22 - Actualiser la recherche intelligente Meilisearch
 echo   23 - Pilote bibliographique BnF + Scrinis (5 a 10 mangas)
+echo   24 - Recette bibliographique complete (3 mangas, bac a sable)
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -109,6 +110,7 @@ if "%CHOICE%"=="20" set "KEY=catalogue-french-scrinis"
 if "%CHOICE%"=="21" set "KEY=catalogue-lifecycle"
 if "%CHOICE%"=="22" set "KEY=search-index"
 if "%CHOICE%"=="23" set "KEY=bibliography-pilot"
+if "%CHOICE%"=="24" set "KEY=bibliography-acceptance"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -196,6 +198,7 @@ if /I "%~1"=="bibliographic-staging" set "ACTION=BibliographicStaging"
 if /I "%~1"=="complete-mal-catalogue" set "ACTION=CompleteMALCatalogue"
 if /I "%~1"=="catalogue-french-scrinis" set "ACTION=CatalogueFrenchScrinis"
 if /I "%~1"=="bibliography-pilot" set "ACTION=BibliographyPilot"
+if /I "%~1"=="bibliography-acceptance" set "ACTION=BibliographyAcceptance"
 if /I "%~1"=="catalogue-lifecycle" set "ACTION=CatalogueLifecycle"
 if /I "%~1"=="search-index" set "ACTION=SearchIndex"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
@@ -261,7 +264,8 @@ echo.
 echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark,
 echo          bnf-enrich, bnf-bulk, sources-benchmark, sources-benchmark-v2,
 echo          bibliographic-staging, complete-mal-catalogue,
-echo          catalogue-french-scrinis, bibliography-pilot, catalogue-lifecycle, search-index,
+echo          catalogue-french-scrinis, bibliography-pilot, bibliography-acceptance,
+echo          catalogue-lifecycle, search-index,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
