@@ -39,6 +39,29 @@ class PaginationTests(unittest.TestCase):
         self.assertEqual(report["bnf_pages_checked"], 3)
         self.assertTrue(report["page_limit_reached"])
 
+    def test_ten_pages_with_pause_and_blank_isbn_page(self):
+        requested, pauses = [], []
+        def get_page(query, *, start_record=1):
+            requested.append(start_record)
+            # Empty ISBN page is not end of SRU records.
+            return {"bnf_reported_records": 145,
+                    "items": [] if start_record == 41 else
+                    [{"isbn13": fake_isbn(start_record)}]}
+        result = search_bnf_title_pages(
+            "Berserk", max_pages=10, fetch_page=get_page,
+            sleep=pauses.append,
+        )
+        self.assertEqual(requested, [1, 21, 41, 61, 81, 101, 121, 141])
+        self.assertEqual(len(pauses), 7)
+        self.assertFalse(result["page_limit_reached"])
+        self.assertEqual(result["count"], 7)
+
+    def test_page_count_must_be_bounded(self):
+        for count in (0, 11, -1, True, 3.5):
+            with self.subTest(count=count):
+                with self.assertRaises(ValueError):
+                    search_bnf_title_pages("Berserk", max_pages=count)
+
     def test_scrinis_keeps_more_than_twenty_unique_isbns(self):
         records = [
             {"n": n, "isbn_13": fake_isbn(n),
