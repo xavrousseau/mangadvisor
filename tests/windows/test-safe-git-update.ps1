@@ -11,9 +11,11 @@ if ($LASTEXITCODE -ne 0) { throw "Git init failed" }
 & git -C $seed config user.email "mangadvisor-ci@example.invalid"
 & git -C $seed config user.name "Mangadvisor CI"
 [IO.File]::WriteAllText((Join-Path $seed "README.txt"),("v1"+[Environment]::NewLine),(New-Object Text.UTF8Encoding($false)))
+New-Item -ItemType Directory -Path (Join-Path $seed "cmd") -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $seed "cmd\library-backup.ps1"),"function Prepare-Existing-Postgres { }",(New-Object Text.UTF8Encoding($false)))
 Copy-Item (Join-Path $PWD ".gitignore") (Join-Path $seed ".gitignore")
 Copy-Item (Join-Path $PWD ".gitattributes") (Join-Path $seed ".gitattributes")
-& git -C $seed add README.txt .gitignore .gitattributes
+& git -C $seed add README.txt .gitignore .gitattributes cmd/library-backup.ps1
 & git -C $seed commit -m initial | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "First commit failed" }
 & git init --bare --initial-branch=main $remote | Out-Null

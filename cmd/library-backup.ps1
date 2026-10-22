@@ -157,13 +157,58 @@ function Prepare-Existing-Postgres {
     Start-Sleep -Seconds 2
   }
   if (-not $ready) { throw "PostgreSQL existant ne demarre pas. Lire ses logs Docker, ne supprimer aucun volume." }
-  # pg_isready alone does not prove that a newly recreated environment
-  # can authenticate against an OLD persisted PostgreSQL cluster.
-  $test=@(& docker exec $containerName sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"' 2>$null)
-  if ($LASTEXITCODE -ne 0 -or $test.Count -ne 1 -or ([string]$test[0]).Trim() -ne "1") {
-    throw "Identifiants du conteneur incompatibles avec la base PostgreSQL existante. Refus de la sauvegarde/mise a jour : recuperer les anciens identifiants."
+  $local=@(& docker exec $containerName psql -X -At -U $pgUser -d $pgDb -c "SELECT current_user" 2>$null)
+  if ($LASTEXITCODE -ne 0 -or $local.Count -ne 1 -or ([string]$local[0]).Trim() -cne $pgUser) {
+    throw "Connexion SQL locale impossible sur PostgreSQL existant. Aucune modification de mot de passe."
   }
-  Write-Host "PostgreSQL existant actif, configuration reconnue et connexion authentifiee."
+  Write-Host "PostgreSQL existant accessible : sauvegarde autorisee."
+}
+function Test-Api-Password {
+  $command='PGPASSWORD="$POSTGRES_PASSWORD" psql -h postgres -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"'
+  try {
+    $rows=@(& docker exec $containerName sh -c $command 2>$null)
+    return ($LASTEXITCODE -eq 0 -and $rows.Count -eq 1 -and ([string]$rows[0]).Trim() -ceq "1")
+  } catch { return $false }
+}
+function Repair-Api-PasswordAfterBackup([string]$dump) {
+  if (Test-Api-Password) {
+    Write-Host "Authentification TCP de l'API PostgreSQL : OK."
+    return
+  }
+  # All password changes require the full backup and isolated restore first.
+  $null=Backup-Path $dump
+  if ($NonInteractive) {
+    throw "Mot de passe de l'API incompatible avec PostgreSQL. Reparation interactive requise."
+  }
+  Write-Warning "Le mot de passe du role PostgreSQL conserve dans la base differe de celui utilise par l'API."
+  Write-Host "Sauvegarde et restauration de verification terminees avant toute modification."
+  Write-Host "Seul le mot de passe du role sera actualise, pas les mangas ni les volumes."
+  Write-Host "Les autres clients utilisant l'ancien mot de passe devront etre reconfigures."
+  if ((Read-Host "Ecrire exactement REPARER pour autoriser ce changement") -cne "REPARER") {
+    throw "Reparation annulee. Sauvegarde et donnees conservees."
+  }
+  $role=Installed-Setting $containerName "POSTGRES_USER"
+  $secret=Installed-Setting $containerName "POSTGRES_PASSWORD"
+  if ($role -notmatch '^[a-zA-Z_][a-zA-Z0-9_]*$' -or $secret.Length -lt 16) {
+    throw "Identifiants non exploitables : aucun changement."
+  }
+  if ($secret -cne (Config-Setting "POSTGRES_PASSWORD") -or
+      $role -cne (Config-Setting "POSTGRES_USER")) {
+    throw "Identifiants .env et conteneur differents : operation abandonnee."
+  }
+  # Use stdin, not argv, to avoid exposing the credential to process listings.
+  $sql='ALTER ROLE "'+$role+'" PASSWORD '+"'"+$secret.Replace("'","''")+"';"
+  $exitCode=1
+  try {
+    $sql | & docker exec -i $containerName psql -X -q -v ON_ERROR_STOP=1 -U $role -d postgres 1>$null 2>$null
+    $exitCode=$LASTEXITCODE
+  } catch { $exitCode=1 }
+  $sql=$null
+  $secret=$null
+  if ($exitCode -ne 0 -or -not (Test-Api-Password)) {
+    throw "Connexion API toujours invalide. Sauvegarde conservee ; ne pas relancer la mise a jour."
+  }
+  Write-Host "Mot de passe du role PostgreSQL aligne et connexion API validee."
 }
 function Db-Setting([string]$key) {
   $result=& docker exec $containerName printenv $key
@@ -273,12 +318,17 @@ function Create-Backup {
 if (-not (Test-Path -LiteralPath $envFile)) { throw "Fichier .env manquant." }
 & docker info --format "{{.ServerVersion}}" | Out-Null
 Assert-Ok "Docker Desktop doit etre demarre"
+Prepare-Existing-Postgres
 $pgDb=Db-Setting "POSTGRES_DB"
 $pgUser=Db-Setting "POSTGRES_USER"
 if ($pgDb -notmatch '^[a-zA-Z_][a-zA-Z0-9_]*$' -or $pgDb -in @("postgres","template0","template1")) {
   throw "Nom de base PostgreSQL non valide pour une restauration."
 }
-if ($Action -eq "Backup") { $null=Create-Backup; exit 0 }
+if ($Action -eq "Backup") {
+  $verified=Create-Backup
+  Repair-Api-PasswordAfterBackup $verified
+  exit 0
+}
 $archive=Backup-Path $File
 if ($Action -eq "Verify") { $null=Restore-Test $archive; exit 0 }
 

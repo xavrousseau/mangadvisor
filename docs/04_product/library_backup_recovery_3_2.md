@@ -32,7 +32,32 @@ de restaurer les anciennes valeurs **sur confirmation explicite**, en
 conservant d'abord une copie du fichier `.env` dans
 `backups/configuration/` (privé, ignoré par Git).
 
-La restauration des paramètres ne modifie ni la base ni les ISBN. Une
+La restauration des paramètres ne modifie ni la base ni les ISBN.
+
+### Si PostgreSQL est Healthy mais que l'API refuse le mot de passe
+
+Sur une base persistante, `POSTGRES_PASSWORD` dans Docker peut avoir été
+renouvelé **sans changer le mot de passe réellement enregistré dans PostgreSQL**.
+Dans ce cas, `pg_isready` est vert et `psql` par socket fonctionne, mais
+l'API FastAPI échoue avec `password authentication failed for user "manga"`.
+
+Le menu 3 tente désormais une connexion **TCP avec mot de passe** après
+une **sauvegarde complète restaurée avec succès dans une base de test**.
+S'il constate ce décalage, il propose de saisir exactement **REPARER**
+pour actualiser uniquement le mot de passe du rôle SQL existant. L'utilisateur
+peut refuser sans modifier le mot de passe ; aucune rotation ne se produit
+en mode non interactif.
+
+Le nouveau mot de passe est transmis à `psql` par l'entrée standard :
+il n'est ni imprimé dans la console ni placé dans les arguments Docker.
+Cela ne réinitialise ni le cluster, ni les éditions, ni les ISBN ou les
+volumes. Attention : d'autres applications éventuellement connectées au
+même compte PostgreSQL devront employer le nouvel identifiant.
+
+Ne pas utiliser `docker compose down -v`, `docker volume rm` ou les
+commandes de réinitialisation SQL pour résoudre cette erreur.
+
+ Une
 connexion PostgreSQL authentifiée est vérifiée **avant** `pg_dump` et le
 dump est restauré dans une base de test indépendante. Si le conteneur
 d'origine est introuvable ou les identifiants ne permettent pas de se

@@ -8,9 +8,12 @@ if not "%~1"=="" goto :direct
 
 :menu
 cls
+set "CODE_REV=non disponible"
+for /f "delims=" %%H in ('git -C "%ROOT_DIR%" rev-parse --short HEAD 2^>nul') do set "CODE_REV=%%H"
 echo ==========================================================
 echo                       MANGADVISOR
 echo ==========================================================
+echo   Version Git locale : %CODE_REV%
 echo.
 echo    1 - Premiere installation (guidage complet)
 echo    2 - Demarrer et ouvrir Mangadvisor

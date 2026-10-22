@@ -829,6 +829,16 @@ function Diagnostic {
 function Backup {
   Say "Sauvegarde PostgreSQL et restauration de verification"
   $path=Join-Path $root "cmd\library-backup.ps1"
+  if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "Script de sauvegarde absent. Utilise le menu 7 pour recuperer les fichiers depuis GitHub."
+  }
+  # Update cannot cure a broken old backup script because backup runs first.
+  # Recognize old code BEFORE docker exec or any database operation.
+  $source=[IO.File]::ReadAllText($path,[Text.Encoding]::UTF8)
+  if (-not $source.Contains("function Prepare-Existing-Postgres")) {
+    $rev=@(& git -C $root rev-parse --short HEAD 2>$null)
+    throw "Script de sauvegarde obsolete (version Git : $($rev -join '')). Choisir 7 pour synchroniser le CODE ; si le probleme persiste, comparer git log -1 et git status -sb. Aucun volume touche."
+  }
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -Action Backup
   Assert-Exit "Echec de sauvegarde : aucune operation sensible ne doit continuer"
 }

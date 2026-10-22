@@ -61,6 +61,19 @@ function Ask-TrackedStash {
   }
 }
 
+function Assert-Backup-Script {
+  # A checkout can contain the expected commit but an unexpected file on
+  # disk. This check catches the specific stale backup failure mode.
+  $file=Join-Path $repo "cmd\library-backup.ps1"
+  if (!(Test-Path -LiteralPath $file -PathType Leaf)) {
+    throw "Sauvegarde Mangadvisor absente : cmd\library-backup.ps1. Code incomplet."
+  }
+  $source=[IO.File]::ReadAllText($file,[Text.Encoding]::UTF8)
+  if (-not $source.Contains("function Prepare-Existing-Postgres")) {
+    throw "Le script de sauvegarde est obsolete : impossible d'annoncer le code a jour. Ne pas relancer le menu 3."
+  }
+}
+
 function Sync-GitHub {
   Write-Host ""
   Write-Host "=== Mangadvisor : recuperer le code depuis GitHub ==="
@@ -85,18 +98,21 @@ function Sync-GitHub {
 
   $current=Git-One @("rev-parse","HEAD") "Commit local inconnu"
   $target=Git-One @("rev-parse","FETCH_HEAD") "Commit distant inconnu"
-  if ($current -ceq $target) {
-    Write-Host "Code deja a jour. Aucune modification necessaire."
-    return
-  }
-  & git -C $repo merge-base --is-ancestor HEAD FETCH_HEAD
-  if ($LASTEXITCODE -eq 1) {
-    throw "Historiques Git divergents. Aucun fichier n'a ete change. Ne pas forcer un reset : conserver l'ancien dossier et demander une migration."
-  }
-  if ($LASTEXITCODE -ne 0) {
-    throw "Impossible de verifier que la mise a jour est sans risque."
+  Write-Host ("Version avant synchronisation : " + $current.Substring(0,12))
+  Write-Host ("Version GitHub disponible   : " + $target.Substring(0,12))
+  if ($current -cne $target) {
+    & git -C $repo merge-base --is-ancestor HEAD FETCH_HEAD
+    if ($LASTEXITCODE -eq 1) {
+      throw "Historiques Git divergents. Aucun fichier n'a ete change. Ne pas forcer un reset : conserver l'ancien dossier et demander une migration."
+    }
+    if ($LASTEXITCODE -ne 0) {
+      throw "Impossible de verifier que la mise a jour est sans risque."
+    }
   }
 
+  # IMPORTANT: even when HEAD == FETCH_HEAD, tracked files can contain
+  # staged/unstaged edits (including an old copy of library-backup.ps1).
+  # Never report an installation as up to date without checking its files.
   # Preserve tracked edits explicitly, never touching untracked/private paths.
   $changes=@(Git-Output @("status","--porcelain=v1","--untracked-files=no") "Lecture des fichiers locaux impossible")
   if ($changes.Count -gt 0) {
@@ -110,6 +126,17 @@ function Sync-GitHub {
       throw "Le code suivi est encore modifie. Mise a jour interrompue."
     }
     Write-Host "Code local suivi preserve : git stash list"
+  }
+
+  if ($current -ceq $target) {
+    $clean=@(Git-Output @("status","--porcelain=v1","--untracked-files=no") "Verification de la version deja installee impossible")
+    if ($clean.Count -gt 0) {
+      throw "Le code suivi reste modifie apres la sauvegarde. Ne pas annoncer une mise a jour reussie."
+    }
+    Assert-Backup-Script
+    Write-Host "Code et scripts de sauvegarde deja au niveau de GitHub : $($current.Substring(0,12))."
+    Write-Host "Aucun changement des donnees Docker, du fichier .env ou des fichiers personnels."
+    return
   }
 
   # Git refuses to fast-forward when untracked local files have names that
@@ -158,9 +185,17 @@ function Sync-GitHub {
 
   # No reset, no clean, no -v, no database modifications.
   Git-Run @("merge","--ff-only","FETCH_HEAD") "Mise a jour Git impossible"
-  $updated=Git-One @("rev-parse","--short","HEAD") "Verification finale impossible"
+  $updated=Git-One @("rev-parse","HEAD") "Verification finale impossible"
+  if ($updated -cne $target) {
+    throw "La version apres mise a jour ne correspond pas au commit distant."
+  }
+  $remaining=@(Git-Output @("status","--porcelain=v1","--untracked-files=no") "Verification des fichiers suivis impossible")
+  if ($remaining.Count -ne 0) {
+    throw "Mise a jour terminee mais des fichiers de code restent modifies : ne pas lancer l'option 3."
+  }
+  Assert-Backup-Script
   Write-Host ""
-  Write-Host "Code Mangadvisor synchronise avec GitHub : $updated"
+  Write-Host ("Code ET script de sauvegarde verifies : " + $updated.Substring(0,12))
   Write-Host "Les fichiers prives (.env, private-data, backups) et Docker sont preserves."
   Write-Host "Utilise l'option 3 pour reconstruire les conteneurs si necessaire."
 }
