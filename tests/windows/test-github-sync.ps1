@@ -49,6 +49,8 @@ Write-Text (Join-Path $working "backups\existing.dump") "PRIVATE BACKUP"
 Write-Text (Join-Path $working "data\raw\original.json") "CACHED CATALOG"
 Write-Text (Join-Path $working "notes-perso.txt") "UNRELATED UNTRACKED WORK"
 Write-Text (Join-Path $seed "README.txt") "new code"
+# Model the backup entry point shipped by modern releases.
+Write-Text (Join-Path $seed "cmd\library-backup.ps1") "function Prepare-Existing-Postgres { }"
 Fixture-Git @("-C",$seed,"add",".")
 Fixture-Git @("-C",$seed,"commit","-m","new version")
 Fixture-Git @("-C",$seed,"push","origin","main")
@@ -95,6 +97,20 @@ if ($LASTEXITCODE -ne 0) { throw "Idempotent rerun failed." }
 if (@(Get-ChildItem (Join-Path $base "mangadvisor-archives-git") -Directory).Count -ne 1) {
   throw "Second run created a redundant archive."
 }
+
+# Regression: same commit SHA but an overwritten/stale tracked file is
+# NOT up to date. Noninteractive execution must refuse without discarding it.
+Write-Text (Join-Path $working "cmd\library-backup.ps1") "OLD UNSAFE SCRIPT"
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $sync -Root $working -NonInteractive
+if ($LASTEXITCODE -eq 0) { throw "Dirty backup script with matching HEAD was incorrectly marked up to date." }
+if ((Get-Content -LiteralPath (Join-Path $working "cmd\library-backup.ps1") -Raw) -cne "OLD UNSAFE SCRIPT") {
+  throw "Dirty script replaced despite denied permission."
+}
+if (@(& git -C $working stash list --format="%gs").Count -ne 0) {
+  throw "Dirty same-HEAD script was stashed without consent."
+}
+# This is an isolated disposable repository; restore the fixture for the next case.
+Fixture-Git @("-C",$working,"restore","--","cmd/library-backup.ps1")
 
 # Local tracked changes require consent, not silent stash.
 Write-Text (Join-Path $seed "README.txt") "new upstream code 3"
