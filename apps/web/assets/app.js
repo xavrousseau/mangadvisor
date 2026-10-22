@@ -137,7 +137,7 @@ function shell(){
     '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+L(key)+'</span></button>').join("")+
   '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p></div></aside>'+
   '<div class="main"><header class="topbar"><div class="crumb">'+L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active)+'</div>'+
-  '<div class="topbar-right"><label class="field-label" for="app-language">'+L("language")+'</label><select id="app-language" class="locale-select" aria-label="'+L("language")+'"><option value="fr"'+(state.lang==="fr"?" selected":"")+'>🇫🇷 FR</option><option value="en"'+(state.lang==="en"?" selected":"")+'>🇬🇧 EN</option></select>'+
+  '<div class="topbar-right"><button type="button" class="global-search-trigger" data-action="global-search" aria-label="'+e(state.lang==="fr"?"Rechercher un manga":"Search manga")+'" title="'+e(state.lang==="fr"?"Rechercher · Ctrl+K":"Search · Ctrl+K")+'">⌕ <span>'+e(state.lang==="fr"?"Rechercher":"Search")+'</span><kbd>Ctrl K</kbd></button><label class="field-label" for="app-language">'+L("language")+'</label><select id="app-language" class="locale-select" aria-label="'+L("language")+'"><option value="fr"'+(state.lang==="fr"?" selected":"")+'>🇫🇷 FR</option><option value="en"'+(state.lang==="en"?" selected":"")+'>🇬🇧 EN</option></select>'+
   '<button type="button" class="appearance-trigger '+(active==="appearance"?'active':'')+'" data-go="/appearance" aria-label="'+L("appearance")+'" title="'+L("appearance")+'"><span aria-hidden="true">⚙</span><span class="appearance-label">'+L("appearance")+'</span></button>'+
   '<div class="avatar" aria-hidden="true">M</div></div></header>'+
   '<main id="content" class="main-content" tabindex="-1"><div class="skeleton"></div></main></div></div>'+
@@ -1472,6 +1472,11 @@ root.addEventListener("click",async event=>{
  }
  const action=button.dataset.action;
  if(action==="refresh")return render();
+ if(action==="global-search"){
+   await go("/discover");
+   document.querySelector("#catalog-query")?.focus();
+   return;
+ }
  if(action==="library-view"){
    const next=button.dataset.value;
    if(!["series","editions","wishlist","manage"].includes(next))return;
@@ -1679,6 +1684,11 @@ root.addEventListener("input",event=>{
  }
 });
 root.addEventListener("keydown",event=>{
+ if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){
+   event.preventDefault();
+   void go("/discover").then(()=>document.querySelector("#catalog-query")?.focus());
+   return;
+ }
  const tab=event.target.closest?.(".library-view-tab");
  if(tab && ["ArrowLeft","ArrowRight","Home","End"].includes(event.key)){
    const tabs=[...document.querySelectorAll(".library-view-tab")];
