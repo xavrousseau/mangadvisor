@@ -202,18 +202,18 @@ class PipelineTests(unittest.TestCase):
     def test_probe_mode_never_invokes_bnf_or_scrinis_writers(self):
         fake_context = MagicMock()
         fake_context.__enter__.return_value = MagicMock()
-        with patch.object(pipeline, "connect_database", return_value=fake_context), \\
-             patch.object(pipeline, "select_ids", return_value=[2, 3]), \\
+        with patch.object(pipeline, "connect_database", return_value=fake_context), \
+             patch.object(pipeline, "select_ids", return_value=[2, 3]), \
              patch.object(pipeline, "load_work_evidence", side_effect=lambda conn, mid: (
                  {"id": mid, "source_mal_id": mid + 10, "title": "Berserk",
                   "title_english": None, "title_japanese": None},
-                 [], None, [])), \\
-             patch.object(pipeline, "scrinis_selection_diagnostics", return_value={}), \\
+                 [], None, [])), \
+             patch.object(pipeline, "scrinis_selection_diagnostics", return_value={}), \
              patch.object(pipeline, "probe_scrinis_work", side_effect=[
                  ({"status": "PROVIDER_ERROR", "reason": "SEARCH_NETWORK_ERROR"},
                   {"status": "NO_VERIFIED_SCRINIS_WORK", "isbn_correlations": []}),
-             ]) as probe, \\
-             patch.object(pipeline, "run_bnf") as run_bnf, \\
+             ]) as probe, \
+             patch.object(pipeline, "run_bnf") as run_bnf, \
              patch.object(pipeline, "run_scrinis") as run_scrinis:
             report = pipeline.run_pilot(manga_ids=[2, 3], bnf=False,
                                         scrinis=False, probe_scrinis=True)
