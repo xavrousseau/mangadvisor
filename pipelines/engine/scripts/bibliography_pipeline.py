@@ -231,6 +231,7 @@ def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,
                         "work_status_counts": quality["work_status_counts"],
                         "language_status_counts": quality["language_status_counts"],
                         "edition_suggested_counts": quality["edition_suggested_counts"],
+                        "candidates": quality["candidates"],
                         "cross_source": correlations})
     result["works"] = reports
     result["notice"] = (
@@ -262,6 +263,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(exc))
     if not args.details:
         for work in report["works"]:
+            work.pop("candidates", None)
             cross = work["cross_source"]
             if "isbn_correlations" in cross:
                 cross["isbn_correlations"] = []
