@@ -104,6 +104,48 @@ def load_work_evidence(conn: Any, manga_id: int) -> tuple[dict, list[dict], dict
         return manga, candidates, fact, aliases
 
 
+
+def scrinis_selection_diagnostics(conn: Any, selected: list[int]) -> dict[int, dict[str, Any]]:
+    """Explain supplier zero-selection from its actual SQL eligibility guards."""
+    result: dict[int, dict[str, Any]] = {}
+    with conn.cursor() as cur:
+        cur.execute("SELECT to_regclass('manga_scrinis_fr_attempt') AS relation")
+        attempt_available = bool(cur.fetchone()["relation"])
+        cur.execute("SELECT to_regclass('manga_title_alias') AS relation")
+        aliases_available = bool(cur.fetchone()["relation"])
+        for manga_id in selected:
+            has_alias = False
+            attempt_status = None
+            cooldown_active = False
+            if aliases_available:
+                cur.execute(
+                    """SELECT EXISTS(SELECT 1 FROM manga_title_alias
+                       WHERE manga_id=%s AND language_code='fr'
+                         AND source_name IN
+                         ('SCRINIS_FR_PRINT','TENRAI_MAL_TYPED','WIKIDATA_P4087')
+                       ) AS present""", (manga_id,))
+                has_alias = bool(cur.fetchone()["present"])
+            if attempt_available:
+                cur.execute(
+                    """SELECT status,checked_at > NOW() -
+                          CASE WHEN status IN ('PROVIDER_ERROR','DETAIL_UNAVAILABLE')
+                               THEN INTERVAL '1 day' ELSE INTERVAL '45 days' END
+                       AS cooldown_active
+                       FROM manga_scrinis_fr_attempt WHERE manga_id=%s""",
+                    (manga_id,))
+                attempt = cur.fetchone()
+                if attempt:
+                    attempt_status = attempt["status"]
+                    cooldown_active = bool(attempt["cooldown_active"])
+            result[manga_id] = {
+                "already_has_source_french_alias": has_alias,
+                "previous_attempt_status": attempt_status,
+                "attempt_cooldown_active": cooldown_active,
+                "source_retry_eligible": not has_alias and not cooldown_active,
+            }
+    return result
+
+
 def select_ids(conn: Any, *, limit: int, manga_ids: list[int] | None) -> list[int]:
     if manga_ids is not None:
         with conn.cursor() as cur:
