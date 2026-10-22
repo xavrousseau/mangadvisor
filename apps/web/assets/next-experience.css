@@ -116,3 +116,32 @@ body{background:var(--bg)}
  .collection-onboarding{padding-inline:14px}
 }
 @media(prefers-reduced-motion:reduce){.stage-book{transition:none!important}}
+
+
+/* Browse a universe, not a database */
+.discover-intro{position:relative;display:flex;align-items:center;overflow:hidden;min-height:350px;padding:48px 54px;border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));border-radius:26px;background:radial-gradient(circle at 86% 24%,rgba(255,160,100,.18),transparent 39%),linear-gradient(118deg,#212238,#1b2130 60%,#3b2a39);margin-bottom:31px}
+.discover-intro-content{z-index:2;max-width:710px}
+.discover-intro .eyebrow{color:var(--accent);font-size:10px;letter-spacing:.18em}
+.discover-intro h1{font-size:clamp(39px,4.5vw,66px);line-height:1.04;max-width:15ch;letter-spacing:-.06em;color:#faf6f0;margin:16px 0}
+.discover-intro p{font-size:14px;color:#cbd1dc;line-height:1.7;max-width:49ch;margin-bottom:23px}
+.discover-intro-decoration{position:absolute;right:4%;top:0;font:900 clamp(200px,27vw,420px)/1.05 'Outfit',sans-serif;color:rgba(255,169,111,.13);transform:rotate(-13deg);letter-spacing:-.13em;pointer-events:none}
+.discover-intro-decoration span{color:rgba(255,197,122,.3)}
+.discover-heading .page-title{font-size:30px;margin:0 0 5px}
+.discover-heading .page-desc{font-size:12px}
+.discover-genre-section{margin:29px 0 30px}
+.discover-genre-section .eyebrow{font-size:10px;color:var(--accent);letter-spacing:.16em}
+.discover-genre-chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.discover-genre-chip{appearance:none;min-height:43px;border:1px solid var(--border);border-radius:100px;color:var(--text);background:var(--surface);font-weight:700;font-size:12px;padding:9px 17px;transition:border-color .2s,transform .2s,background .2s}
+.discover-genre-chip:hover{transform:translateY(-2px);border-color:var(--accent)}
+.discover-genre-chip.active{background:var(--accent-tint);color:var(--accent);border-color:var(--accent)}
+@media(max-width:740px){
+ .discover-intro{min-height:340px;padding:31px 23px;margin-bottom:25px;border-radius:18px}
+ .discover-intro h1{font-size:clamp(35px,8.5vw,48px)}
+ .discover-intro p{font-size:12px}
+ .discover-intro-decoration{right:-12%;top:8%;font-size:260px;opacity:.55}
+ .discover-genre-section{margin:22px 0}
+ .discover-genre-chips{gap:7px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:6px;margin-right:-15px}
+ .discover-genre-chips::-webkit-scrollbar{display:none}
+ .discover-genre-chip{flex-shrink:0;min-height:40px;padding:8px 13px}
+ .discover-heading .page-title{font-size:28px}
+}
