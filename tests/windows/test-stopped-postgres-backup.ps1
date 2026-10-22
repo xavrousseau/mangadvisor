@@ -7,6 +7,7 @@ New-Item -ItemType Directory -Force -Path $fixture | Out-Null
 $script:envFile=Join-Path $fixture ".env"
 $script:backups=Join-Path $fixture "backups"
 $script:containerName="mangadvisor_postgres"
+$script:NonInteractive=$false
 $script:allow=$false
 $script:running=$false
 $script:containerExists=$true
