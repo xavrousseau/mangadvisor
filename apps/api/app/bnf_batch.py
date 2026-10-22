@@ -244,11 +244,13 @@ def run_batch(
                 except (HTTPException, TimeoutError, OSError, ValueError):
                     errors += 1
             candidates = normalize_candidates(titles, results)
+            # A capped staging batch is incomplete even if the SRU record pages ended.
+            candidate_cap_reached = len(candidates) >= MAX_CANDIDATES_PER_MANGA
             if not titles:
                 status = "SKIPPED"
             elif errors == len(titles):
                 status = "ERROR"
-            elif errors or any(payload.get("page_limit_reached", False) for _, payload in results):
+            elif errors or candidate_cap_reached or any(payload.get("page_limit_reached", False) for _, payload in results):
                 status = "PARTIAL"
             else:
                 status = "CHECKED" if candidates else "EMPTY"
