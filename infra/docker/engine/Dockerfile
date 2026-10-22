@@ -10,3 +10,6 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 COPY pipelines/engine /workspace/pipelines/engine
 # Shared BnF SRU candidate module for background worker.
 COPY apps/api /workspace/apps/api
+
+# Include the versioned regression suite for reproducible sandbox checks.
+COPY tests /workspace/tests
