@@ -62,7 +62,7 @@ class PipelineTests(unittest.TestCase):
              patch.object(pipeline, "select_ids", return_value=[2]), \
              patch.object(pipeline, "load_work_evidence", return_value=(
                  {"source_mal_id": 2, "title": "Berserk", "title_english": None,
-                  "title_japanese": None}, [], None)), \
+                  "title_japanese": None}, [], None, [])), \
              patch.object(pipeline, "run_bnf") as bnf, \
              patch.object(pipeline, "run_scrinis") as scrinis:
             output = pipeline.run_pilot(manga_ids=[2], bnf=False, scrinis=False)
