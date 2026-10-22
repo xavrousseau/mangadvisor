@@ -91,7 +91,7 @@ def load_work_evidence(conn: Any, manga_id: int) -> tuple[dict, list[dict], dict
                 """SELECT scrinis_public_n, work_evidence, author_evidence
                    FROM manga_scrinis_fr_fact WHERE manga_id=%s""", (manga_id,))
             fact = cur.fetchone()
-        return manga, candidates, fact
+        return manga, candidates, fact, []
 
 
 def select_ids(conn: Any, *, limit: int, manga_ids: list[int] | None) -> list[int]:
@@ -139,9 +139,9 @@ def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,
     reports = []
     for manga_id in selected:
         with connect_database() as conn:
-            manga, raw, fact = load_work_evidence(conn, manga_id)
+            manga, raw, fact, aliases = load_work_evidence(conn, manga_id)
         titles = [manga[k] for k in ("title", "title_english", "title_japanese")
-                  if manga.get(k)]
+                  if manga.get(k)] + aliases
         quality = review(raw, titles)
         correlations = (
             scrinis_isbn_evidence(fact, quality["candidates"], client)
