@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from pipelines.engine.scripts import bibliography_pipeline as pipeline
 
@@ -55,12 +55,9 @@ class PipelineTests(unittest.TestCase):
             pipeline.run_pilot(manga_ids=[1, 1])
 
     def test_report_only_never_calls_suppliers_or_writes(self):
-        fake_conn = Mock()
-        fake_context = Mock()
-        fake_context.__enter__ = Mock(return_value=fake_conn)
-        fake_context.__exit__ = Mock(return_value=None)
-        fake_conn.cursor.return_value.__enter__ = Mock()
-        fake_conn.cursor.return_value.__exit__ = Mock(return_value=None)
+        fake_conn = MagicMock()
+        fake_context = MagicMock()
+        fake_context.__enter__.return_value = fake_conn
         with patch.object(pipeline, "connect_database", return_value=fake_context), \
              patch.object(pipeline, "select_ids", return_value=[2]), \
              patch.object(pipeline, "load_work_evidence", return_value=(
