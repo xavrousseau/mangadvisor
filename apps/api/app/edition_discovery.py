@@ -8,6 +8,7 @@ and explicit manual edition/volume confirmation in the parent collection API.
 from __future__ import annotations
 
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -22,6 +23,8 @@ from apps.api.app.collection import (
 )
 
 MAX_BIBLIOGRAPHY_RESULTS = 20
+MAX_TITLE_PAGES = 10
+PAGE_DELAY_SECONDS = 1.25
 MAX_RESPONSE_BYTES = 1_500_000
 SRW = "{http://www.loc.gov/zing/srw/}"
 DC = "{http://purl.org/dc/elements/1.1/}"
@@ -117,8 +120,8 @@ def parse_title_search_response(raw: bytes, *, limit: int = MAX_BIBLIOGRAPHY_RES
 
 def search_bnf_by_title(query: str, *, start_record: int = 1) -> dict[str,Any]:
     cleaned=sanitize_title_query(query)
-    # Fixed 20-record BnF pages, at most three. Existing manual discovery stays at page 1.
-    if start_record not in (1, 21, 41):
+    # Fixed 20-record pages, bounded. Manual discovery remains page one by default.
+    if type(start_record) is not int or start_record not in range(1, 1 + 20 * MAX_TITLE_PAGES, 20):
         raise ValueError("Page BnF non autorisée.")
     args=urllib.parse.urlencode({
         "version":"1.2","operation":"searchRetrieve",
@@ -149,38 +152,43 @@ def search_bnf_by_title(query: str, *, start_record: int = 1) -> dict[str,Any]:
 def search_bnf_title_pages(
     query: str, *, max_pages: int = 3,
     fetch_page: Callable[..., dict[str, Any]] = search_bnf_by_title,
+    sleep: Callable[[float], Any] = time.sleep,
 ) -> dict[str, Any]:
-    """Search up to three BnF SRU pages; still candidate-only and not exhaustive.
+    """Bounded BnF SRU page retrieval; candidate-only and non-exhaustive by design.
 
-    A bounded call avoids uncontrolled traffic. Failed later pages propagate so
-    a partial scan is never misrepresented as a complete checked work.
+    Page pauses apply between HTTP requests; reported SRU record count (not
+    candidate-ISBN count) controls whether additional pages exist.
     """
-    if type(max_pages) is not int or not 1 <= max_pages <= 3:
+    if type(max_pages) is not int or not 1 <= max_pages <= MAX_TITLE_PAGES:
         raise ValueError("Nombre de pages BnF invalide.")
     items: list[dict[str, Any]] = []
     seen: set[str] = set()
     reported_total: int | None = None
     pages = 0
     for index in range(max_pages):
+        if index:
+            sleep(PAGE_DELAY_SECONDS)
         start = 1 + index * MAX_BIBLIOGRAPHY_RESULTS
         payload = fetch_page(query, start_record=start)
         pages += 1
         if index == 0:
-            reported_total = payload.get("bnf_reported_records")
+            count = payload.get("bnf_reported_records")
+            reported_total = count if type(count) is int and count >= 0 else None
         page_items = payload.get("items") or []
         for item in page_items:
             isbn = item.get("isbn13")
             if isinstance(isbn, str) and isbn not in seen:
                 seen.add(isbn)
                 items.append(item)
-        # Use the provider's number of records, not ISBN count: not all
-        # bibliographic records have an ISBN or pass candidate validation.
-        if isinstance(reported_total, int) and start + MAX_BIBLIOGRAPHY_RESULTS > reported_total:
+        # A BnF page can contain 20 records but zero usable ISBNs. Only the
+        # provider's record count can establish end of results in that case.
+        if reported_total is not None:
+            if start + MAX_BIBLIOGRAPHY_RESULTS - 1 >= reported_total:
+                break
+        elif not page_items:
             break
-        if not page_items and not isinstance(reported_total, int):
-            break
-    checked_slots = pages * MAX_BIBLIOGRAPHY_RESULTS
-    exhausted = isinstance(reported_total, int) and checked_slots >= reported_total
+    inspected_slots = pages * MAX_BIBLIOGRAPHY_RESULTS
+    end_reached = reported_total is not None and inspected_slots >= reported_total
     return {
         "items": items,
         "count": len(items),
@@ -188,9 +196,9 @@ def search_bnf_title_pages(
         "bnf_pages_checked": pages,
         "search_scope": "bounded_multi_page_title_search",
         "exhaustive": False,
-        "page_limit_reached": not exhausted,
+        "page_limit_reached": not end_reached,
         "candidate_only": True,
-        "message": "ISBN candidats uniquement ; rapprochement oeuvre et edition a verifier.",
+        "message": "ISBN candidats uniquement ; rapprochement oeuvre, langue et edition a verifier.",
     }
 
 
