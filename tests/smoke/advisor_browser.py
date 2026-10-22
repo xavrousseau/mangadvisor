@@ -73,6 +73,9 @@ def run(page,device):
     expect(page.locator(".advisor-card")).to_have_count(0)
     # Previous recommendation modes remain accessible.
     page.locator('[data-action="rec-mode"][data-value="mood"]:visible').first.click()
+    # The UX now intentionally keeps advanced mood filters collapsed.
+    # Expand the native details widget before asserting its controls.
+    page.locator(".mood-advanced > summary").click()
     expect(page.locator("#mood-length")).to_be_visible()
     page.locator('[data-action="rec-mode"][data-value="advisor"]').click()
     expect(page.locator("#advisor-message")).to_be_visible()
