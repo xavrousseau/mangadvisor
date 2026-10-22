@@ -84,6 +84,23 @@ class CandidateQualityTests(unittest.TestCase):
             self.assertEqual(result[key], candidate[key])
         self.assertFalse(result["registration_ready"])
 
+    def test_author_corroboration_is_independent_and_conservative(self):
+        entry = row("One Piece. 1", language="fre")
+        entry["author_fr"] = "Oda, Eiichiro ; traduction et adaptation"
+        matched = classify_candidate(entry, ["One Piece"], ["Eiichiro Oda"])
+        self.assertEqual(matched["author_evidence"], "MATCH")
+        entry["author_fr"] = "Auteur inconnu"
+        mismatched = classify_candidate(entry, ["One Piece"], ["Eiichiro Oda"])
+        self.assertEqual(mismatched["author_evidence"], "REVIEW_DIFFERENT_CREDITS")
+        self.assertFalse(mismatched["registration_ready"])
+        self.assertEqual(
+            classify_candidate(entry, ["One Piece"])["author_evidence"], "UNVERIFIED"
+        )
+        self.assertEqual(
+            review([entry], ["One Piece"], ["Eiichiro Oda"])["author_evidence_counts"],
+            {"REVIEW_DIFFERENT_CREDITS": 1},
+        )
+
     def test_language_is_declared_not_inferred_from_publisher(self):
         for text, expected in [
             (None, "UNKNOWN"),
