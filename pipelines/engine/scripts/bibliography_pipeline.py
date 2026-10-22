@@ -158,7 +158,7 @@ def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,
             if scrinis else {"status": "NOT_REQUESTED", "isbn_correlations": []}
         )
         reports.append({"manga_id": manga_id, "mal_id": manga["source_mal_id"],
-                        "title": manga["title"], "total_candidates": quality["total_staged"],
+                        "title": manga["title"], "trusted_french_aliases": aliases, "total_candidates": quality["total_staged"],
                         "work_status_counts": quality["work_status_counts"],
                         "language_status_counts": quality["language_status_counts"],
                         "edition_suggested_counts": quality["edition_suggested_counts"],
