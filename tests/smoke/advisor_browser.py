@@ -77,7 +77,7 @@ def run(page,device):
     # Expand the native details widget before asserting its controls.
     page.locator(".mood-advanced > summary").click()
     expect(page.locator("#mood-length")).to_be_visible()
-    page.locator('[data-action="rec-mode"][data-value="advisor"]').click()
+    page.locator('[data-action="rec-mode"][data-value="advisor"]:visible').first.click()
     expect(page.locator("#advisor-message")).to_be_visible()
 
 if __name__=="__main__":
