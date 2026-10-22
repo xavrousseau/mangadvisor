@@ -235,3 +235,25 @@ body{background:var(--bg)}
 .collection-demo-notice p{font-size:12px;line-height:1.55;color:var(--muted);margin:5px 0 0}
 .collection-demo-notice .btn{white-space:nowrap}
 @media(max-width:740px){.collection-demo-notice{align-items:stretch;flex-direction:column}.collection-demo-notice .btn{width:100%}}
+
+
+/* Real editorial homepage hero; never claims personal recommendations. */
+.hero-has-feature .hero-content{max-width:640px}
+.hero-has-feature h1{font-size:clamp(48px,6.8vw,102px);max-width:12ch;line-height:.98;overflow-wrap:anywhere;margin:19px 0 17px}
+.hero-has-feature .featured-summary{max-width:44ch;color:#e0dee6;line-height:1.7;margin:0 0 15px}
+.featured-genre-row{display:flex;flex-wrap:wrap;gap:7px;margin:13px 0}
+.featured-genre{display:inline-flex;align-items:center;min-height:28px;padding:5px 11px;background:rgba(255,255,255,.08);color:#eee8e9;border:1px solid rgba(255,255,255,.17);border-radius:20px;font-size:11px;font-weight:700}
+.hero-featured .featured-meta{font-size:12px;color:#d6d6e3;letter-spacing:.02em;margin:0 0 18px}
+.hero-has-feature .feature-cover-stack{width:52%}
+@media(max-width:1050px){
+ .hero-has-feature h1{font-size:clamp(45px,6vw,70px)}
+ .hero-has-feature .feature-cover-stack{opacity:.67}
+}
+@media(max-width:740px){
+ .hero-has-feature{min-height:460px}
+ .hero-has-feature h1{font-size:clamp(40px,11vw,58px);line-height:1}
+ .hero-has-feature .featured-summary{font-size:12px;max-width:43ch}
+ .hero-has-feature .featured-meta{font-size:11px}
+ .hero-has-feature .feature-cover-stack{width:100%;opacity:.72}
+ .featured-genre{font-size:10px;min-height:25px}
+}
