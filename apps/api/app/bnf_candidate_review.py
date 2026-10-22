@@ -9,12 +9,16 @@ from apps.api.app.bnf_batch import connect_database
 from apps.api.app.bnf_candidate_quality import classify_candidate
 
 
-def review(rows: list[dict], known_titles: list[str]) -> dict:
-    classified = [classify_candidate(row, known_titles) for row in rows]
+def review(
+    rows: list[dict], known_titles: list[str],
+    known_authors: list[str] | None = None,
+) -> dict:
+    classified = [classify_candidate(row, known_titles, known_authors) for row in rows]
     return {
         "total_staged": len(classified),
         "work_status_counts": dict(Counter(r["work_status"] for r in classified)),
         "language_status_counts": dict(Counter(r["language_status"] for r in classified)),
+        "author_evidence_counts": dict(Counter(r["author_evidence"] for r in classified)),
         "edition_suggested_counts": dict(Counter(r["edition_suggested"] for r in classified)),
         "candidates": sorted(classified, key=lambda row: (
             row["work_status"], row["edition_suggested"],
