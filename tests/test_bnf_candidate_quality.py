@@ -41,6 +41,49 @@ class CandidateQualityTests(unittest.TestCase):
         self.assertIsNone(found["volume_suggested"])
         self.assertFalse(found["registration_ready"])
 
+    def test_large_series_bare_volume_numbers_are_only_suggested(self):
+        cases = [
+            ("One Piece 01", 1),
+            ("One Piece 105 (édition originale)", 105),
+            ("Solo Leveling : 12", 12),
+            ("One Piece 2024", None),
+            ("One Piece 3D2Y", None),
+            ("One Piece (2024)", None),
+        ]
+        for title, expected in cases:
+            with self.subTest(title=title):
+                found = classify_candidate(row(title), ["One Piece", "Solo Leveling"])
+                self.assertEqual(found["volume_suggested"], expected)
+                self.assertFalse(found["registration_ready"])
+
+    def test_derivatives_and_false_title_prefix_are_not_tomes(self):
+        for title in (
+            "One Piece : artbook Color Walk",
+            "One Piece (guide officiel)",
+            "Chainsaw Man : roman",
+            "One Piece fanbook",
+        ):
+            with self.subTest(title=title):
+                found = classify_candidate(row(title), ["One Piece", "Chainsaw Man"])
+                self.assertEqual(found["work_status"], "REVIEW_DERIVATIVE")
+                self.assertFalse(found["registration_ready"])
+        self.assertEqual(
+            classify_candidate(row("One Pieceful Adventure"), ["One Piece"])["work_status"],
+            "REJECT_DIFFERENT_WORK",
+        )
+
+    def test_detailed_candidate_preserves_publication_and_provenance(self):
+        candidate = row("Solo Leveling. tome 1", language="fre")
+        candidate.update({
+            "author_fr": "Dubu", "release_date_text": "2021",
+            "source_name": "BNF_SRU",
+            "source_url": "https://catalogue.bnf.fr/ark:/12148/cb000000000",
+        })
+        result = classify_candidate(candidate, ["Solo Leveling"])
+        for key in ("author_fr", "release_date_text", "source_name", "source_url"):
+            self.assertEqual(result[key], candidate[key])
+        self.assertFalse(result["registration_ready"])
+
     def test_language_is_declared_not_inferred_from_publisher(self):
         for text, expected in [
             (None, "UNKNOWN"),
