@@ -164,7 +164,7 @@ function Prepare-Existing-Postgres {
   Write-Host "PostgreSQL existant accessible : sauvegarde autorisee."
 }
 function Test-Api-Password {
-  $command='PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"'
+  $command='PGPASSWORD="$POSTGRES_PASSWORD" psql -h postgres -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"'
   try {
     $rows=@(& docker exec $containerName sh -c $command 2>$null)
     return ($LASTEXITCODE -eq 0 -and $rows.Count -eq 1 -and ([string]$rows[0]).Trim() -ceq "1")
