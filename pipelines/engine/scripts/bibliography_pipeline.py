@@ -197,6 +197,10 @@ def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,
     result: dict[str, Any] = {"selected_ids": selected,
                               "confirmed_editions_written": 0,
                               "user_inventory_written": 0}
+    # Read-only supplier-selection diagnostics are useful even when skipping Scrinis.
+    if selected:
+        with connect_database() as conn:
+            result["scrinis_selection_diagnostics"] = scrinis_selection_diagnostics(conn, selected)
     if bnf and selected:
         result["bnf"] = run_bnf(connect_database, limit=len(selected),
                                 refresh=True, target_ids=selected,
