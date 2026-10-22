@@ -1,85 +1,75 @@
-# Atelier de rapprochement de la mangathèque physique (édition par édition)
+# Rapprochement manuel de la mangathèque physique
 
 ## Objectif
 
-Lors d'un import CSV, certaines séries sont conservées dans
-`user_manga_inventory_pending` parce qu'aucune correspondance exacte et
-unique n'a été établie avec le catalogue. L'utilisateur a actuellement
-**49 lignes en attente**. Elles représentent des déclarations physiques
-préservées, **pas** des mangas validés ni des ISBN.
+Un import CSV peut conserver des lignes dans `user_manga_inventory_pending`
+quand aucune correspondance sûre avec une œuvre du catalogue n'a été
+établie. Les lignes en attente sont des **déclarations personnelles
+conservées**, pas des ISBN vérifiés ni des tomes déjà attribués.
 
-L'atelier permet de confirmer manuellement, depuis **Ma bibliothèque**,
-le **manga du catalogue** correspondant à une ligne existante sans
-recharger le CSV et sans taper de commandes SQL.
+Dans **Ma bibliothèque → Mes éditions**, une entrée en attente peut être
+rapprochée manuellement d'une œuvre. Les titres français, anglais et
+japonais servent à **proposer des candidats**, jamais à confirmer
+silencieusement une correspondance.
 
-## Utilisation
+## Parcours utilisateur
 
-1. Dans `mangadvisor.cmd`, choisir **3 — Mettre à jour sans perdre mes données** :
-   sauvegarde PostgreSQL vérifiée, synchronisation GitHub, reconstruction Docker.
-2. Ouvrir [Mangadvisor](http://localhost:8501) → **Ma bibliothèque**.
-3. Descendre à **En attente de rapprochement**. Chaque entrée possède un
-   bouton **Rapprocher cette ligne**.
-4. Vérifier le nom, l'édition déclarée et le nombre de tomes.
-5. Rechercher l'œuvre du catalogue : le nom courant est proposé mais
-   **aucune correspondance n'est appliquée automatiquement**. Modifier la
-   recherche (nom français, anglais ou japonais) si nécessaire.
-6. Choisir **Examiner cette œuvre** : le serveur revalide l'œuvre, vérifie les
-   conflits avec les éditions déjà enregistrées, puis affiche un récapitulatif.
-7. Cocher la confirmation explicite et cliquer sur **Enregistrer l'association**.
-8. La ligne disparaît des éléments en attente et apparaît parmi les
-   déclarations physiques sous le manga choisi, avec son **édition et ses
-   quantités d'origine inchangées**.
+1. Ouvrir **Ma bibliothèque → Mes éditions** et choisir une ligne en attente.
+2. Cliquer **Rapprocher cette ligne**, chercher l'œuvre et sélectionner
+   **Examiner cette œuvre**.
+3. Vérifier ensemble : œuvre canonique, édition déclarée, nombre de tomes,
+   autres éditions et doublons.
+4. **Si aucune édition n'est déjà déclarée** : confirmer l'association.
+5. **Si cette œuvre existe déjà** : comparer les exemplaires réels ;
+   sélectionner explicitement l'une des actions permises :
+   - **Ajouter une édition distincte** : uniquement si la clé d'édition
+     est différente des éditions déjà présentes. Les quantités originales
+     sont conservées.
+   - **Archiver la ligne déjà comptée** : pour éviter de compter deux fois
+     les mêmes livres. La ligne est retirée des attentes et conservée dans
+     le journal d'audit, **sans ajouter de déclaration ou de tome**.
+6. Confirmer explicitement la comparaison des déclarations existantes,
+   puis le rapprochement choisi.
 
-### Plusieurs éditions de Dragon Ball
+**Exemple :** les éditions Pastel et Deluxe de *Dragon Ball* peuvent
+partager la même œuvre MAL sans partager leurs ISBN ou leurs volumes.
+Une seconde ligne décrivant déjà la Deluxe ne doit pas ajouter ses 34 tomes
+une deuxième fois.
 
-Une ligne pour `Dragon Ball — Pastel, 42 tomes` et une autre pour
-`Dragon Ball — Deluxe, 34 tomes` peuvent viser le **même manga canonique**,
-mais sont conservées avec deux clés d'édition différentes. Les
-éditions distinctes **ne sont jamais fusionnées**.
+La confirmation reste refusée si l'œuvre est marquée `NOT_INTERESTED`
+dans la bibliothèque de lecture tant que cette contradiction n'est pas
+corrigée explicitement.
 
-Si deux lignes veulent s'associer à la *même œuvre et la même édition*,
-l'opération est bloquée : les quantités ne sont pas additionnées
-silencieusement. Si un manga est marqué `NOT_INTERESTED`, le rapprochement
-est également bloqué jusqu'à correction explicite de ce conflit.
+## Garanties techniques
 
-## Garanties PostgreSQL
+- `GET /inventory/pending/candidates` retourne des **suggestions seulement**.
+- `POST /inventory/pending/resolve/preview` présente les éditions
+  existantes, les quantités, les actions autorisées et un jeton SHA256
+  incluant le contexte. Aucune écriture.
+- `POST /inventory/pending/resolve` exige le jeton actuel,
+  `acknowledge_work_and_edition=true` et, si des déclarations existent,
+  `acknowledge_existing_inventory=true`. L'action est explicite :
+  `CREATE_DECLARATION` ou `MARK_DUPLICATE`.
+- Sous transaction, une nouvelle édition distincte crée une ligne dans
+  `user_manga_inventory_declaration`. L'archivage **n'en crée pas**.
+  Les deux actions enregistrent leur mode et le contenu original dans
+  `user_manga_inventory_resolution` avant de retirer une seule ligne
+  de `user_manga_inventory_pending`. En cas d'erreur, la transaction
+  n'est pas validée.
+- Une colonne `resolution_mode` est ajoutée de manière additive aux
+  installations existantes ; les anciens rapprochements sont identifiés
+  par défaut comme créations de déclaration.
 
-Les deux opérations de lecture sont :
+Aucune action ne déduit d'ISBN, de numéro de tome exact, de lecture ou
+de note. Les tables `manga_fr_edition`, `user_manga_volume` et
+`user_manga_library` ne sont pas modifiées par ce rapprochement.
 
-- `GET /inventory/pending/candidates?source_key=...&q=...` : candidats
-  de recherche seulement ; le classement textuel n'est pas une preuve.
-- `POST /inventory/pending/resolve/preview` avec `source_key` et
-  `manga_id` : vérifie les données, retourne un récapitulatif et un jeton
-  de cohérence dérivé de la déclaration, de l'édition et du manga choisis.
+## Validation
 
-Une confirmation explicite via `POST /inventory/pending/resolve` ajoute
-atomiquement :
-
-- Une déclaration dans `user_manga_inventory_declaration` avec **les
-  valeurs de l'utilisateur reprises telles quelles**.
-- Une trace de provenance dans `user_manga_inventory_resolution` :
-  original, identifiant lié, édition, empreinte SHA, date de confirmation.
-- La suppression de la **ligne en attente correspondante uniquement**,
-  après que les deux écritures ont réussi. Tout échec annule l'ensemble.
-
-Aucune insertion dans `manga_fr_edition`, `user_manga_volume` ou
-`user_manga_library` : **zéro ISBN inventé, zéro numéro de tome déduit,
-zéro lecture ou note modifiée**.
-
-Un jeton périmé (notice catalogue, déclaration ou édition modifiées)
-entraîne une réponse 409 avec invitation à refaire l'aperçu. Une
-déclaration déjà résolue ne peut pas être reconfirmée par erreur.
-
-## Et après ?
-
-Le rapprochement d'une œuvre ne garantit pas encore la disponibilité des
-volumes à l'unité. La prochaine étape pourra vérifier un ISBN physique
-avec la BnF pour attribuer de véritables numéros de tome à la bonne édition.
-Les 49 lignes non rapprochées seront résolues progressivement, à partir
-des choix du propriétaire plutôt que d'une association arbitraire.
-
-Tests de non-régression :
+Les comportements de création d'une édition distincte et d'archivage
+sans double comptage sont couverts par les tests
 `tests/test_inventory_resolution.py`,
-`tests/web/inventory-resolution.test.mjs`, test d'intégration HTTP sur
-PostgreSQL jetable (deux éditions d'une même œuvre, rejet des anciens
-jetons, traçabilité, non-mutation du statut de lecture et des ISBN).
+`tests/web/inventory-resolution.test.mjs` et par la recette
+PostgreSQL/HTTP jetable de la CI. La validation des livres réels
+appartient au propriétaire : **l'application ne peut pas deviner quels
+exemplaires sont physiquement identiques**.
