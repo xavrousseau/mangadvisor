@@ -21,7 +21,7 @@ import {
 } from "./appearance.js";
 
 const STATUS = ["READ","READING","OWNED","WANT_TO_READ","DROPPED","NOT_INTERESTED"];
-const SCREENS = ["home","discover","recommendations","library","appearance"];
+const SCREENS = ["home","discover","recommendations","library","releases","appearance"];
 const state = {
   lang: ["fr","en"].includes(localStorage.getItem("ma-language")) ? localStorage.getItem("ma-language") : "fr",
   appearance: loadAppearance(window.localStorage),
@@ -118,6 +118,7 @@ function routeInfo(){
  if(path==="/for-you")return {view:"recommendations"};
  if(path==="/library")return {view:"library"};
  if(path==="/appearance")return {view:"appearance"};
+ if(path==="/releases")return {view:"releases"};
  const match=path.match(/^\/manga\/([1-9]\d*)$/);
  if(match&&idNumber(match[1]))return {view:"detail",id:Number(match[1])};
  return {view:"not-found"};
@@ -128,13 +129,13 @@ function shell(){
   document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
   const navItems=[
     ["home","/","◈","home"],["discover","/discover","⌕","discover"],
-    ["recommendations","/for-you","✧","forYou"],["library","/library","▤","library"]
+    ["recommendations","/for-you","✧","forYou"],["library","/library","▤","library"],["releases","/releases","◷","releases"]
   ];
   return '<div class="layout"><aside class="sidebar" aria-label="Navigation principale"><a href="/" class="brand" data-go="/">'+
   '<div class="logo-mark">M</div><div class="logo-word">mangadvisor<span>.</span><small>YOUR MANGA UNIVERSE</small></div></a>'+
   '<div class="sidebar-caption">Mangadvisor</div><nav class="nav">'+navItems.map(([view,url,icon,key])=>
     '<button class="nav-link '+(active===view?'active':'')+'" data-go="'+url+'"'+(active===view?' aria-current="page"':'')+
-    '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+L(key)+'</span></button>').join("")+
+    '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+(key==="releases"?e(state.lang==="fr"?"Sorties":"Releases"):L(key))+'</span></button>').join("")+
   '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p></div></aside>'+
   '<div class="main"><header class="topbar"><div class="crumb">'+L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active)+'</div>'+
   '<div class="topbar-right"><button type="button" class="global-search-trigger" data-action="global-search" aria-label="'+e(state.lang==="fr"?"Rechercher un manga":"Search manga")+'" title="'+e(state.lang==="fr"?"Rechercher · Ctrl+K":"Search · Ctrl+K")+'">⌕ <span>'+e(state.lang==="fr"?"Rechercher":"Search")+'</span><kbd>Ctrl K</kbd></button><label class="field-label" for="app-language">'+L("language")+'</label><select id="app-language" class="locale-select" aria-label="'+L("language")+'"><option value="fr"'+(state.lang==="fr"?" selected":"")+'>🇫🇷 FR</option><option value="en"'+(state.lang==="en"?" selected":"")+'>🇬🇧 EN</option></select>'+
@@ -165,13 +166,13 @@ async function render(){
    document.documentElement.lang=state.lang;
    document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
    root.querySelectorAll(".nav-link[data-go]").forEach(link=>{
-     const selected=link.dataset.go===({home:"/",discover:"/discover",recommendations:"/for-you",library:"/library"}[active]||"");
+     const selected=link.dataset.go===({home:"/",discover:"/discover",recommendations:"/for-you",library:"/library",releases:"/releases"}[active]||"");
      link.classList.toggle("active",selected);
      if(selected)link.setAttribute("aria-current","page");
      else link.removeAttribute("aria-current");
    });
    const crumb=root.querySelector(".crumb");
-   if(crumb)crumb.textContent=L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
+   if(crumb)crumb.textContent=active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
    const appearance=root.querySelector(".appearance-trigger");
    if(appearance)appearance.classList.toggle("active",active==="appearance");
    content.innerHTML='<div class="skeleton"></div>';
@@ -196,8 +197,15 @@ async function view(token){
    if(view.view==="library")return await renderLibrary(token);
    if(view.view==="recommendations")return await renderRecommendations(token);
    if(view.view==="appearance")return renderAppearance(token);
+   if(view.view==="releases")return renderReleases(token);
    mount(emptyBox("⌕",L("noResults"),L("noResultsHelp"),L("startExplore"),"/discover"),token);
  }catch(err){mount(errorBox(err),token);}
+}
+function renderReleases(token){
+ const fr=state.lang==="fr";
+ const html='<section class="releases-hero"><span class="eyebrow">◷ MANGADVISOR · '+(fr?'AGENDA DES SORTIES':'RELEASE CALENDAR')+'</span><h1>'+(fr?'Ne rate plus la suite de tes séries.':'Never miss the next volume.')+'</h1><p>'+(fr?'Un calendrier pensé pour ta collection, avec les sorties françaises vérifiées, les éditions exactes et les ISBN.':'A release timeline for your collection with verified editions and ISBNs.')+'</p></section>'+
+ '<section class="releases-empty"><div class="releases-empty-mark">◷</div><h2>'+(fr?'Le calendrier arrive. Les dates doivent être fiables.':'The calendar is coming. Dates must be verified.')+'</h2><p>'+(fr?'Notre base française est encore en cours d’enrichissement BnF/Scrinis. Nous n’affichons aucune date non confirmée ni de faux tomes manquants. En attendant, retrouve tes séries et tes éditions dans ta collection.':'French publication metadata is being verified. No invented dates or missing volumes are displayed.')+'</p><div class="actions"><button class="btn btn-primary" data-go="/library">'+(fr?'Voir ma collection':'My collection')+' →</button><button class="btn btn-soft" data-go="/discover">'+(fr?'Explorer les mangas':'Explore manga')+' →</button></div></section>';
+ return mount(html,token);
 }
 function renderAppearance(token){
  const presetCards=PRESETS.map(preset=>
