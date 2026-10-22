@@ -163,6 +163,14 @@ jobs:
             throw "Le parcours de mise a jour Git securisee est invalide."
           }
 
+      - name: Tester le vrai menu 7 pendant sa propre mise a jour Git
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-menu-real-github-update.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Le menu 7 ne parvient pas a mettre a jour son propre batch et le script de sauvegarde."
+          }
+
       - name: Verifier le synchroniseur GitHub sur un clone Windows jetable
         shell: powershell
         run: |
