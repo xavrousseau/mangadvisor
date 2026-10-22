@@ -306,8 +306,7 @@ async function renderHome(token){
    const library=await request("/library?limit=1");
    if(!stillHere()||!target)return;
    if(!(library.items||[]).length){
-     target.innerHTML=emptyBox("✧",L("homePersonalTitle"),L("homePersonalMissing"),
-       L("startExplore"),"/discover");
+     target.innerHTML='<div class="home-onboarding"><div class="home-onboarding-icon">✧</div><div><strong>'+L("homePersonalTitle")+'</strong><p>'+L("homePersonalMissing")+'</p></div><button class="btn btn-small btn-soft" data-go="/discover">'+L("startExplore")+' →</button></div>';
      return;
    }
    const result=await request("/recommendations/library",{
@@ -320,8 +319,7 @@ async function renderHome(token){
    const picks=personalPicks(result.recommendations||[],[],4);
    if(!stillHere()||!target)return;
    if(!picks.length){
-     target.innerHTML=emptyBox("✧",L("homePersonalTitle"),L("homePersonalNoMatch"),
-       L("homePersonalAction"),"/for-you");
+     target.innerHTML='<div class="home-onboarding"><div class="home-onboarding-icon">✧</div><div><strong>'+L("homePersonalTitle")+'</strong><p>'+L("homePersonalNoMatch")+'</p></div><button class="btn btn-small btn-soft" data-go="/for-you">'+L("homePersonalAction")+' →</button></div>';
      return;
    }
    const sources=recommendationSources(result);
