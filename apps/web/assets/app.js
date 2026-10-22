@@ -238,14 +238,12 @@ function renderAppearance(token){
  );
 }
 async function renderHome(token){
- const markup='<section class="hero"><div class="hero-decor" aria-hidden="true"></div><div class="hero-content"><div class="eyebrow">✦ '+L("eyebrow")+'</div>'+
+ const markup='<section class="hero hero-featured"><div class="hero-decor" aria-hidden="true"></div><div class="hero-content"><div class="eyebrow">✦ '+e(state.lang==="fr"?"TON PROCHAIN COUP DE CŒUR":"YOUR NEXT FAVORITE")+'</div>'+
  '<h1>'+ (state.lang==="fr"?'Chaque grande histoire commence par une <em>découverte.</em>':'Every great story begins with <em>discovery.</em>')+'</h1>'+
  '<p>'+L("heroText")+'</p><div class="hero-actions"><button class="btn btn-primary" data-go="/discover">⌕ '+L("startExplore")+' →</button>'+
  '<button class="btn btn-ghost" data-go="/for-you">✧ '+L("getRecs")+'</button></div></div></section>'+
- '<div class="section-header"><div><h2 class="section-title">'+L("whatNext")+'</h2></div></div>'+
- '<div class="quick-actions">'+[
-  ["⌕","discover","browseHelp","/discover"],["✧","forYou","recommendationsHelp","/for-you"],["▤","library","libraryHelp","/library"]
- ].map(([icon,title,subtitle,target])=>'<button class="quick-card" data-go="'+target+'"><span class="quick-symbol" aria-hidden="true">'+icon+'</span><span class="quick-arrow">↗</span><h3>'+L(title)+'</h3><p>'+L(subtitle)+'</p></button>').join("")+'</div>'+
+ '<div class="feature-cover-stack" id="home-featured-covers" aria-hidden="true"></div><div class="section-header home-action-heading"><div><h2 class="section-title">'+L("whatNext")+'</h2></div></div>'+
+ '<div class="home-shortcuts"><button class="shortcut-chip" data-go="/discover">⌕ '+L("discover")+' ↗</button><button class="shortcut-chip" data-go="/for-you">✧ '+L("forYou")+' ↗</button><button class="shortcut-chip" data-go="/library">▤ '+L("library")+' ↗</button></div>'+
  '<section aria-labelledby="home-continue-title"><div class="section-header"><div><h2 class="section-title" id="home-continue-title">'+L("homeContinue")+'</h2>'+
  '<p class="section-caption">'+L("homeContinueDesc")+'</p></div><button class="btn-link" data-go="/library">'+L("homeContinueAction")+' →</button></div>'+
  '<div id="home-continue">'+loadingCards(4)+'</div></section>'+
@@ -289,6 +287,14 @@ async function renderHome(token){
    const items=result.items||[];
    const urls=await covers(items);
    if(!stillHere()||!target)return;
+   const feature=document.querySelector("#home-featured-covers");
+   if(feature && items.length){
+     const artworks=items.slice(0,3).map(item=>{
+       const src=coverUrl(urls[item.manga_id||item.id]);
+       return src?'<img src="'+e(src)+'" alt="" loading="lazy" decoding="async">':'';
+     }).filter(Boolean);
+     feature.innerHTML=artworks.map((img,index)=>'<div class="feature-volume feature-volume-'+index+'">'+img+'</div>').join("");
+   }
    target.innerHTML=items.length?'<div class="manga-grid">'+items.map(item=>card(item,urls)).join("")+'</div>':
      emptyBox("📚",L("noResults"),L("noResultsHelp"));
   }catch(error){if(stillHere()&&target)target.innerHTML=errorBox(error);}
@@ -335,13 +341,13 @@ async function renderHome(token){
 async function renderDiscover(token){
  const opts=GENRES.map(([value,label])=>'<option value="'+e(value)+'"'+(state.catalogGenre===value?' selected':'')+'>'+
  (label==="allGenres"?L("allGenres"):tr(value))+'</option>').join("");
- const layout='<div class="headline-row"><div><div class="eyebrow">MANGADVISOR · DISCOVERY</div><h1 class="page-title">'+L("startExplore")+'</h1>'+
+ const layout='<div class="headline-row discover-heading"><div><div class="eyebrow">✦ MANGADVISOR · DISCOVERY</div><h1 class="page-title">'+L("startExplore")+'</h1>'+
  '<p class="page-desc">'+L("browseHelp")+'</p></div></div>'+
- '<div class="filters"><div class="field grow"><label for="catalog-query">'+L("search")+'</label>'+
+ '<div class="discover-search-shell"><div class="filters"><div class="field grow"><label for="catalog-query">'+L("search")+'</label>'+
  '<input type="search" class="input" id="catalog-query" autocomplete="off" value="'+e(state.catalogQuery)+'" placeholder="'+L("searchPlaceholder")+'"></div>'+
  '<div class="field medium"><label for="catalog-genre">'+L("filterGenre")+'</label><select class="select" id="catalog-genre">'+opts+'</select></div>'+
- '<label class="check"><input type="checkbox" id="catalog-finished"'+(state.catalogFinished?" checked":"")+'>'+L("finishedOnly")+'</label></div>'+
- '<div id="catalog-results">'+loadingCards(10)+'</div>';
+ '<label class="check"><input type="checkbox" id="catalog-finished"'+(state.catalogFinished?" checked":"")+'>'+L("finishedOnly")+'</label></div></div>'+
+ '<div class="discover-collection-head"><h2>'+e(state.lang==="fr"?"À explorer":"Explore the collection")+'</h2><p>'+e(state.lang==="fr"?"Des mangas à découvrir, à ton rythme.":"Find a new read from the catalogue.")+'</p></div><div id="catalog-results">'+loadingCards(10)+'</div>';
  if(!mount(layout,token))return;
  await updateCatalog(token);
 }
@@ -366,7 +372,7 @@ async function updateCatalog(token){
 }
 async function renderLibrary(token){
  const statusOpts=[["","allStatuses"],...STATUS.map(v=>[v,v])];
- const html='<div class="headline-row"><div><div class="eyebrow">YOUR COLLECTION</div><h1 class="page-title">'+L("library")+'</h1>'+
+ const html='<div class="headline-row library-heading"><div><div class="eyebrow">✦ YOUR COLLECTION</div><h1 class="page-title">'+L("library")+'</h1>'+
  '<p class="page-desc">'+L("libraryHelp")+'</p></div>'+
  '<div class="actions"><button class="btn btn-primary" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner mes tomes":"Scan my volumes")+'</button>'+
  '<button class="btn btn-soft" data-go="/discover">＋ '+L("startExplore")+'</button></div></div>'+
@@ -375,7 +381,7 @@ async function renderLibrary(token){
  '<div class="field medium"><label for="lib-status">'+L("status")+'</label><select id="lib-status" class="select">'+
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
- '<div id="library-results">'+loadingCards(10)+'</div>'+
+ '<div id="library-results">'+loadingCards(10)+'</div><div class="library-tools-heading"><h2>'+e(state.lang==="fr"?"Organiser ma collection":"Manage my collection")+'</h2><p>'+e(state.lang==="fr"?"Imports, éditions et outils de gestion, accessibles quand tu en as besoin.":"Import and edition tools, when you need them.")+'</p></div>'+
  '<section class="bulk-workspace"><details id="reading-profile-workspace"><summary>◈ '+e(state.lang==="fr"?"Mon profil de lecture":"My reading profile")+'</summary><button class="btn btn-soft" type="button" data-action="reading-profile-load">'+e(state.lang==="fr"?"Afficher mon profil":"Show my profile")+'</button><div id="reading-profile-results"></div></details></section>'+
  '<section class="bulk-workspace"><details id="reading-import-workspace"><summary>▤ '+e(state.lang==="fr"?"Importer une bibliothèque de lecture (CSV / Excel)":"Import reading library (CSV / Excel)")+'</summary>'+
  '<p class="page-desc">'+e(state.lang==="fr"?"Ajoute de nouveaux statuts, notes et favoris sans écraser les fiches existantes. Les fichiers Excel sont convertis localement sur ton API. Ce n’est pas l’import de tomes ISBN.":"Add reading status and ratings without overwriting existing entries. This is not the ISBN book import.")+'</p>'+
