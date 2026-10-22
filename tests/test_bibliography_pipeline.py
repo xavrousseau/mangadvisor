@@ -44,6 +44,16 @@ class PipelineTests(unittest.TestCase):
             {"scrinis_public_n": 42}, [], client)
         self.assertEqual(output["status"], "SCRINIS_ID_MISMATCH")
 
+    def test_verified_french_alias_prevents_translated_title_false_negative(self):
+        from apps.api.app.bnf_candidate_review import review
+        sample = [{"isbn13": "9781234567897", "title_fr": "L'Attaque des Titans. 1",
+                   "language_recorded": "fre", "edition_kind_suggested": "UNKNOWN"}]
+        without = review(sample, ["Shingeki no Kyojin"])
+        with_alias = review(sample, ["Shingeki no Kyojin", "L'Attaque des Titans"])
+        self.assertEqual(without["work_status_counts"], {"REJECT_DIFFERENT_WORK": 1})
+        self.assertEqual(with_alias["work_status_counts"], {"REVIEW_VOLUME_CANDIDATE": 1})
+        self.assertFalse(with_alias["candidates"][0]["registration_ready"])
+
     def test_full_scan_requires_single_explicit_manga(self):
         with self.assertRaises(ValueError):
             pipeline.run_pilot(pages=10)
