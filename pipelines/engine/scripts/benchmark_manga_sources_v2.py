@@ -31,6 +31,7 @@ BASE = {"scrinis": "https://scrin.is/api/v1",
         "mangaupdates": "https://api.mangaupdates.com/v1"}
 PAUSE = {"scrinis": 4.5, "mangaupdates": 2.0}
 MAX_RESPONSE = 600_000
+MAX_DETAIL_RESPONSE = 2_500_000
 MAX_CANDIDATES = 8
 DETAIL_BUDGET = 12
 ALT_BUDGET = 6
@@ -257,7 +258,10 @@ def request_public(source: str, kind: str, session: Any, *,
         return {"status": "UNAVAILABLE", "http_status": response.status_code}
     if response.status_code >= 400:
         return {"status": "HTTP_ERROR", "http_status": response.status_code}
-    if len(response.content) > MAX_RESPONSE:
+    # Long-running manga series can exceed the generic 600 kB envelope.
+    # Keep a separate hard cap for metadata details; never parse unbounded JSON.
+    allowed_bytes = MAX_DETAIL_RESPONSE if (source == "scrinis" and kind == "detail") else MAX_RESPONSE
+    if len(response.content) > allowed_bytes:
         return {"status": "RESPONSE_TOO_LARGE"}
     try:
         payload = json.loads(response.content)
