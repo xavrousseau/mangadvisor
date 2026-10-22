@@ -20,14 +20,14 @@ from fastapi import APIRouter, HTTPException
 from apps.api.app.collection import (
     BNF_SOURCE, EDITION_KINDS, isbn13_normalize, safe_bnf_ark,
 )
-from apps.api.app.edition_discovery import search_bnf_by_title
+from apps.api.app.edition_discovery import search_bnf_title_pages
 from apps.api.app.edition_enrichment import select_search_titles, title_clue
 
 SOURCE = "BNF_SRU"
 MAX_BATCH = 25
 DEFAULT_BATCH = 10
 REQUEST_DELAY = 1.25
-MAX_CANDIDATES_PER_MANGA = 40
+MAX_CANDIDATES_PER_MANGA = 120
 
 # Additive and idempotent. Separate from manga_fr_edition by design.
 # There is NO foreign-key insert into user_manga_volume or library tables.
@@ -202,7 +202,7 @@ def run_batch(
     connection_factory: Callable[..., Any],
     *, limit: int = DEFAULT_BATCH,
     refresh: bool = False,
-    search: Callable[[str], dict[str, Any]] = search_bnf_by_title,
+    search: Callable[[str], dict[str, Any]] = search_bnf_title_pages,
     sleep: Callable[[float], Any] = time.sleep,
     target_ids: list[int] | None = None,
 ) -> dict[str, int]:
@@ -247,7 +247,7 @@ def run_batch(
                 status = "SKIPPED"
             elif errors == len(titles):
                 status = "ERROR"
-            elif errors:
+            elif errors or any(payload.get("page_limit_reached", False) for _, payload in results):
                 status = "PARTIAL"
             else:
                 status = "CHECKED" if candidates else "EMPTY"
