@@ -222,6 +222,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Identifiants internes separes par des virgules")
     parser.add_argument("--pages", type=int, default=3)
     parser.add_argument("--skip-scrinis", action="store_true")
+    parser.add_argument("--skip-bnf", action="store_true",
+                        help="Reutiliser les candidats BnF existants sans requete BnF")
     parser.add_argument("--details", action="store_true",
                         help="Inclure les lignes ISBN dans le rapport JSON")
     parser.add_argument("--report-only", action="store_true",
@@ -231,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
         ids = [int(x.strip()) for x in args.manga_ids.split(",")] if args.manga_ids else None
         report = run_pilot(limit=args.limit, manga_ids=ids, pages=args.pages,
                            scrinis=not (args.skip_scrinis or args.report_only),
-                           bnf=not args.report_only)
+                           bnf=not (args.report_only or args.skip_bnf))
     except (ValueError, TypeError) as exc:
         parser.error(str(exc))
     if not args.details:
