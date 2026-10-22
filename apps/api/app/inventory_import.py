@@ -72,10 +72,16 @@ CREATE TABLE IF NOT EXISTS user_manga_inventory_resolution (
     original_declaration JSONB NOT NULL,
     original_sha256 TEXT NOT NULL,
     confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resolution_mode TEXT NOT NULL DEFAULT 'CREATE_DECLARATION'
+        CHECK (resolution_mode IN ('CREATE_DECLARATION', 'MARK_DUPLICATE')),
     PRIMARY KEY (user_id, source_key)
 );
 CREATE INDEX IF NOT EXISTS user_manga_inventory_resolution_work_idx
   ON user_manga_inventory_resolution(user_id, manga_id);
+-- Existing installations receive the new audit field without resetting inventory.
+ALTER TABLE user_manga_inventory_resolution
+    ADD COLUMN IF NOT EXISTS resolution_mode TEXT NOT NULL
+    DEFAULT 'CREATE_DECLARATION';
 """
 
 
@@ -100,6 +106,9 @@ class PendingResolvePreview(BaseModel):
 class PendingResolveConfirm(PendingResolvePreview):
     confirmation_token: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     acknowledge_work_and_edition: bool = False
+    resolution_mode: str = Field("CREATE_DECLARATION",
+                                 pattern=r"^(CREATE_DECLARATION|MARK_DUPLICATE)$")
+    acknowledge_existing_inventory: bool = False
 
 
 def ensure_inventory_schema(connection_factory: Callable[..., Any]) -> None:
