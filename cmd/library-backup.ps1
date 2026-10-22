@@ -165,6 +165,17 @@ function Prepare-Existing-Postgres {
   }
   Write-Host "PostgreSQL existant accessible : sauvegarde autorisee."
 }
+function Test-Api-Password {
+  # Container env may be newer than the role secret in the retained PGDATA.
+  # Test the SAME TCP password authentication that FastAPI needs.
+  $command='PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"'
+  try {
+    $rows=@(& docker exec $containerName sh -c $command 2>$null)
+    return ($LASTEXITCODE -eq 0 -and $rows.Count -eq 1 -and ([string]$rows[0]).Trim() -ceq "1")
+  } catch {
+    return $false
+  }
+}
 function Db-Setting([string]$key) {
   $result=& docker exec $containerName printenv $key
   Assert-Ok "Configuration PostgreSQL $key indisponible"
