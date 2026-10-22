@@ -120,6 +120,46 @@ class PipelineTests(unittest.TestCase):
                 "9782344067802",
             )
 
+    def test_details_shows_bnf_candidates_and_summary_omits_them(self):
+        import contextlib
+        import io
+        import json
+
+        candidate = {
+            "isbn13": "9782344067802",
+            "title_fr": "Exemple. Tome 1",
+            "publisher_fr": "Editeur",
+            "work_status": "REVIEW_VOLUME_CANDIDATE",
+            "language_status": "FRENCH_DECLARED",
+            "edition_suggested": "UNKNOWN",
+            "volume_suggested": 1,
+            "registration_ready": False,
+        }
+
+        def sample_report():
+            return {
+                "selected_ids": [2],
+                "works": [{
+                    "manga_id": 2,
+                    "candidates": [candidate.copy()],
+                    "cross_source": {"status": "NOT_REQUESTED", "isbn_correlations": []},
+                }],
+            }
+
+        with patch.object(pipeline, "run_pilot", side_effect=lambda **kw: sample_report()):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(pipeline.main(["--report-only", "--details"]), 0)
+            detailed = json.loads(out.getvalue())
+            self.assertEqual(detailed["works"][0]["candidates"], [candidate])
+            self.assertFalse(detailed["works"][0]["candidates"][0]["registration_ready"])
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(pipeline.main(["--report-only"]), 0)
+            summary = json.loads(out.getvalue())
+            self.assertNotIn("candidates", summary["works"][0])
+
     def test_skip_bnf_reuses_saved_candidates(self):
         import contextlib
         import io
