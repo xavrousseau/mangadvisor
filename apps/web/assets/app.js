@@ -241,8 +241,8 @@ async function renderHome(token){
  const markup='<section class="hero hero-featured"><div class="hero-decor" aria-hidden="true"></div><div class="hero-content"><div class="eyebrow">✦ '+e(state.lang==="fr"?"TON PROCHAIN COUP DE CŒUR":"YOUR NEXT FAVORITE")+'</div>'+
  '<h1>'+ (state.lang==="fr"?'Chaque grande histoire commence par une <em>découverte.</em>':'Every great story begins with <em>discovery.</em>')+'</h1>'+
  '<p>'+L("heroText")+'</p><div class="hero-actions"><button class="btn btn-primary" data-go="/discover">⌕ '+L("startExplore")+' →</button>'+
- '<button class="btn btn-ghost" data-go="/for-you">✧ '+L("getRecs")+'</button></div></div></section>'+
- '<div class="feature-cover-stack" id="home-featured-covers" aria-hidden="true"></div><div class="section-header home-action-heading"><div><h2 class="section-title">'+L("whatNext")+'</h2></div></div>'+
+ '<button class="btn btn-ghost" data-go="/for-you">✧ '+L("getRecs")+'</button></div></div>'+
+ '<div class="feature-cover-stack" id="home-featured-covers" aria-hidden="true"></div></section><div class="section-header home-action-heading"><div><h2 class="section-title">'+L("whatNext")+'</h2></div></div>'+
  '<div class="home-shortcuts"><button class="shortcut-chip" data-go="/discover">⌕ '+L("discover")+' ↗</button><button class="shortcut-chip" data-go="/for-you">✧ '+L("forYou")+' ↗</button><button class="shortcut-chip" data-go="/library">▤ '+L("library")+' ↗</button></div>'+
  '<section aria-labelledby="home-continue-title"><div class="section-header"><div><h2 class="section-title" id="home-continue-title">'+L("homeContinue")+'</h2>'+
  '<p class="section-caption">'+L("homeContinueDesc")+'</p></div><button class="btn-link" data-go="/library">'+L("homeContinueAction")+' →</button></div>'+
