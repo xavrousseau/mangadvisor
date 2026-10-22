@@ -143,7 +143,24 @@ def scrinis_selection_diagnostics(conn: Any, selected: list[int]) -> dict[int, d
                 "attempt_cooldown_active": cooldown_active,
                 "source_retry_eligible": not has_alias and not cooldown_active,
             }
+    for detail in result.values():
+        detail["next_action"] = next_scrinis_action(detail)
     return result
+
+
+def next_scrinis_action(row: dict[str, Any]) -> str:
+    """Safe triage without overriding a retry delay or inventing a match."""
+    status = row.get("previous_attempt_status")
+    if row.get("already_has_source_french_alias"):
+        return "USE_EXISTING_TITLE_EVIDENCE"
+    if status == "AMBIGUOUS":
+        return "REVIEW_AMBIGUOUS_SOURCE_MATCH"
+    if status == "DETAIL_UNAVAILABLE":
+        return ("AWAIT_NORMAL_RETRY" if row.get("attempt_cooldown_active")
+                else "RETRY_DETAIL_WHEN_ELIGIBLE")
+    if row.get("attempt_cooldown_active"):
+        return "AWAIT_NORMAL_RETRY"
+    return "ELIGIBLE_FOR_NORMAL_PROVIDER_SEARCH"
 
 
 def select_ids(conn: Any, *, limit: int, manga_ids: list[int] | None) -> list[int]:
