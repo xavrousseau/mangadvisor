@@ -286,7 +286,7 @@ def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,
             manga, raw, fact, aliases = load_work_evidence(conn, manga_id)
         titles = [manga[k] for k in ("title", "title_english", "title_japanese")
                   if manga.get(k)] + aliases
-        quality = review(raw, titles)
+        quality = review(raw, titles, manga.get("mal_authors") or [])
         probe = None
         if probe_scrinis:
             if probe_blocked:
@@ -307,6 +307,7 @@ def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,
             "total_candidates": quality["total_staged"],
             "work_status_counts": quality["work_status_counts"],
             "language_status_counts": quality["language_status_counts"],
+            "author_evidence_counts": quality["author_evidence_counts"],
             "edition_suggested_counts": quality["edition_suggested_counts"],
             "candidates": quality["candidates"],
             "cross_source": correlations,
