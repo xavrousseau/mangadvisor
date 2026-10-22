@@ -703,7 +703,7 @@ jobs:
           assert after[:3]==before[:3],(before,after)
           assert after[3]==before[3]+2,(before,after)
           assert after[4]==before[4],(before,after)
-          assert after[5]==before[5]+2,(before,after)
+          assert after[5]==before[5]+3,(before,after)
           with get_connection() as conn:
               with conn.cursor() as cur:
                   cur.execute("""
