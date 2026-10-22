@@ -116,7 +116,30 @@ def edition_status(title: str, existing: str = "UNKNOWN") -> str:
     return existing if existing and existing != "CLASSIC" else "UNKNOWN"
 
 
-def classify_candidate(row: dict[str, Any], known_titles: list[str]) -> dict[str, Any]:
+def author_correspondence(author: Any, known_authors: list[str] | None) -> str:
+    """Independent author hint, not a licence to link an ISBN or work.
+
+    Catalogued contributors can include translators and editors; a missing
+    token match is therefore REVIEW rather than a definitive work conflict.
+    """
+    if not isinstance(author, str) or not author.strip() or not known_authors:
+        return "UNVERIFIED"
+    source = set(re.findall(r"[a-z0-9]+", normalized(author)))
+    usable = []
+    for name in known_authors:
+        tokens = set(re.findall(r"[a-z0-9]+", normalized(name)))
+        if len(tokens) >= 2 and sum(len(x) for x in tokens) >= 6:
+            usable.append(tokens)
+    if not source or not usable:
+        return "UNVERIFIED"
+    return "MATCH" if any(tokens <= source for tokens in usable) else "REVIEW_DIFFERENT_CREDITS"
+
+
+def classify_candidate(
+    row: dict[str, Any], known_titles: list[str],
+    known_authors: list[str] | None = None,
+) -> dict[str, Any]:
+
     work = work_candidate_status(str(row.get("title_fr") or ""), known_titles)
     lang = language_status(row.get("language_recorded"))
     edition = edition_status(str(row.get("title_fr") or ""),
@@ -137,6 +160,7 @@ def classify_candidate(row: dict[str, Any], known_titles: list[str]) -> dict[str
         "language_recorded": row.get("language_recorded"),
         "work_status": work,
         "language_status": lang,
+        "author_evidence": author_correspondence(row.get("author_fr"), known_authors),
         "edition_suggested": edition,
         "volume_suggested": volume,
         "registration_ready": False,
