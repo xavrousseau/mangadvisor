@@ -7,6 +7,8 @@ New-Item -ItemType Directory -Force -Path $fixture | Out-Null
 $script:envFile=Join-Path $fixture ".env"
 $script:backups=Join-Path $fixture "backups"
 $script:containerName="mangadvisor_postgres"
+$script:pgDb="mangadvisor"
+$script:pgUser="manga"
 $script:NonInteractive=$false
 $script:allow=$false
 $script:running=$false
@@ -83,6 +85,7 @@ function docker {
     return
   }
   if ($argv[0] -eq "exec" -and $argv[2] -eq "pg_isready") { return }
+  if ($argv[0] -eq "exec" -and $argv[2] -eq "psql") { "manga"; return }
   if ($argv[0] -eq "exec" -and $argv[2] -eq "sh") { "1"; return }
   if ($argv[0] -eq "volume") {
     $global:LASTEXITCODE=1
