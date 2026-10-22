@@ -601,10 +601,32 @@ async function updateLibrary(token){
    '<div class="manga-grid">'+items.map(m=>'<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(preferredMangaTitle(m,state.lang))+'</h3>'+
    '<p class="manga-card-meta">'+e(libraryCardMeta({...m,library_status:libraryStatus(state.lang,m.library_status)},declared,state.lang))+
    (m.is_favorite?' ♥':'')+'</p><button class="card-open" data-go="/manga/'+m.manga_id+'">'+L("details")+' →</button></div></article>').join("")+'</div>':
-   (wishlistMode?emptyBox("♡",e(state.lang==="fr"?"Pas encore de mangas dans tes envies":"Your wishlist is empty"),e(state.lang==="fr"?"Explore le catalogue et ajoute les séries que tu souhaites lire.":"Explore the catalogue and save manga you want to read."),L("startExplore"),"/discover"):'<section class="collection-onboarding"><div class="collection-onboarding-art" aria-hidden="true">✧</div><span class="eyebrow">'+e(state.lang==="fr"?"LA PREMIÈRE PAGE":"CHAPTER ONE")+'</span><h2>'+e(state.lang==="fr"?"Ta mangathèque commence ici.":"Your manga collection starts here.")+'</h2><p>'+e(state.lang==="fr"?"Scanne un tome, ajoute une série depuis le catalogue ou importe ta bibliothèque existante.":"Scan a volume, add a series or import your existing library.")+'</p><div class="collection-onboarding-actions"><button class="btn btn-primary" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner mon premier tome":"Scan my first volume")+'</button><button class="btn btn-soft" data-go="/discover">⌕ '+L("startExplore")+'</button><button class="btn btn-ghost" data-action="library-view" data-value="manage">↓ '+e(state.lang==="fr"?"Importer":"Import")+'</button></div></section>');
+   (wishlistMode?emptyBox("♡",e(state.lang==="fr"?"Pas encore de mangas dans tes envies":"Your wishlist is empty"),e(state.lang==="fr"?"Explore le catalogue et ajoute les séries que tu souhaites lire.":"Explore the catalogue and save manga you want to read."),L("startExplore"),"/discover"):'<section class="collection-onboarding"><div class="collection-onboarding-art" aria-hidden="true">✧</div><span class="eyebrow">'+e(state.lang==="fr"?"LA PREMIÈRE PAGE":"CHAPTER ONE")+'</span><h2>'+e(state.lang==="fr"?"Ta mangathèque commence ici.":"Your manga collection starts here.")+'</h2><p>'+e(state.lang==="fr"?"Scanne un tome, ajoute une série depuis le catalogue ou importe ta bibliothèque existante.":"Scan a volume, add a series or import your existing library.")+'</p><div class="collection-onboarding-actions"><button class="btn btn-primary" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner mon premier tome":"Scan my first volume")+'</button><button class="btn btn-soft" data-go="/discover">⌕ '+L("startExplore")+'</button><button class="btn btn-ghost" data-action="library-view" data-value="manage">↓ '+e(state.lang==="fr"?"Importer":"Import")+'</button></div><button class="collection-demo-trigger" data-action="library-demo">✧ '+e(state.lang==="fr"?"Voir un aperçu avec de vrais mangas du catalogue":"Preview with real catalogue manga")+' →</button></section>');
   out.innerHTML=html+paginate(state.libraryPage,hasNext,"library");
  if(!wishlistMode){out.classList.toggle("library-results-list",state.libraryDisplay==="list");out.classList.toggle("library-results-covers",state.libraryDisplay!=="list");}
  }catch(err){if(token===renderToken)out.innerHTML=errorBox(err);}
+}
+async function showLibraryDemo(){
+ const token=renderToken;
+ if(routeInfo().view!=="library")return;
+ const target=document.querySelector("#library-results");
+ if(!target)return;
+ target.innerHTML=loadingCards(5);
+ try{
+  const result=await request("/mangas?limit=10");
+  const entries=(result.items||[]).slice(0,10);
+  const urls=await covers(entries);
+  if(renderToken!==token||state.libraryView!=="series")return;
+  const host=document.querySelector("#library-results");
+  if(!host)return;
+  host.innerHTML='<section class="collection-demo-notice" role="status"><div><strong>'+e(state.lang==="fr"?"APERÇU DU DESIGN — PAS TA COLLECTION":"DESIGN PREVIEW — NOT YOUR LIBRARY")+'</strong><p>'+e(state.lang==="fr"?"Ces œuvres viennent du catalogue public. Aucune possession, édition ou progression ne t’est attribuée.":"These are public catalogue items. Nothing is added to your library.")+'</p></div><button type="button" class="btn btn-small" data-action="library-demo-close">'+e(state.lang==="fr"?"Fermer l’aperçu":"Close preview")+'</button></section>'+
+   '<div class="manga-grid">'+entries.map(m=>card(m,urls)).join("")+'</div>';
+ }catch(err){
+  if(renderToken===token){
+   const host=document.querySelector("#library-results");
+   if(host)host.innerHTML=errorBox(err);
+  }
+ }
 }
 async function readLibraryItem(manga){
  try{
@@ -1484,6 +1506,8 @@ root.addEventListener("click",async event=>{
  }
  const action=button.dataset.action;
  if(action==="refresh")return render();
+ if(action==="library-demo")return showLibraryDemo();
+ if(action==="library-demo-close")return updateLibrary(renderToken);
  if(action==="discover-genre"){
    const genre=button.dataset.value;
    if(!GENRES.some(([value])=>value===genre))return;
