@@ -213,6 +213,7 @@ class BenchmarkV2Tests(unittest.TestCase):
             "public_n": 3014, "titles": {"primary": "One Piece"},
             "summary": "x" * 2_600_000,
         }).encode()
+        response._content_consumed = True
         sess.get.return_value = response
         result = v2.request_public("scrinis", "detail", sess, identifier="3014")
         self.assertEqual(result["status"], "OK")
@@ -227,6 +228,7 @@ class BenchmarkV2Tests(unittest.TestCase):
         response = requests.Response()
         response.status_code = 200
         response._content = b"x" * 1000
+        response._content_consumed = True
         sess.get.return_value = response
         with patch.object(v2, "MAX_DETAIL_RESPONSE", 300):
             result = v2.request_public("scrinis", "detail", sess, identifier="3014")
