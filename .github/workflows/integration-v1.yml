@@ -5,6 +5,65 @@ on:
   workflow_dispatch:
 
 jobs:
+  postgres-volume-recovery:
+    # Fast, isolated Docker regression: no Playwright download required.
+    # This job uses a newly initialized and disposable GitHub runner only.
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialiser PostgreSQL de test
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .env <<'EOF'
+          POSTGRES_DB=mangadvisor_ci
+          POSTGRES_USER=manga_ci
+          POSTGRES_PASSWORD=only-for-disposable-github-runner
+          POSTGRES_PORT=5432
+          MEILI_MASTER_KEY=disposable-ci-key-long-enough-2026
+          MEILI_PORT=7700
+          API_PORT=8000
+          UI_PORT=8501
+          EMBEDDING_MODEL=none
+          ENABLE_TRANSLATION=false
+          ENABLE_OLLAMA=false
+          OLLAMA_PORT=11434
+          EOF
+          docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d postgres meilisearch
+          for i in $(seq 1 60); do
+            if docker exec mangadvisor_postgres pg_isready -U manga_ci -d mangadvisor_ci >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          for file in sql/schema/001_jikan_source_tables.sql sql/schema/002_canonical_manga_tables.sql sql/schema/004_add_theme_demographic_tables.sql sql/schema/006_add_jikan_recommendation_tables.sql sql/schema/007_add_user_library_tables.sql tests/smoke/seed_catalog.sql; do
+            docker exec -i mangadvisor_postgres psql -X -v ON_ERROR_STOP=1 -U manga_ci -d mangadvisor_ci < "$file" >/dev/null
+          done
+      - name: Rattacher un ancien volume PostgreSQL apres disparition du conteneur
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v pwsh
+          pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup -NonInteractive
+          BEFORE="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
+          test "$BEFORE" -gt 0
+          docker volume inspect mangadvisor_mangadvisor_pgdata >/dev/null
+          docker stop mangadvisor_postgres >/dev/null
+          docker rm mangadvisor_postgres >/dev/null
+          if pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup -NonInteractive; then
+            echo "ERREUR: reprise sans consentement"
+            exit 1
+          fi
+          if docker ps -a --format '{{.Names}}' | grep -Fx 'mangadvisor_postgres'; then
+            echo "ERREUR: conteneur recree apres refus"
+            exit 1
+          fi
+          printf 'RECUPERER\n' | pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup
+          AFTER="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
+          test "$BEFORE" = "$AFTER" || { echo "Catalogue modifie pendant la reprise"; exit 1; }
+          docker inspect --format '{{json .Mounts}}' mangadvisor_postgres | grep -q 'mangadvisor_mangadvisor_pgdata'
+          docker exec mangadvisor_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h postgres -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"' | grep -Fx '1'
+          echo "OK: volume reattache, sauvegarde verifiee, TCP authentifie, catalogue identique."
+
   docker-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 22
@@ -866,39 +925,6 @@ jobs:
           HTTP="$(curl --noproxy '*' -s --connect-timeout 3 --max-time 6 --cacert /tmp/mangadvisor-ca.crt -u manga:wrong-password -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/)"
           test "$HTTP" = "401" || { echo "Expected rejection of invalid password, got $HTTP"; exit 1; }
           echo "Mobile HTTPS: trusted local root, correct IP certificate and authentication OK"
-
-      - name: Recuperer un PostgreSQL CI sans conteneur depuis son volume historique
-        shell: bash
-        run: |
-          set -euo pipefail
-          # WARNING: this entire step runs ONLY on disposable GitHub CI
-          # PostgreSQL and never against a user's Docker Desktop.
-          BEFORE="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
-          docker volume inspect mangadvisor_mangadvisor_pgdata >/dev/null
-          docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml stop api web postgres
-          docker rm mangadvisor_postgres
-          if pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup -NonInteractive; then
-            echo "Recovery created a container without consent"
-            exit 1
-          fi
-          if docker ps -a --format '{{.Names}}' | grep -Fx 'mangadvisor_postgres'; then
-            echo "Noninteractive recovery recreated PostgreSQL"
-            exit 1
-          fi
-          printf 'RECUPERER\n' | pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup
-          docker volume inspect mangadvisor_mangadvisor_pgdata >/dev/null
-          AFTER="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
-          test "$BEFORE" = "$AFTER" || { echo "Le catalogue a ete modifie pendant le rattachement."; exit 1; }
-          docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml up -d api web
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8000/health | grep -q '"status":"ok"'; then
-              echo "PostgreSQL historique rattache, sauvegarde verifiee, API active, catalogue inchange."
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "API indisponible apres reprise du conteneur."
-          exit 1
 
       - name: Captures d'écran et diagnostic
         if: always()
