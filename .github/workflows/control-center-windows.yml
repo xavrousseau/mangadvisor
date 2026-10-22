@@ -155,6 +155,14 @@ jobs:
             throw "Docker Go-template arguments corrompus par Windows PowerShell 5.1."
           }
 
+      - name: Tester la recuperation d'un conteneur PostgreSQL absent sans toucher aux volumes
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-missing-postgres-volume.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Recuperation du volume PostgreSQL historique invalide."
+          }
+
       - name: Tester la reprise PostgreSQL arrete et la recuperation de .env (sans Docker)
         shell: powershell
         run: |
