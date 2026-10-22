@@ -561,6 +561,7 @@ async function selectPendingManga(button){
   });
   if(draft!==state.pendingMatch)return;
   draft.review=review;
+  draft.reviewMode=(review.existing_declarations||[]).length?"":"CREATE_DECLARATION";
   draft.loading=false;renderPendingMatcher();
   document.querySelector(".inventory-match-review")?.scrollIntoView({behavior:"smooth",block:"nearest"});
  }catch(err){
@@ -573,14 +574,20 @@ async function confirmPendingManga(button){
  const draft=state.pendingMatch;
  const review=draft?.review;
  const acknowledged=document.querySelector("#pending-match-ack")?.checked;
- if(!draft||!review||!acknowledged)return;
+ const prior=(review?.existing_declarations||[]).length>0;
+ const mode=prior?String(document.querySelector("#pending-match-mode")?.value||""):"CREATE_DECLARATION";
+ const existingAcknowledged=!prior||Boolean(document.querySelector("#pending-match-existing-ack")?.checked);
+ if(!draft||!review||!acknowledged||!existingAcknowledged||
+    !review.allowed_actions?.includes(mode))return;
  button.disabled=true;
  try{
   const outcome=await request("/inventory/pending/resolve",{
     method:"POST",data:{
       source_key:draft.sourceKey,manga_id:review.manga.id,
       confirmation_token:review.confirmation_token,
-      acknowledge_work_and_edition:true
+      acknowledge_work_and_edition:true,
+      resolution_mode:mode,
+      acknowledge_existing_inventory:existingAcknowledged
     }
   });
   if(draft!==state.pendingMatch)return;
@@ -1679,9 +1686,18 @@ root.addEventListener("change",async event=>{
  if(input.id==="catalog-finished"){state.catalogFinished=input.checked;state.catalogPage=1;await updateCatalog(renderToken);}
  if(input.id==="lib-status"){state.libraryStatus=input.value;state.libraryPage=1;await updateLibrary(renderToken);}
  if(input.id==="bulk-resolve-ack")syncBulkConfirmation();
- if(input.id==="pending-match-ack"){
-   const save=document.querySelector('[data-action="pending-match-confirm"]');
-   if(save)save.disabled=!input.checked;
+ if(["pending-match-ack","pending-match-existing-ack","pending-match-mode"].includes(input.id)){
+   const draft=state.pendingMatch;
+   if(draft){
+     if(input.id==="pending-match-mode")draft.reviewMode=input.value;
+     const prior=(draft.review?.existing_declarations||[]).length>0;
+     const allowed=draft.review?.allowed_actions||[];
+     const mode=prior?String(document.querySelector("#pending-match-mode")?.value||""):"CREATE_DECLARATION";
+     const sourceAck=Boolean(document.querySelector("#pending-match-ack")?.checked);
+     const compareAck=!prior||Boolean(document.querySelector("#pending-match-existing-ack")?.checked);
+     const save=document.querySelector('[data-action="pending-match-confirm"]');
+     if(save)save.disabled=!(sourceAck&&compareAck&&allowed.includes(mode));
+   }
  }
  if(input.id==="reading-delimiter"||input.id==="reading-default-status"){
   state.readingPreview=null;
