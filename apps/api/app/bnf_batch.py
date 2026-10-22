@@ -8,6 +8,7 @@ No user library, reading progress, canonical manga or confirmed ISBN is written.
 from __future__ import annotations
 
 import argparse
+from functools import partial
 import os
 import re
 import time
@@ -318,6 +319,8 @@ def create_bnf_catalog_router(connection_factory: Callable[..., Any]) -> APIRout
 def cli_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Recherche BnF non destructive, par petits lots.")
     parser.add_argument("--limit", type=int, default=DEFAULT_BATCH)
+    parser.add_argument("--pages", type=int, default=3,
+                        help="Pages BnF par titre : 1 a 10 (plus de 3 : manga cible obligatoire).")
     parser.add_argument("--manga-id", type=int, default=None,
                         help="Limiter la recherche a un manga interne precis.")
     parser.add_argument("--refresh", action="store_true",
@@ -329,8 +332,14 @@ def cli_main(argv: list[str] | None = None) -> int:
     print("Ni la mangathèque, ni les éditions confirmées ne sont modifiées.", flush=True)
     if args.manga_id is not None and args.manga_id <= 0:
         parser.error("--manga-id doit etre un identifiant positif.")
+    if not 1 <= args.pages <= 10:
+        parser.error("--pages doit etre entre 1 et 10.")
+    if args.pages > 3 and args.manga_id is None:
+        parser.error("--pages superieur a 3 exige --manga-id pour limiter les appels BnF.")
+    search = partial(search_bnf_title_pages, max_pages=args.pages)
     stats = run_batch(connect_database, limit=args.limit, refresh=args.refresh,
-                      target_ids=[args.manga_id] if args.manga_id is not None else None)
+                      target_ids=[args.manga_id] if args.manga_id is not None else None,
+                      search=search)
     print("Bilan :", ", ".join(f"{key}={value}" for key, value in stats.items()), flush=True)
     if stats["selected"] and stats["error"] == stats["selected"]:
         print("ECHEC : toutes les recherches BnF ont échoué. "
