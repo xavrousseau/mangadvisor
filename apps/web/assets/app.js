@@ -339,12 +339,14 @@ async function renderHome(token){
 async function renderDiscover(token){
  const opts=GENRES.map(([value,label])=>'<option value="'+e(value)+'"'+(state.catalogGenre===value?' selected':'')+'>'+
  (label==="allGenres"?L("allGenres"):tr(value))+'</option>').join("");
- const layout='<div class="headline-row discover-heading"><div><div class="eyebrow">✦ MANGADVISOR · DISCOVERY</div><h1 class="page-title">'+L("startExplore")+'</h1>'+
+ const layout='<section class="discover-intro" aria-labelledby="discover-page-title"><div class="discover-intro-content"><span class="eyebrow">✦ '+e(state.lang==="fr"?"EXPLORE TON PROCHAIN UNIVERS":"EXPLORE YOUR NEXT WORLD")+'</span><h1 id="discover-page-title">'+e(state.lang==="fr"?"Et si ton prochain manga préféré était ici ?":"Your next favorite manga is here.")+'</h1><p>'+e(state.lang==="fr"?"Des dizaines de milliers d’œuvres à explorer. Commence par une envie, un titre ou un genre.":"Browse thousands of stories by title, mood or genre.")+'</p><button type="button" class="btn btn-primary" data-go="/for-you">✦ '+e(state.lang==="fr"?"Trouver mon prochain coup de cœur":"Find my next favorite")+' →</button></div><div class="discover-intro-decoration" aria-hidden="true">M<span>.</span></div></section>'+
+ '<div class="headline-row discover-heading"><div><div class="eyebrow">✦ MANGADVISOR · DISCOVERY</div><h1 class="page-title">'+L("startExplore")+'</h1>'+
  '<p class="page-desc">'+L("browseHelp")+'</p></div></div>'+
  '<div class="discover-search-shell"><div class="filters"><div class="field grow"><label for="catalog-query">'+L("search")+'</label>'+
  '<input type="search" class="input" id="catalog-query" autocomplete="off" value="'+e(state.catalogQuery)+'" placeholder="'+L("searchPlaceholder")+'"></div>'+
  '<div class="field medium"><label for="catalog-genre">'+L("filterGenre")+'</label><select class="select" id="catalog-genre">'+opts+'</select></div>'+
  '<label class="check"><input type="checkbox" id="catalog-finished"'+(state.catalogFinished?" checked":"")+'>'+L("finishedOnly")+'</label></div></div>'+
+ '<div class="discover-genre-section"><span class="eyebrow">'+e(state.lang==="fr"?"L'ENVIE DU MOMENT":"WHAT ARE YOU IN THE MOOD FOR")+'</span><div class="discover-genre-chips">'+GENRES.filter(([value])=>["Action","Adventure","Fantasy","Mystery","Romance","Psychological","Slice of Life"].includes(value)).map(([value,label])=>'<button type="button" class="discover-genre-chip'+(state.catalogGenre===value?' active':'')+'" data-action="discover-genre" data-value="'+e(value)+'" aria-pressed="'+(state.catalogGenre===value)+'">'+tr(value)+'</button>').join("")+'</div></div>'+
  '<div class="discover-collection-head"><h2>'+e(state.lang==="fr"?"À explorer":"Explore the collection")+'</h2><p>'+e(state.lang==="fr"?"Des mangas à découvrir, à ton rythme.":"Find a new read from the catalogue.")+'</p></div><div id="catalog-results">'+loadingCards(10)+'</div>';
  if(!mount(layout,token))return;
  await updateCatalog(token);
@@ -1473,6 +1475,21 @@ root.addEventListener("click",async event=>{
  }
  const action=button.dataset.action;
  if(action==="refresh")return render();
+ if(action==="discover-genre"){
+   const genre=button.dataset.value;
+   if(!GENRES.some(([value])=>value===genre))return;
+   state.catalogGenre=state.catalogGenre===genre?"":genre;
+   state.catalogPage=1;
+   const dropdown=document.querySelector("#catalog-genre");
+   if(dropdown)dropdown.value=state.catalogGenre;
+   document.querySelectorAll(".discover-genre-chip").forEach(chip=>{
+     const pressed=chip.dataset.value===state.catalogGenre;
+     chip.classList.toggle("active",pressed);
+     chip.setAttribute("aria-pressed",String(pressed));
+   });
+   await updateCatalog(renderToken);
+   return;
+ }
  if(action==="global-search"){
    await go("/discover");
    document.querySelector("#catalog-query")?.focus();
