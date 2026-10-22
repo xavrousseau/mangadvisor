@@ -26,7 +26,7 @@ const state = {
   lang: ["fr","en"].includes(localStorage.getItem("ma-language")) ? localStorage.getItem("ma-language") : "fr",
   appearance: loadAppearance(window.localStorage),
   catalogPage:1, catalogQuery:"",catalogGenre:"",catalogFinished:false,
-  libraryPage:1,libraryQuery:"",libraryStatus:"",libraryView:"series",
+  libraryPage:1,libraryQuery:"",libraryStatus:"",libraryView:"series",libraryDisplay:"covers",libraryPreviousStatus:"",
   recMode:"mood",mood:"MYSTERY",moodLength:"ANY",moodFinished:false,moodUseLibrary:true,moodMinScore:6.5,recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   advisorHistory:[],advisorContext:{},advisorSeen:[],advisorResponse:null,advisorBusy:false,
@@ -369,7 +369,7 @@ async function updateCatalog(token){
  }catch(err){if(renderToken===token)out.innerHTML=errorBox(err);}
 }
 function applyLibraryView(){
- const active=["series","editions","manage"].includes(state.libraryView)?state.libraryView:"series";
+ const active=["series","editions","wishlist","manage"].includes(state.libraryView)?state.libraryView:"series";
  const content=document.querySelector("#content");
  if(!content||routeInfo().view!=="library")return;
  content.dataset.libraryView=active;
@@ -382,9 +382,11 @@ function applyLibraryView(){
  const series=content.querySelector("#library-series-panel");
  const editions=content.querySelector("#library-editions-panel");
  const tools=content.querySelector("#library-manage-panel");
+ const wishes=content.querySelector("#library-wishlist-panel");
  if(series)series.hidden=active!=="series";
  if(editions)editions.hidden=active!=="editions";
  if(tools)tools.hidden=active!=="manage";
+ if(wishes)wishes.hidden=active!=="wishlist";
 }
 async function renderLibrary(token){
  const statusOpts=[["","allStatuses"],...STATUS.map(v=>[v,v])];
@@ -395,13 +397,17 @@ async function renderLibrary(token){
  '<div class="library-view-tabs" role="tablist" aria-label="'+e(state.lang==="fr"?"Explorer ma bibliothèque":"Browse my library")+'">'+
  '<button type="button" role="tab" class="library-view-tab" data-action="library-view" data-value="series">'+e(state.lang==="fr"?"Mes séries":"My series")+'</button>'+
  '<button type="button" role="tab" class="library-view-tab" data-action="library-view" data-value="editions">'+e(state.lang==="fr"?"Mes éditions":"My editions")+'</button>'+
+ '<button type="button" role="tab" class="library-view-tab" data-action="library-view" data-value="wishlist">'+e(state.lang==="fr"?"Mes envies":"Wishlist")+'</button>'+
  '<button type="button" role="tab" class="library-view-tab" data-action="library-view" data-value="manage">'+e(state.lang==="fr"?"Gérer et importer":"Manage & import")+'</button></div>'+
  '<div id="library-series-panel" role="tabpanel"><div class="filters"><div class="field grow"><label for="lib-query">'+L("librarySearch")+'</label>'+
  '<input id="lib-query" class="input" type="search" autocomplete="off" value="'+e(state.libraryQuery)+'" placeholder="'+L("searchPlaceholder")+'"></div>'+
  '<div class="field medium"><label for="lib-status">'+L("status")+'</label><select id="lib-status" class="select">'+
  statusOpts.map(([value,key])=>'<option value="'+e(value)+'"'+(state.libraryStatus===value?' selected':'')+'>'+
  (value?e(libraryStatus(state.lang,value)):L(key))+'</option>').join("")+'</select></div></div>'+
- '<div id="library-results">'+loadingCards(10)+'</div></div><div id="library-manage-panel" role="tabpanel"><div class="library-tools-heading"><h2>'+e(state.lang==="fr"?"Organiser ma collection":"Manage my collection")+'</h2><p>'+e(state.lang==="fr"?"Imports, éditions et outils de gestion, accessibles quand tu en as besoin.":"Import and edition tools, when you need them.")+'</p></div>'+
+ '<div class="library-collection-toolbar"><span>'+e(state.lang==="fr"?"Affichage":"Display")+'</span><div class="library-display-switch" role="group" aria-label="'+e(state.lang==="fr"?"Affichage des séries":"Series view")+'"><button type="button" data-action="library-display" data-value="covers" aria-pressed="'+(state.libraryDisplay==="covers")+'">▦ '+e(state.lang==="fr"?"Galerie":"Gallery")+'</button><button type="button" data-action="library-display" data-value="list" aria-pressed="'+(state.libraryDisplay==="list")+'">☰ '+e(state.lang==="fr"?"Liste":"List")+'</button></div></div>'+
+ '<div id="library-results" class="library-results-'+e(state.libraryDisplay)+'">'+loadingCards(10)+'</div></div>'+
+ '<div id="library-wishlist-panel" role="tabpanel"><div class="library-wishlist-intro"><div class="eyebrow">♡ '+e(state.lang==="fr"?"MES ENVIES":"WISHLIST")+'</div><h2>'+e(state.lang==="fr"?"Mes prochaines découvertes":"What I want to read next")+'</h2><p>'+e(state.lang==="fr"?"Les séries que tu souhaites lire, distinctes des tomes physiques possédés.":"Reading wishes, kept separate from owned physical books.")+'</p></div><div id="library-wishlist-results"></div></div>'+
+ '<div id="library-manage-panel" role="tabpanel"><div class="library-tools-heading"><h2>'+e(state.lang==="fr"?"Organiser ma collection":"Manage my collection")+'</h2><p>'+e(state.lang==="fr"?"Imports, éditions et outils de gestion, accessibles quand tu en as besoin.":"Import and edition tools, when you need them.")+'</p></div>'+
  '<section class="bulk-workspace"><details id="reading-profile-workspace"><summary>◈ '+e(state.lang==="fr"?"Mon profil de lecture":"My reading profile")+'</summary><button class="btn btn-soft" type="button" data-action="reading-profile-load">'+e(state.lang==="fr"?"Afficher mon profil":"Show my profile")+'</button><div id="reading-profile-results"></div></details></section>'+
  '<section class="bulk-workspace"><details id="reading-import-workspace"><summary>▤ '+e(state.lang==="fr"?"Importer une bibliothèque de lecture (CSV / Excel)":"Import reading library (CSV / Excel)")+'</summary>'+
  '<p class="page-desc">'+e(state.lang==="fr"?"Ajoute de nouveaux statuts, notes et favoris sans écraser les fiches existantes. Les fichiers Excel sont convertis localement sur ton API. Ce n’est pas l’import de tomes ISBN.":"Add reading status and ratings without overwriting existing entries. This is not the ISBN book import.")+'</p>'+
@@ -564,12 +570,14 @@ async function confirmPendingManga(button){
  }
 }
 async function updateLibrary(token){
- const out=document.querySelector("#library-results");if(!out||renderToken!==token)return;
+ const wishlistMode=state.libraryView==="wishlist";
+ const out=document.querySelector(wishlistMode?"#library-wishlist-results":"#library-results");if(!out||renderToken!==token)return;
  out.innerHTML=loadingCards(8);
  try{
   const params=new URLSearchParams({limit:"25",offset:String((state.libraryPage-1)*24)});
-  if(state.libraryQuery)params.set("q",state.libraryQuery);
-  if(state.libraryStatus)params.set("status",state.libraryStatus);
+  if(!wishlistMode && state.libraryQuery)params.set("q",state.libraryQuery);
+  if(wishlistMode)params.set("status","WANT_TO_READ");
+ else if(state.libraryStatus)params.set("status",state.libraryStatus);
   const [res,physical]=await Promise.all([
     request("/library?"+params),
     request("/inventory/declarations").catch(()=>null),
@@ -584,6 +592,7 @@ async function updateLibrary(token){
    (m.is_favorite?' ♥':'')+'</p><button class="card-open" data-go="/manga/'+m.manga_id+'">'+L("details")+' →</button></div></article>').join("")+'</div>':
    emptyBox("▤",L("libraryEmpty"),L("libraryEmptyHelp"),L("startExplore"),"/discover");
   out.innerHTML=html+paginate(state.libraryPage,hasNext,"library");
+ if(!wishlistMode){out.classList.toggle("library-results-list",state.libraryDisplay==="list");out.classList.toggle("library-results-covers",state.libraryDisplay!=="list");}
  }catch(err){if(token===renderToken)out.innerHTML=errorBox(err);}
 }
 async function readLibraryItem(manga){
@@ -1465,10 +1474,21 @@ root.addEventListener("click",async event=>{
  if(action==="refresh")return render();
  if(action==="library-view"){
    const next=button.dataset.value;
-   if(!["series","editions","manage"].includes(next))return;
+   if(!["series","editions","wishlist","manage"].includes(next))return;
+   const previous=state.libraryView;
    state.libraryView=next;
+   if(next==="wishlist"||previous==="wishlist")state.libraryPage=1;
    applyLibraryView();
+   if(next==="wishlist"||previous==="wishlist")await updateLibrary(renderToken);
    document.querySelector(".library-view-tabs")?.scrollIntoView({block:"nearest",behavior:"smooth"});
+   return;
+ }
+ if(action==="library-display"){
+   if(!["covers","list"].includes(button.dataset.value))return;
+   state.libraryDisplay=button.dataset.value;
+   const out=document.querySelector("#library-results");
+   if(out){out.classList.toggle("library-results-list",state.libraryDisplay==="list");out.classList.toggle("library-results-covers",state.libraryDisplay!=="list");}
+   document.querySelectorAll("[data-action='library-display']").forEach(el=>el.setAttribute("aria-pressed",String(el.dataset.value===state.libraryDisplay)));
    return;
  }
  if(action==="open-scanner")return isbnScanner.open(routeInfo().view==="detail"?state.currentDetail:null);
