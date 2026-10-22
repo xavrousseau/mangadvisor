@@ -612,6 +612,10 @@ function Run-Bibliography-Acceptance {
   }
   & docker @common up -d postgres meilisearch
   Assert-Exit "Demarrage de la sandbox impossible"
+  # The sandbox does not bind-mount pipeline sources. Rebuild the ephemeral
+  # engine image so GitHub updates cannot silently use stale Python code.
+  & docker @common build engine
+  Assert-Exit "Construction du moteur actualise impossible"
   $python=@("run","--rm","-T","-e","POSTGRES_DB=mangadvisor_realtest",
             "engine","python","-m","pipelines.engine.scripts.bibliography_pipeline",
             "--manga-ids",$selected,"--details")
