@@ -145,3 +145,25 @@ body{background:var(--bg)}
  .discover-genre-chip{flex-shrink:0;min-height:40px;padding:8px 13px}
  .discover-heading .page-title{font-size:28px}
 }
+
+
+/* Releases is an honest product destination; only verified future dates belong here. */
+.releases-hero{min-height:320px;padding:55px clamp(30px,5vw,70px);border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));border-radius:26px;display:flex;flex-direction:column;justify-content:center;background:radial-gradient(circle at 85% 25%,rgba(255,181,111,.17),transparent 35%),linear-gradient(116deg,#24243a,#1b2332 64%,#34273a);overflow:hidden}
+.releases-hero .eyebrow{color:var(--accent)}
+.releases-hero h1{font-size:clamp(38px,5vw,70px);line-height:1.04;max-width:15ch;margin:15px 0;color:#fff7ee}
+.releases-hero p{font-size:14px;color:#d2d5e2;max-width:56ch;line-height:1.7;margin:0}
+.releases-empty{margin:32px auto 0;max-width:830px;display:flex;align-items:center;text-align:center;flex-direction:column;border:1px solid var(--border);border-radius:23px;background:var(--surface);padding:42px 32px}
+.releases-empty-mark{height:76px;width:76px;border-radius:23px;background:var(--accent-tint);color:var(--accent);display:grid;place-items:center;font-size:40px;margin-bottom:16px}
+.releases-empty h2{font-size:clamp(25px,2.8vw,36px);line-height:1.13;margin-bottom:12px}
+.releases-empty p{font-size:13px;color:var(--muted);line-height:1.7;max-width:67ch}
+.releases-empty .actions{justify-content:center;margin-top:12px}
+@media(max-width:740px){
+ .sidebar .nav{grid-template-columns:repeat(5,minmax(0,1fr));gap:2px}
+ .sidebar .nav-link{font-size:9px;min-height:59px;padding:7px 1px}
+ .sidebar .nav-ico{font-size:19px}
+ .releases-hero{padding:33px 23px;min-height:300px;border-radius:18px}
+ .releases-hero h1{font-size:clamp(35px,9vw,48px)}
+ .releases-empty{padding:33px 20px}
+ .releases-empty .actions{display:grid;width:100%}
+}
+@media(max-width:360px){.sidebar .nav-link{font-size:8px}.sidebar .nav-ico{font-size:18px}}
