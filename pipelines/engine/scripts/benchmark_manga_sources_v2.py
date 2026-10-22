@@ -31,7 +31,7 @@ BASE = {"scrinis": "https://scrin.is/api/v1",
         "mangaupdates": "https://api.mangaupdates.com/v1"}
 PAUSE = {"scrinis": 4.5, "mangaupdates": 2.0}
 MAX_RESPONSE = 600_000
-MAX_DETAIL_RESPONSE = 2_500_000
+MAX_DETAIL_RESPONSE = 8_000_000
 MAX_CANDIDATES = 8
 DETAIL_BUDGET = 12
 ALT_BUDGET = 6
@@ -230,6 +230,26 @@ def validate_id(source: str, value: Any) -> str | None:
     return None
 
 
+def _read_bounded_response(response: Any, max_bytes: int) -> bytes | None:
+    """Bound *decompressed* JSON bytes while downloading real HTTP responses.
+
+    Request test doubles expose .content only; real requests.Response supports
+    streaming so a huge series does not allocate unbounded response memory.
+    """
+    if isinstance(response, requests.Response):
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            total += len(chunk)
+            if total > max_bytes:
+                return None
+            if chunk:
+                chunks.append(chunk)
+        return b"".join(chunks)
+    raw = response.content
+    return raw if len(raw) <= max_bytes else None
+
+
 def request_public(source: str, kind: str, session: Any, *,
                    query: str | None = None, identifier: str | None = None) -> dict:
     if source not in SOURCES:
@@ -241,37 +261,45 @@ def request_public(source: str, kind: str, session: Any, *,
         if source == "scrinis":
             response = session.get(BASE[source] + "/search",
                                    params={"q": query, "limit": MAX_CANDIDATES},
-                                   headers=headers, timeout=20)
+                                   headers=headers, timeout=20, stream=True)
         else:
             response = session.post(BASE[source] + "/series/search",
                                     json={"search": query, "perpage": MAX_CANDIDATES},
-                                    headers=headers, timeout=20)
+                                    headers=headers, timeout=20, stream=True)
     elif kind == "detail":
         safe_id = validate_id(source, identifier)
         if safe_id is None:
             raise ValueError("Identifiant de fiche absent ou invalide")
         response = session.get(BASE[source] + "/series/" + safe_id,
-                               headers=headers, timeout=20)
+                               headers=headers, timeout=20, stream=True)
     else:
         raise ValueError("Endpoint non autorise")
-    if response.status_code in (401, 403, 429):
-        return {"status": "UNAVAILABLE", "http_status": response.status_code}
-    if response.status_code >= 400:
-        return {"status": "HTTP_ERROR", "http_status": response.status_code}
-    # Long-running manga series can exceed the generic 600 kB envelope.
-    # Keep a separate hard cap for metadata details; never parse unbounded JSON.
-    allowed_bytes = MAX_DETAIL_RESPONSE if (source == "scrinis" and kind == "detail") else MAX_RESPONSE
-    if len(response.content) > allowed_bytes:
-        return {"status": "RESPONSE_TOO_LARGE"}
     try:
-        payload = json.loads(response.content)
-    except (ValueError, UnicodeError):
-        return {"status": "INVALID_JSON"}
-    if kind == "search":
-        data, diagnostic = parse_hits(payload, source=source)
-        return {"status": "OK", "candidates": data, "schema": diagnostic} if data is not None else {
-            "status": "UNKNOWN_SCHEMA", "schema": diagnostic}
-    return {"status": "OK", "data": parse_details(source, payload)}
+        if response.status_code in (401, 403, 429):
+            return {"status": "UNAVAILABLE", "http_status": response.status_code}
+        if response.status_code >= 400:
+            return {"status": "HTTP_ERROR", "http_status": response.status_code}
+        allowed_bytes = (
+            MAX_DETAIL_RESPONSE if source == "scrinis" and kind == "detail"
+            else MAX_RESPONSE
+        )
+        raw = _read_bounded_response(response, allowed_bytes)
+        if raw is None:
+            return {"status": "RESPONSE_TOO_LARGE"}
+        try:
+            payload = json.loads(raw)
+        except (ValueError, UnicodeError):
+            return {"status": "INVALID_JSON"}
+        if kind == "search":
+            data, diagnostic = parse_hits(payload, source=source)
+            return (
+                {"status": "OK", "candidates": data, "schema": diagnostic}
+                if data is not None
+                else {"status": "UNKNOWN_SCHEMA", "schema": diagnostic}
+            )
+        return {"status": "OK", "data": parse_details(source, payload)}
+    finally:
+        response.close()
 
 
 def _labels(raw: Any, *, keys=("name", "genre", "category", "title")) -> list[str]:
