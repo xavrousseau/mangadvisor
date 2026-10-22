@@ -1,6 +1,7 @@
 # Source-only Docker build context. Runtime data are provided by volumes.
 .git
 .gitignore
+!.gitignore
 .github/
 .vscode/
 .idea/
