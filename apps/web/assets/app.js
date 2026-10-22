@@ -158,7 +158,27 @@ async function go(path,replace=false){
 async function render(){
  isbnScanner.close();
  const token=++renderToken;
- root.innerHTML=shell();
+ const active=routeInfo().view;
+ const content=root.querySelector("#content");
+ // Keep the navigation and top bar mounted between routes: only the page changes.
+ if(content && root.dataset.shellLang===state.lang && root.querySelector(".layout")){
+   document.documentElement.lang=state.lang;
+   document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
+   root.querySelectorAll(".nav-link[data-go]").forEach(link=>{
+     const selected=link.dataset.go===({home:"/",discover:"/discover",recommendations:"/for-you",library:"/library"}[active]||"");
+     link.classList.toggle("active",selected);
+     if(selected)link.setAttribute("aria-current","page");
+     else link.removeAttribute("aria-current");
+   });
+   const crumb=root.querySelector(".crumb");
+   if(crumb)crumb.textContent=L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
+   const appearance=root.querySelector(".appearance-trigger");
+   if(appearance)appearance.classList.toggle("active",active==="appearance");
+   content.innerHTML='<div class="skeleton"></div>';
+ }else{
+   root.innerHTML=shell();
+   root.dataset.shellLang=state.lang;
+ }
  await view(token);
 }
 function mount(html,token){
@@ -236,8 +256,7 @@ async function renderHome(token){
  '<section aria-labelledby="home-explore-title"><div class="section-header"><div><h2 class="section-title" id="home-explore-title">'+L("homeExploreTitle")+'</h2>'+
  '<p class="section-caption">'+L("homeExploreDesc")+'</p></div><button class="btn-link" data-go="/discover">'+L("homeExploreAction")+' →</button></div>'+
  '<div id="home-cards">'+loadingCards(5)+'</div></section>'+
- '<div class="section-header"><h2 class="section-title">'+L("quickStart")+'</h2></div>'+
- '<div class="steps">'+[1,2,3].map(i=>'<div class="step"><span class="step-count">'+i+'</span><div><h3>'+L("step"+i)+'</h3><p>'+L("step"+i+"Desc")+'</p></div></div>').join("")+'</div>';
+ '';
  if(!mount(markup,token))return;
 
  // Chargement indépendant des trois espaces : un moteur lent n'empêche pas
@@ -367,7 +386,7 @@ async function renderLibrary(token){
  '<div class="field"><label for="reading-default-status">'+e(state.lang==="fr"?"Statut par défaut":"Default status")+'</label><select class="select" id="reading-default-status">'+STATUS.map(s=>'<option value="'+s+'"'+(s===state.readingDefaultStatus?' selected':'')+'>'+e(libraryStatus(state.lang,s))+'</option>').join("")+'</select></div>'+
  '<button type="button" class="btn btn-primary" data-action="reading-preview">'+e(state.lang==="fr"?"Simuler et vérifier":"Preview without changes")+' →</button>'+
  '<div id="reading-import-result"></div></details></section>'+
- '<section class="physical-inventory-section"><details id="physical-inventory-workspace" open>'+
+ '<section class="physical-inventory-section"><details id="physical-inventory-workspace">'+
  '<summary>▤ '+L("physicalTitle")+'</summary>'+
  '<p class="page-desc">'+L("physicalIntro")+'</p>'+
  '<div id="physical-inventory-results"><div class="info">'+L("loading")+'</div></div>'+
@@ -785,7 +804,7 @@ async function renderMoodRecommendations(token){
   '<button data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
   '<button data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
   moodFormMarkup({mood:state.mood,length:state.moodLength,onlyFinished:state.moodFinished,
-   useLibrary:state.moodUseLibrary,minScore:state.moodMinScore},L,e)+
+   useLibrary:state.moodUseLibrary,minScore:state.moodMinScore,lang:state.lang},L,e)+
   '<div id="rec-results">'+(state.recResult?'':'<div class="info">'+L("moodFirstHint")+'</div>')+'</div>';
  if(!mount(html,token))return;
  if(state.recResult)await showMoodResults(token);
