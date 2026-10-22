@@ -145,6 +145,55 @@ def search_bnf_by_title(query: str, *, start_record: int = 1) -> dict[str,Any]:
             "La recherche dans le catalogue BnF est momentanément indisponible ; aucune édition n'a été ajoutée.") from exc
 
 
+
+def search_bnf_title_pages(
+    query: str, *, max_pages: int = 3,
+    fetch_page: Callable[..., dict[str, Any]] = search_bnf_by_title,
+) -> dict[str, Any]:
+    """Search up to three BnF SRU pages; still candidate-only and not exhaustive.
+
+    A bounded call avoids uncontrolled traffic. Failed later pages propagate so
+    a partial scan is never misrepresented as a complete checked work.
+    """
+    if type(max_pages) is not int or not 1 <= max_pages <= 3:
+        raise ValueError("Nombre de pages BnF invalide.")
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    reported_total: int | None = None
+    pages = 0
+    for index in range(max_pages):
+        start = 1 + index * MAX_BIBLIOGRAPHY_RESULTS
+        payload = fetch_page(query, start_record=start)
+        pages += 1
+        if index == 0:
+            reported_total = payload.get("bnf_reported_records")
+        page_items = payload.get("items") or []
+        for item in page_items:
+            isbn = item.get("isbn13")
+            if isinstance(isbn, str) and isbn not in seen:
+                seen.add(isbn)
+                items.append(item)
+        # Use the provider's number of records, not ISBN count: not all
+        # bibliographic records have an ISBN or pass candidate validation.
+        if isinstance(reported_total, int) and start + MAX_BIBLIOGRAPHY_RESULTS > reported_total:
+            break
+        if not page_items and not isinstance(reported_total, int):
+            break
+    checked_slots = pages * MAX_BIBLIOGRAPHY_RESULTS
+    exhausted = isinstance(reported_total, int) and checked_slots >= reported_total
+    return {
+        "items": items,
+        "count": len(items),
+        "bnf_reported_records": reported_total,
+        "bnf_pages_checked": pages,
+        "search_scope": "bounded_multi_page_title_search",
+        "exhaustive": False,
+        "page_limit_reached": not exhausted,
+        "candidate_only": True,
+        "message": "ISBN candidats uniquement ; rapprochement oeuvre et edition a verifier.",
+    }
+
+
 def edition_discovery_router(connection_factory: Callable[...,Any]) -> APIRouter:
     router=APIRouter(prefix="/collection",tags=["Recherche bibliographique française"])
 
