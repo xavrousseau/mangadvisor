@@ -126,7 +126,7 @@ function routeInfo(){
 function shell(){
   const active=routeInfo().view;
   document.documentElement.lang=state.lang;
-  document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
+  document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="releases"?"discover":active==="not-found"?"discover":active);
   const navItems=[
     ["home","/","◈","home"],["discover","/discover","⌕","discover"],
     ["recommendations","/for-you","✧","forYou"],["library","/library","▤","library"],["releases","/releases","◷","releases"]
@@ -137,7 +137,7 @@ function shell(){
     '<button class="nav-link '+(active===view?'active':'')+'" data-go="'+url+'"'+(active===view?' aria-current="page"':'')+
     '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+(key==="releases"?e(state.lang==="fr"?"Sorties":"Releases"):L(key))+'</span></button>').join("")+
   '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p></div></aside>'+
-  '<div class="main"><header class="topbar"><div class="crumb">'+L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active)+'</div>'+
+  '<div class="main"><header class="topbar"><div class="crumb">'+(active==="releases"?e(state.lang==="fr"?"Sorties":"Releases"):L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="releases"?"discover":active==="not-found"?"discover":active))+'</div>'+
   '<div class="topbar-right"><button type="button" class="global-search-trigger" data-action="global-search" aria-label="'+e(state.lang==="fr"?"Rechercher un manga":"Search manga")+'" title="'+e(state.lang==="fr"?"Rechercher · Ctrl+K":"Search · Ctrl+K")+'">⌕ <span>'+e(state.lang==="fr"?"Rechercher":"Search")+'</span><kbd>Ctrl K</kbd></button><label class="field-label" for="app-language">'+L("language")+'</label><select id="app-language" class="locale-select" aria-label="'+L("language")+'"><option value="fr"'+(state.lang==="fr"?" selected":"")+'>🇫🇷 FR</option><option value="en"'+(state.lang==="en"?" selected":"")+'>🇬🇧 EN</option></select>'+
   '<button type="button" class="appearance-trigger '+(active==="appearance"?'active':'')+'" data-go="/appearance" aria-label="'+L("appearance")+'" title="'+L("appearance")+'"><span aria-hidden="true">⚙</span><span class="appearance-label">'+L("appearance")+'</span></button>'+
   '<div class="avatar" aria-hidden="true">M</div></div></header>'+
@@ -164,7 +164,7 @@ async function render(){
  // Keep the navigation and top bar mounted between routes: only the page changes.
  if(content && root.dataset.shellLang===state.lang && root.querySelector(".layout")){
    document.documentElement.lang=state.lang;
-   document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
+   document.title="Mangadvisor — "+t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="releases"?"discover":active==="not-found"?"discover":active);
    root.querySelectorAll(".nav-link[data-go]").forEach(link=>{
      const selected=link.dataset.go===({home:"/",discover:"/discover",recommendations:"/for-you",library:"/library",releases:"/releases"}[active]||"");
      link.classList.toggle("active",selected);
@@ -172,7 +172,7 @@ async function render(){
      else link.removeAttribute("aria-current");
    });
    const crumb=root.querySelector(".crumb");
-   if(crumb)crumb.textContent=active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active);
+   if(crumb)crumb.textContent=active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):L(active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="releases"?"discover":active==="not-found"?"discover":active);
    const appearance=root.querySelector(".appearance-trigger");
    if(appearance)appearance.classList.toggle("active",active==="appearance");
    content.innerHTML='<div class="skeleton"></div>';
