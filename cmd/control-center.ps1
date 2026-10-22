@@ -51,14 +51,18 @@ function Ensure-Environment {
       $dockerAvailable=$LASTEXITCODE -eq 0
     }
     if ($dockerAvailable) {
-      $existing=@(& docker container inspect --format "{{.Id}}" mangadvisor_postgres 2>$null)
-      if ($LASTEXITCODE -eq 0 -and $existing.Count -gt 0) {
+      # Enumerate rather than inspect a non-existent object: under Windows
+      # PowerShell 5.1 stderr may terminate even with 2>$null.
+      $names=@(& docker container ls -a --format "{{.Names}}")
+      Assert-Exit "Lecture des conteneurs Docker impossible"
+      if ($names -contains "mangadvisor_postgres") {
         throw "Ancien PostgreSQL Mangadvisor detecte sans .env. Recuperer l'ancienne configuration avant toute mise a jour."
       }
+      $volumes=@(& docker volume ls --format "{{.Name}}")
+      Assert-Exit "Lecture des volumes Docker impossible"
       foreach ($volume in @("mangadvisor_mangadvisor_pgdata",
                              "mangadvisor_mangadvisor_meili")) {
-        $existing=@(& docker volume inspect --format "{{.Name}}" $volume 2>$null)
-        if ($LASTEXITCODE -eq 0 -and $existing.Count -gt 0) {
+        if ($volumes -contains $volume) {
           throw "Volume Docker $volume present sans .env : installation ancienne detectee. Recuperer la configuration d'origine."
         }
       }
