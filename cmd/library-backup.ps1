@@ -25,8 +25,10 @@ function Run-Docker([string[]]$CommandArgs, [string]$Message) {
   Assert-Ok $Message
 }
 function Container-Exists([string]$name) {
-  $found=@(& docker container inspect --format "{{.Id}}" $name 2>$null)
-  return ($LASTEXITCODE -eq 0 -and $found.Count -gt 0)
+  # Missing docker objects must not produce fatal NativeCommandError on PS 5.1.
+  $names=@(& docker container ls -a --format "{{.Names}}")
+  Assert-Ok "Liste des conteneurs Docker indisponible"
+  return ($names -contains $name)
 }
 function Installed-Setting([string]$container,[string]$key) {
   # Docker keeps the original service configuration even while stopped.
@@ -79,8 +81,9 @@ function Repair-Installed-Environment {
     $installed["MEILI_MASTER_KEY"]=Installed-Setting $meiliName "MEILI_MASTER_KEY"
   } else {
     # A previously persisted Meilisearch index may depend on its old key.
-    $existing=@(& docker volume inspect --format "{{.Name}}" "mangadvisor_mangadvisor_meili" 2>$null)
-    if ($LASTEXITCODE -eq 0 -and $existing.Count -gt 0) {
+    $volumes=@(& docker volume ls --format "{{.Name}}")
+    Assert-Ok "Liste des volumes Docker indisponible"
+    if ($volumes -contains "mangadvisor_mangadvisor_meili") {
       throw "Ancien volume Meilisearch present sans conteneur correspondant. Ne pas appliquer une nouvelle cle automatiquement."
     }
   }
