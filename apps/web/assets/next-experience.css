@@ -190,3 +190,38 @@ body{background:var(--bg)}
  .rec-mode-tabs{overflow-x:auto;max-width:100%;scrollbar-width:none}
  .rec-mode-tabs button{flex-shrink:0}
 }
+
+
+/* Manga detail becomes an editorial series sheet rather than a database form. */
+.detail-hero{position:relative;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:clamp(25px,4vw,64px);align-items:center;min-height:415px;padding:clamp(23px,4vw,45px);border-radius:25px;border:1px solid var(--border);background:radial-gradient(ellipse at 93% 5%,rgba(255,174,103,.1),transparent 43%),linear-gradient(120deg,var(--surface),var(--bg));overflow:hidden}
+.detail-cover{border-radius:16px;border-color:color-mix(in srgb,var(--text) 16%,var(--border));box-shadow:12px 21px 37px rgba(0,0,0,.28);transform:rotate(-2deg);transition:transform .2s}
+.detail-hero:hover .detail-cover{transform:rotate(0)}
+.detail-info .eyebrow{color:var(--accent);font-size:11px;letter-spacing:.17em}
+.detail-info h1{font-size:clamp(37px,4.5vw,67px);max-width:18ch;line-height:1.05;letter-spacing:-.055em;margin:12px 0 16px}
+.detail-info .detail-sub{font-size:13px;line-height:1.7}
+.detail-info .actions{margin-top:24px}
+.detail-info .actions>.btn{min-height:45px}
+.detail-stats{gap:12px;margin:18px 0 34px}
+.detail-stats .stat{border-radius:15px;padding:20px;background:var(--surface)}
+.detail-stats .stat strong{font-size:clamp(19px,2vw,27px)}
+.synopsis{max-width:none;font-size:14px;line-height:1.85;padding:clamp(23px,3vw,37px);border-radius:20px}
+.library-editor{max-width:100%;border-radius:19px;padding:clamp(21px,3vw,35px)}
+#collection-book-panel{margin-top:30px}
+#similar-results{margin-bottom:30px}
+@media(max-width:740px){
+ .detail-hero{display:grid;grid-template-columns:112px minmax(0,1fr);gap:16px;align-items:start;padding:20px 15px;min-height:0;border-radius:18px}
+ .detail-cover{transform:none;border-radius:11px;box-shadow:3px 8px 18px rgba(0,0,0,.2)}
+ .detail-hero:hover .detail-cover{transform:none}
+ .detail-info h1{font-size:clamp(25px,6.8vw,36px);margin:5px 0 9px}
+ .detail-info .eyebrow{font-size:9px}
+ .detail-info .actions{grid-column:1/-1;display:flex;flex-wrap:wrap;margin-top:13px;gap:7px}
+ .detail-info .actions>.btn{font-size:11px;flex:1 1 135px;padding-inline:7px;min-height:43px}
+ .detail-info .tag-row{gap:4px;margin-bottom:7px}
+ .detail-info .pill{font-size:9px;padding:4px 7px}
+ .detail-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .detail-stats .stat{padding:14px}
+ .synopsis{padding:21px;font-size:13px}
+ .library-editor{padding:18px}
+}
+@media(max-width:375px){.detail-hero{grid-template-columns:94px minmax(0,1fr)}.detail-info h1{font-size:25px}}
+@media(prefers-reduced-motion:reduce){.detail-cover{transition:none}}
