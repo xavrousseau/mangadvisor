@@ -270,6 +270,8 @@ def lookup_work(item: dict, client: Any) -> dict:
         return {"status": "NEEDS_AUTHOR_REVIEW", "reason": "EXACT_TITLE_WITHOUT_AUTHOR_CORROBORATION"}
     isbns = french_print_isbns(detail)
     if not isbns:
+        if detail.get("book_references_truncated"):
+            return {"status": "DETAIL_UNAVAILABLE", "reason": "INCOMPLETE_DETAIL_NO_FR_PRINT_ISBN"}
         return {"status": "NO_FR_PRINT_ISBN", "reason": "NO_VERIFIED_FRENCH_PRINT_ISBN_IN_FETCHED_DETAIL"}
     title = str(detail.get("title") or "").strip()
     if len(title) < 2 or len(title) > 200:
@@ -282,6 +284,10 @@ def lookup_work(item: dict, client: Any) -> dict:
         "scrinis_id": str(first["id"]), "mal_id": int(item["mal_id"]),
         "work_evidence": "SAME_MAL_ID" if same_mal else "EXACT_TITLE_AUTHOR",
         "author_evidence": author_check, "isbn_count": len(isbns),
+        # In-memory read-only evidence used by the explicit bibliography probe.
+        # The existing SQL saver ignores these extra fields.
+        "french_print_isbns": isbns,
+        "book_references_truncated": bool(detail.get("book_references_truncated")),
         "url": "https://scrin.is/api/v1/series/" + str(first["id"]),
         "manga_id": int(item["id"]),
         "alias_key": alias_key,
