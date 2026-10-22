@@ -20,6 +20,18 @@ La base de référence internationale MAL/Tenrai et la collection utilisateur ne
 
 ## Modes d'exécution
 
+### Parcours conseillé — une seule opération sous Windows
+
+Lancer `mangadvisor.cmd` → **A (Options avancées) → 24 (Recette bibliographique complète)**.
+Cette action n'utilise que `.env.sandbox`, `docker-compose.sandbox.yml` et la base
+`mangadvisor_realtest`. Elle produit automatiquement **deux rapports JSON** sous
+`data/logs/bibliography_validation/` : l'audit BnF sans réseau puis la sonde
+Scrinis réelle. Une seule confirmation est demandée avant les appels.
+La sandbox doit déjà contenir la base de recette et les 99 candidats importés.
+
+Les commandes ci-dessous sont conservées **pour diagnostic développeur**, pas
+comme des étapes à demander une par une à l'utilisateur.
+
 Depuis PowerShell à la racine du dépôt, avec la sandbox PostgreSQL, le mode **rapport uniquement** relit les candidats déjà collectés et ne contacte pas les fournisseurs :
 
 ```powershell
