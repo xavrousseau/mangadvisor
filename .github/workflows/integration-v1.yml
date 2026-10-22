@@ -828,7 +828,7 @@ jobs:
           # Simulate a Docker container recreated with NEW POSTGRES_PASSWORD
           # while the already initialized PGDATA still has a DIFFERENT role secret.
           docker exec mangadvisor_postgres psql -X -v ON_ERROR_STOP=1             -U manga_ci -d postgres             -c "ALTER ROLE manga_ci PASSWORD 'disposable-ci-old-role-password';"
-          if docker exec mangadvisor_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"' >/dev/null 2>&1; then
+          if docker exec mangadvisor_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h postgres -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"' >/dev/null 2>&1; then
             echo "Le test n'a pas produit de divergence d'authentification."
             exit 1
           fi
@@ -836,7 +836,7 @@ jobs:
           # before asking approval, and keep the table contents unchanged.
           BEFORE="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
           printf 'REPARER\n' | pwsh -NoProfile -File cmd/library-backup.ps1 -Action Backup
-          docker exec mangadvisor_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"' | grep -Fx '1'
+          docker exec mangadvisor_postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h postgres -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"' | grep -Fx '1'
           AFTER="$(docker exec mangadvisor_postgres psql -X -At -U manga_ci -d mangadvisor_ci -c 'SELECT count(*) FROM manga')"
           test "$BEFORE" = "$AFTER" || { echo "Le catalogue a change lors de la reparation."; exit 1; }
           curl --fail --silent --show-error http://127.0.0.1:8000/health | grep -q '"status":"ok"'
