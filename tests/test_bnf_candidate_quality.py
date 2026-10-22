@@ -17,7 +17,7 @@ class CandidateQualityTests(unittest.TestCase):
         cases = [
             ("Berserk. 1 (Éd. prestige) Kentaro Miura", "PRESTIGE", 1),
             ("Berserk. 3 (Édition Prestige)", "PRESTIGE", 3),
-            ("Berserk : 5 (Éd. prestige)", "PRESTIGE", None),
+            ("Berserk : 5 (Éd. prestige)", "PRESTIGE", 5),
             ("Berserk. tome 6 (Edition prestige)", "PRESTIGE", 6),
             ("Berserk. 42 (Éd. collector)", "COLLECTOR", 42),
             ("Berserk. 42 / Kentaro Miura", "UNKNOWN", 42),
