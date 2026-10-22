@@ -318,6 +318,8 @@ def create_bnf_catalog_router(connection_factory: Callable[..., Any]) -> APIRout
 def cli_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Recherche BnF non destructive, par petits lots.")
     parser.add_argument("--limit", type=int, default=DEFAULT_BATCH)
+    parser.add_argument("--manga-id", type=int, default=None,
+                        help="Limiter la recherche a un manga interne precis.")
     parser.add_argument("--refresh", action="store_true",
                         help="Rechercher même les mangas déjà analysés récemment.")
     args = parser.parse_args(argv)
@@ -325,7 +327,10 @@ def cli_main(argv: list[str] | None = None) -> int:
         parser.error(f"--limit doit être entre 1 et {MAX_BATCH}")
     print("Mangadvisor : enrichissement BnF (candidats UNIQUEMENT).", flush=True)
     print("Ni la mangathèque, ni les éditions confirmées ne sont modifiées.", flush=True)
-    stats = run_batch(connect_database, limit=args.limit, refresh=args.refresh)
+    if args.manga_id is not None and args.manga_id <= 0:
+        parser.error("--manga-id doit etre un identifiant positif.")
+    stats = run_batch(connect_database, limit=args.limit, refresh=args.refresh,
+                      target_ids=[args.manga_id] if args.manga_id is not None else None)
     print("Bilan :", ", ".join(f"{key}={value}" for key, value in stats.items()), flush=True)
     if stats["selected"] and stats["error"] == stats["selected"]:
         print("ECHEC : toutes les recherches BnF ont échoué. "
