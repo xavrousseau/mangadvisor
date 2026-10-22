@@ -159,6 +159,19 @@ class ScrinisDirectEnrichmentTests(unittest.TestCase):
                 self.assertNotIn(mod.INSERT_ALIAS, db.statements)
                 self.assertNotIn(mod.UPSERT_FACT, db.statements)
 
+    def test_probe_can_reuse_same_verified_isbn_evidence_without_second_detail(self):
+        result = mod.lookup_work(row(), Provider())
+        self.assertEqual(result["status"], "MATCHED")
+        self.assertEqual(result["french_print_isbns"], ["9780306406157"])
+        self.assertFalse(result["book_references_truncated"])
+
+    def test_truncated_detail_without_fr_print_isbn_is_not_definitive_absence(self):
+        partial = scrinis_detail(lang="ja", medium="ebook")
+        partial["book_references_truncated"] = True
+        outcome = mod.lookup_work(row(), Provider(detail={"status": "OK", "data": partial}))
+        self.assertEqual(outcome["status"], "DETAIL_UNAVAILABLE")
+        self.assertEqual(outcome["reason"], "INCOMPLETE_DETAIL_NO_FR_PRINT_ISBN")
+
     def test_mal_work_and_scrinis_derived_formats_cannot_mix(self):
         result = mod.lookup_work(row(manga_type="Manga"), Provider(
             detail={"status": "OK", "data": scrinis_detail(work_type="Novel")}))
