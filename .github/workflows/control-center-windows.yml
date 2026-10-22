@@ -147,6 +147,14 @@ jobs:
             Remove-Item -LiteralPath $settings -Force -ErrorAction SilentlyContinue
           }
 
+      - name: Tester la vraie transmission des etiquettes Docker sous PowerShell 5.1
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-docker-labels-native.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Docker Go-template arguments corrompus par Windows PowerShell 5.1."
+          }
+
       - name: Tester la reprise PostgreSQL arrete et la recuperation de .env (sans Docker)
         shell: powershell
         run: |

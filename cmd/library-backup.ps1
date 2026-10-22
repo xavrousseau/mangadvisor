@@ -54,16 +54,31 @@ function Config-Setting([string]$key) {
   return ([string]$lines[0]).Split("=",2)[1].Trim().Trim("'").Trim('"')
 }
 function Assert-Managed-Container([string]$container,[string]$service) {
-  $format='{{index .Config.Labels "com.docker.compose.service"}}'
-  $actual=@(& docker container inspect --format $format $container)
-  Assert-Ok "Impossible de verifier le service Docker $container"
-  if ($actual.Count -ne 1 -or ([string]$actual[0]).Trim() -cne $service) {
-    throw "Conteneur $container inconnu ou non gere par Compose ($service attendu). Stop : aucun volume remplace."
+  # IMPORTANT Windows PowerShell 5.1: quoting a Go template with string
+  # arguments (index .Config.Labels "com.docker.compose.service") strips the
+  # embedded quotes on the native command line. Docker then throws
+  # "template parsing error: function com not defined".
+  # Fetch the complete labels map as JSON with NO embedded quote arguments.
+  $labelJson=@(& docker container inspect --format '{{json .Config.Labels}}' $container)
+  Assert-Ok "Impossible de lire les etiquettes Docker du conteneur $container"
+  if ($labelJson.Count -ne 1 -or [string]::IsNullOrWhiteSpace([string]$labelJson[0])) {
+    throw "Etiquettes Docker absentes ou incompletes pour $container. Sauvegarde annulee."
   }
-  $project=@(& docker container inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' $container)
-  Assert-Ok "Impossible de verifier le projet Docker"
-  if ($project.Count -ne 1 -or ([string]$project[0]).Trim() -cne "mangadvisor") {
-    throw "Le conteneur $container appartient a un autre projet. Sauvegarde annulee."
+  try {
+    $labels=ConvertFrom-Json -InputObject ([string]$labelJson[0]) -ErrorAction Stop
+  } catch {
+    throw "Etiquettes Docker non valides pour $container (JSON invalide). Sauvegarde annulee."
+  }
+  if ($null -eq $labels) {
+    throw "Aucune etiquette Docker pour $container. Sauvegarde annulee."
+  }
+  $actualService=$labels.PSObject.Properties['com.docker.compose.service']
+  $actualProject=$labels.PSObject.Properties['com.docker.compose.project']
+  if ($null -eq $actualService -or ([string]$actualService.Value) -cne $service) {
+    throw "Conteneur $container inconnu ou non gere par Compose ($service attendu). Aucun volume remplace."
+  }
+  if ($null -eq $actualProject -or ([string]$actualProject.Value) -cne "mangadvisor") {
+    throw "Le conteneur $container appartient a un autre projet Docker. Sauvegarde annulee."
   }
 }
 function Repair-Installed-Environment {
