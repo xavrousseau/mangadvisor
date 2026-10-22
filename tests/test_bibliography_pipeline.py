@@ -64,6 +64,45 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pipeline.run_pilot(manga_ids=[1, 1])
 
+    def test_cli_summary_hides_isbn_rows_unless_details_requested(self):
+        import contextlib
+        import io
+        import json
+        sample = {
+            "selected_ids": [2],
+            "works": [{"cross_source": {
+                "status": "COMPARED",
+                "correlation_counts": {"ISBN_IN_BOTH_SOURCES": 1},
+                "isbn_correlations": [{"isbn13": "9782344067802",
+                                       "evidence_status": "ISBN_IN_BOTH_SOURCES"}],
+            }}],
+        }
+        with patch.object(pipeline, "run_pilot", return_value=sample):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(pipeline.main(["--report-only"]), 0)
+            summary = json.loads(out.getvalue())
+            self.assertEqual(summary["works"][0]["cross_source"]["isbn_correlations"], [])
+            self.assertEqual(
+                summary["works"][0]["cross_source"]["correlation_counts"],
+                {"ISBN_IN_BOTH_SOURCES": 1},
+            )
+        detailed_sample = {
+            "selected_ids": [2],
+            "works": [{"cross_source": {
+                "status": "COMPARED",
+                "isbn_correlations": [{"isbn13": "9782344067802"}],
+            }}],
+        }
+        with patch.object(pipeline, "run_pilot", return_value=detailed_sample):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(pipeline.main(["--report-only", "--details"]), 0)
+            self.assertEqual(
+                json.loads(out.getvalue())["works"][0]["cross_source"]["isbn_correlations"][0]["isbn13"],
+                "9782344067802",
+            )
+
     def test_report_only_never_calls_suppliers_or_writes(self):
         fake_conn = MagicMock()
         fake_context = MagicMock()
