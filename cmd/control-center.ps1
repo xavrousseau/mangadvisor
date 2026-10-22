@@ -2,7 +2,7 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","CatalogueLifecycle","Wikidata","LibraryEnrichment","SearchIndex","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","BibliographyPilot","CatalogueLifecycle","Wikidata","LibraryEnrichment","SearchIndex","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
@@ -560,6 +560,25 @@ function Import-BnF-Bulk {
   Engine @("pipelines/engine/scripts/bnf_bulk_import.py")
   Write-Host "Notices BnF candidates importees ; edition et tome non confirmes."
 }
+function Run-Bibliography-Pilot {
+  Say "Pilote bibliographique BnF et Scrinis - candidats uniquement"
+  Ensure-Environment
+  Check-Docker
+  Compose @("up","-d","postgres","meilisearch","api")
+  Wait-Postgres
+  Write-Host "Lot borne a 10 mangas. Recherche BnF 3 pages par titre."
+  Write-Host "Les ISBN croises BnF/Scrinis ne sont PAS des editions confirmees."
+  Write-Host "Seules les notices candidates BnF et alias FR verifies Scrinis sont enregistres."
+  Write-Host "La mangatheque, les volumes declares et les editions confirmees restent intacts."
+  $limit=Ask-Number "Combien de mangas traiter (maximum 10) ?" 5 10
+  if (!(Confirm "Lancer ce pilote avec une sauvegarde prealable ?" $false)) {
+    Write-Host "Aucun traitement lance."
+    return
+  }
+  Backup
+  Engine @("-m","pipelines.engine.scripts.bibliography_pipeline","--limit",[string]$limit)
+}
+
 function Enrich-BnF {
   Say "Enrichissement progressif depuis le catalogue BnF"
   Ensure-Environment
@@ -891,6 +910,7 @@ try {
     "CatalogueExtended" { Load-Extended-Catalogue }
     "CompleteMALCatalogue" { Load-Complete-MAL-Catalogue }
     "CatalogueFrenchScrinis" { Enrich-Catalogue-French-Scrinis }
+    "BibliographyPilot" { Run-Bibliography-Pilot }
     "CatalogueLifecycle" { Manage-Catalogue-Lifecycle }
     "Recommendations" { Load-Recommendations }
     "SearchIndex"     { Reindex-Manga-Search }
