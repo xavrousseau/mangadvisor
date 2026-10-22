@@ -117,7 +117,7 @@ try {
   if ($script:started -ne 1 -or -not $script:running) {
     throw "Existing stopped PostgreSQL container not restarted."
   }
-  if ($script:commands -match 'up|create|rm|down|volume rm') {
+  if (@($script:commands | Where-Object { $_ -match '^(compose|rm|create|volume rm)(\\s|$)' }).Count -gt 0) {
     throw "An unsafe Compose/container/volume action was issued."
   }
 
@@ -131,7 +131,7 @@ try {
   $blocked=$false
   try { Prepare-Existing-Postgres } catch { $blocked=$true }
   if (-not $blocked) { throw "A missing PostgreSQL container must block a backup." }
-  if ($script:commands -match 'up|create|volume rm') {
+  if (@($script:commands | Where-Object { $_ -match '^(compose|rm|create|volume rm)(\\s|$)' }).Count -gt 0) {
     throw "A missing container triggered a dangerous replacement."
   }
   Write-Host "OK: stopped-container recovery, owner refusal, secret preservation, no recreation, missing-container blockade."
