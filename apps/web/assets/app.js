@@ -849,7 +849,8 @@ async function sendAdvisorMessage(raw){
  }
 }
 async function renderMoodRecommendations(token){
- const html='<div class="headline-row"><div><div class="eyebrow">✧ MANGADVISOR · GUIDED DISCOVERY</div>'+
+ const html='<section class="reco-stage"><div class="eyebrow">✧ '+e(state.lang==="fr"?"TON PROCHAIN COUP DE CŒUR":"YOUR NEXT FAVORITE")+'</div><h1>'+e(state.lang==="fr"?"Quel univers t’attire aujourd’hui ?":"Which world calls to you today?")+'</h1><p>'+e(state.lang==="fr"?"Une envie, une humeur, une découverte. Mangadvisor trouve des histoires qui te correspondent, en s’appuyant sur de vraies données.":"A feeling, a mood, a new discovery. Manga suggestions grounded in real data.")+'</p><div class="reco-stage-actions"><button type="button" class="btn btn-primary" data-action="rec-mode" data-value="advisor">✧ '+e(state.lang==="fr"?"Parler au conseiller":"Talk to advisor")+'</button><button type="button" class="btn btn-soft" data-action="rec-mode" data-value="library">▤ '+e(state.lang==="fr"?"Selon ma collection":"From my library")+'</button></div><div class="reco-stage-art" aria-hidden="true">✧</div></section>'+
+ '<div class="headline-row"><div><div class="eyebrow">✧ MANGADVISOR · GUIDED DISCOVERY</div>'+
   '<h1 class="page-title">'+L("moodPageTitle")+'</h1><p class="page-desc">'+L("moodPageIntro")+'</p></div></div>'+
   '<div class="toggle-tabs rec-mode-tabs" role="group" aria-label="'+L("forYou")+'">'+
   '<button class="selected" data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button>'+
