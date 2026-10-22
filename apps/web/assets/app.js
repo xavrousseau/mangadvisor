@@ -590,7 +590,7 @@ async function updateLibrary(token){
    '<div class="manga-grid">'+items.map(m=>'<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(preferredMangaTitle(m,state.lang))+'</h3>'+
    '<p class="manga-card-meta">'+e(libraryCardMeta({...m,library_status:libraryStatus(state.lang,m.library_status)},declared,state.lang))+
    (m.is_favorite?' ♥':'')+'</p><button class="card-open" data-go="/manga/'+m.manga_id+'">'+L("details")+' →</button></div></article>').join("")+'</div>':
-   emptyBox("▤",L("libraryEmpty"),L("libraryEmptyHelp"),L("startExplore"),"/discover");
+   (wishlistMode?emptyBox("♡",e(state.lang==="fr"?"Pas encore de mangas dans tes envies":"Your wishlist is empty"),e(state.lang==="fr"?"Explore le catalogue et ajoute les séries que tu souhaites lire.":"Explore the catalogue and save manga you want to read."),L("startExplore"),"/discover"):emptyBox("▤",L("libraryEmpty"),L("libraryEmptyHelp"),L("startExplore"),"/discover"));
   out.innerHTML=html+paginate(state.libraryPage,hasNext,"library");
  if(!wishlistMode){out.classList.toggle("library-results-list",state.libraryDisplay==="list");out.classList.toggle("library-results-covers",state.libraryDisplay!=="list");}
  }catch(err){if(token===renderToken)out.innerHTML=errorBox(err);}
@@ -1679,6 +1679,19 @@ root.addEventListener("input",event=>{
  }
 });
 root.addEventListener("keydown",event=>{
+ const tab=event.target.closest?.(".library-view-tab");
+ if(tab && ["ArrowLeft","ArrowRight","Home","End"].includes(event.key)){
+   const tabs=[...document.querySelectorAll(".library-view-tab")];
+   const current=tabs.indexOf(tab);
+   if(current!==-1){
+     event.preventDefault();
+     const next=event.key==="Home"?0:event.key==="End"?tabs.length-1:
+       (current+(event.key==="ArrowRight"?1:-1)+tabs.length)%tabs.length;
+     tabs[next].focus();
+     tabs[next].click();
+   }
+   return;
+ }
  if(event.key==="Escape"&&isbnScanner.isOpen()){event.preventDefault();isbnScanner.close();return;}
  if(event.key==="Enter"&&event.target.id==="manual-search"){event.preventDefault();manualSearch();}
 });
