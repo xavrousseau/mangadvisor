@@ -14,6 +14,8 @@ $script:allow=$false
 $script:running=$false
 $script:containerExists=$true
 $script:loginFixed=$false
+$script:brokenLabels=$false
+$script:wrongProject=$false
 $script:started=0
 $script:commands=New-Object "System.Collections.Generic.List[string]"
 $original=@'
@@ -67,9 +69,17 @@ function docker {
       return
     }
     if ($format -match "Config.Labels") {
-      if ($format -match "compose.service") {
-        if ($name -eq "mangadvisor_postgres") { "postgres" } else { "meilisearch" }
-      } else { "mangadvisor" }
+      # Simulate Docker's Go-template parser: embedded quoted map keys
+      # are LOST by Windows PowerShell 5.1 native argument marshaling.
+      if ($format -cne "{{json .Config.Labels}}") {
+        throw "Go template parsing error: function com not defined"
+      }
+      if ($script:brokenLabels) { "{not valid json"; return }
+      $service=if ($name -eq "mangadvisor_postgres") { "postgres" } else { "meilisearch" }
+      $project=if ($script:wrongProject) { "other_project" } else { "mangadvisor" }
+      # Return a realistic Docker JSON labels object in ONE native output line.
+      '{"com.docker.compose.service":"' + $service +
+        '","com.docker.compose.project":"' + $project + '"}'
       return
     }
     if ($format -match "State.Running") {
@@ -104,6 +114,29 @@ function docker {
 function Confirm-Repair([string]$Question) { return $script:allow }
 
 try {
+  # 0. Reproduce the exact Windows go-template failure safely:
+  # the service and project labels must be parsed from a JSON map, never
+  # from a Go 'index .Config.Labels "com...."' template.
+  Assert-Managed-Container "mangadvisor_postgres" "postgres"
+  Assert-Managed-Container "mangadvisor_meilisearch" "meilisearch"
+  $dockerLabelCalls=@($script:commands | Where-Object { $_ -match 'inspect --format \{\{json \.Config\.Labels\}\}' })
+  if ($dockerLabelCalls.Count -ne 2) {
+    throw "The real label checks are not using the quote-safe Docker JSON template."
+  }
+  $script:brokenLabels=$true
+  $rejected=$false
+  try { Assert-Managed-Container "mangadvisor_postgres" "postgres" } catch { $rejected=$true }
+  if (-not $rejected) { throw "Malformed Docker label JSON was accepted." }
+  $script:brokenLabels=$false
+  $script:wrongProject=$true
+  $rejected=$false
+  try { Assert-Managed-Container "mangadvisor_postgres" "postgres" } catch { $rejected=$true }
+  if (-not $rejected) { throw "Foreign Docker Compose project was accepted." }
+  $script:wrongProject=$false
+  $rejected=$false
+  try { Assert-Managed-Container "mangadvisor_postgres" "meilisearch" } catch { $rejected=$true }
+  if (-not $rejected) { throw "Wrong Docker Compose service was accepted." }
+
   # 1. Owner refusal: no starting PostgreSQL, no secret rewrite.
   $denied=$false
   try { Prepare-Existing-Postgres } catch { $denied=$true }
