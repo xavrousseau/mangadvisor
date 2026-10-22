@@ -299,7 +299,11 @@ def request_public(source: str, kind: str, session: Any, *,
             )
         return {"status": "OK", "data": parse_details(source, payload)}
     finally:
-        response.close()
+        # Actual HTTP responses always support close(); lightweight offline
+        # fixtures may only expose status_code and content.
+        closer = getattr(response, "close", None)
+        if callable(closer):
+            closer()
 
 
 def _labels(raw: Any, *, keys=("name", "genre", "category", "title")) -> list[str]:
