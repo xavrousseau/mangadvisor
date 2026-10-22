@@ -39,6 +39,12 @@ function docker {
   $argv=@($args)
   $script:commands.Add(($argv -join " "))
   $global:LASTEXITCODE=0
+  if ($argv[0] -eq "container" -and $argv[1] -eq "ls") {
+    if ($script:containerExists) { "mangadvisor_postgres" }
+    "mangadvisor_meilisearch"
+    return
+  }
+  if ($argv[0] -eq "volume" -and $argv[1] -eq "ls") { return }
   if ($argv[0] -eq "container" -and $argv[1] -eq "inspect") {
     $format=[string]$argv[3]
     $name=[string]$argv[4]
