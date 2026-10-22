@@ -50,17 +50,17 @@ def work_candidate_status(title: str, known_titles: list[str]) -> str:
     # Keep them visible for human review, never register them as ordinary tomes.
     descriptor = suffix.strip(" ()[]{}-:;,.")
     if re.search(
-        r"\\b(?:illustrations? file|art\\s?book|guide\\s?book|"
-        r"official guide|guide officiel|fan\\s?book|data\\s?book|"
-        r"roman|novel|color walk|character book|anime comics)\\b",
+        r"\b(?:illustrations? file|art\s?book|guide\s?book|"
+        r"official guide|guide officiel|fan\s?book|data\s?book|"
+        r"roman|novel|color walk|character book|anime comics)\b",
         descriptor,
     ):
         return "REVIEW_DERIVATIVE"
     if re.match(r"^(?:of |des |de |du |and |et )", descriptor):
         return "REJECT_DIFFERENT_WORK"
-    if re.match(r"^(?:tome\\s*\\d+|vol(?:ume)?\\.?\\s*\\d+|t\\.?\\s*\\d+|\\d+\\b)", descriptor):
+    if re.match(r"^(?:tome\s*\d+|vol(?:ume)?\.?\s*\d+|t\.?\s*\d+|\d+\b)", descriptor):
         return "REVIEW_VOLUME_CANDIDATE"
-    if re.match(r"^ed(?:ition|\\.)?\\b", descriptor):
+    if re.match(r"^ed(?:ition|\.)?\b", descriptor):
         return "REVIEW_EDITION_CANDIDATE"
     return "REVIEW_UNNUMBERED"
 
@@ -75,8 +75,8 @@ def volume_from_known_title(title: str, known_titles: list[str]) -> int | None:
     if suffix is None or not suffix:
         return None
     match = re.match(
-        r"^(?:tome\\s*|vol(?:ume)?\\.?\\s*|t\\.?\\s*)?"
-        r"0*([1-9]\\d{0,2})(?=$|[\\s.,:;/()\\-])",
+        r"^(?:tome\s*|vol(?:ume)?\.?\s*|t\.?\s*)?"
+        r"0*([1-9]\d{0,2})(?=$|[\s.,:;/()\-])",
         suffix,
     )
     return int(match.group(1)) if match else None
