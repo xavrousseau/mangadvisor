@@ -152,6 +152,9 @@ def run():
             expect(page).to_have_url(BASE+"/library")
             expect(page.locator(".manga-card").first).to_be_visible(timeout=30000)
             page.screenshot(path=str(OUTPUT / f"{device}-bibliotheque.png"), full_page=True)
+            # The redesigned library keeps import tools behind the Manage tab.
+            page.locator('[data-action="library-view"][data-value="manage"]').last.click()
+            expect(page.locator("#library-manage-panel")).to_be_visible()
             # Batch import: preview must match only ISBNs already verified in the catalog.
             page.locator("#bulk-import-workspace summary").click()
             expect(page.locator("#bulk-csv-text")).to_be_visible()
