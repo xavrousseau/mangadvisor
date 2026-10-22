@@ -200,6 +200,21 @@ class BnfBatchTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             cli_main(["--manga-id", "-2"])
 
+    def test_cli_extended_pagination_requires_target(self):
+        with self.assertRaises(SystemExit):
+            cli_main(["--pages", "10"])
+        with self.assertRaises(SystemExit):
+            cli_main(["--pages", "11", "--manga-id", "2"])
+        stats = {"selected": 1, "searched": 1, "candidates": 30,
+                 "checked": 0, "empty": 0, "partial": 1,
+                 "error": 0, "skipped": 0}
+        with patch("apps.api.app.bnf_batch.run_batch", return_value=stats) as run:
+            self.assertEqual(cli_main(
+                ["--pages", "10", "--manga-id", "2", "--limit", "1", "--refresh"]
+            ), 0)
+            self.assertEqual(run.call_args.kwargs["target_ids"], [2])
+            self.assertEqual(run.call_args.kwargs["search"].keywords["max_pages"], 10)
+
     def test_limit_rejected_before_database_or_network(self):
         db = FakeDb()
         for value in (0, MAX_BATCH + 1, -1):
