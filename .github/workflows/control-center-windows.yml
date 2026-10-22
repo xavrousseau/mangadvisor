@@ -58,6 +58,10 @@ jobs:
           if (-not $menu.Contains("cmd\control-center.ps1")) {
             throw "Le centre de pilotage n'est pas branche au menu."
           }
+          if (-not $menu.Contains("Version Git locale : %CODE_REV%") -or
+              -not $menu.Contains('set "KEY=github-sync"')) {
+            throw "Le menu doit afficher le vrai commit local et proposer une synchronisation du code."
+          }
 
       - name: Executer le nouveau lanceur batch sous Windows
         shell: powershell
