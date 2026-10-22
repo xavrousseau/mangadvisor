@@ -141,10 +141,13 @@ class PipelineTests(unittest.TestCase):
                  {"source_mal_id": 2, "title": "Berserk", "title_english": None,
                   "title_japanese": None}, [], None, [])), \
              patch.object(pipeline, "run_bnf") as bnf, \
-             patch.object(pipeline, "run_scrinis") as scrinis:
+             patch.object(pipeline, "run_scrinis") as scrinis, \
+             patch.object(pipeline, "scrinis_selection_diagnostics", return_value={2: {"next_action": "REVIEW_AMBIGUOUS_SOURCE_MATCH"}}) as diagnostics:
             output = pipeline.run_pilot(manga_ids=[2], bnf=False, scrinis=False)
             bnf.assert_not_called()
             scrinis.assert_not_called()
+            diagnostics.assert_called_once()
+            self.assertEqual(output["scrinis_selection_diagnostics"][2]["next_action"], "REVIEW_AMBIGUOUS_SOURCE_MATCH")
             self.assertEqual(output["works"][0]["total_candidates"], 0)
             self.assertEqual(output["user_inventory_written"], 0)
 
