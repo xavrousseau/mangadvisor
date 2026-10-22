@@ -143,6 +143,14 @@ jobs:
             Remove-Item -LiteralPath $settings -Force -ErrorAction SilentlyContinue
           }
 
+      - name: Tester la reprise PostgreSQL arrete et la recuperation de .env (sans Docker)
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\\windows\\test-stopped-postgres-backup.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Restauration securisee de la configuration PostgreSQL invalide."
+          }
+
       - name: Tester la mise a jour Git en clone Windows jetable
         shell: powershell
         run: |
