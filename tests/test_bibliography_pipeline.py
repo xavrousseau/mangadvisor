@@ -103,6 +103,17 @@ class PipelineTests(unittest.TestCase):
                 "9782344067802",
             )
 
+    def test_skip_bnf_reuses_saved_candidates(self):
+        import contextlib
+        import io
+        with patch.object(pipeline, "run_pilot", return_value={
+            "selected_ids": [2], "works": []}) as run:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    pipeline.main(["--manga-ids", "2", "--skip-bnf"]), 0)
+            self.assertFalse(run.call_args.kwargs["bnf"])
+            self.assertTrue(run.call_args.kwargs["scrinis"])
+
     def test_report_only_never_calls_suppliers_or_writes(self):
         fake_conn = MagicMock()
         fake_context = MagicMock()
