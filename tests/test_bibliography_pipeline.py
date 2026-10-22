@@ -54,6 +54,23 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(with_alias["work_status_counts"], {"REVIEW_VOLUME_CANDIDATE": 1})
         self.assertFalse(with_alias["candidates"][0]["registration_ready"])
 
+    def test_scrinis_triage_respects_ambiguity_and_retry(self):
+        cases = [
+            ({"already_has_source_french_alias": True, "previous_attempt_status": "MATCHED"},
+             "USE_EXISTING_TITLE_EVIDENCE"),
+            ({"previous_attempt_status": "AMBIGUOUS", "attempt_cooldown_active": True},
+             "REVIEW_AMBIGUOUS_SOURCE_MATCH"),
+            ({"previous_attempt_status": "DETAIL_UNAVAILABLE", "attempt_cooldown_active": True},
+             "AWAIT_NORMAL_RETRY"),
+            ({"previous_attempt_status": "DETAIL_UNAVAILABLE", "attempt_cooldown_active": False},
+             "RETRY_DETAIL_WHEN_ELIGIBLE"),
+            ({"previous_attempt_status": None, "attempt_cooldown_active": False},
+             "ELIGIBLE_FOR_NORMAL_PROVIDER_SEARCH"),
+        ]
+        for state, expected in cases:
+            with self.subTest(state=state):
+                self.assertEqual(pipeline.next_scrinis_action(state), expected)
+
     def test_full_scan_requires_single_explicit_manga(self):
         with self.assertRaises(ValueError):
             pipeline.run_pilot(pages=10)
