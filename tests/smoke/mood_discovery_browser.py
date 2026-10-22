@@ -12,6 +12,8 @@ def check(page, layout):
     expect(page.locator(".mood-choice")).to_have_count(6)
     page.locator('[data-action="mood-select"][data-mood="MYSTERY"]').click()
     expect(page.locator('[data-mood="MYSTERY"]')).to_have_attribute("aria-pressed", "true")
+    # Length and completion controls now live in collapsed advanced options.
+    page.locator(".mood-advanced > summary").click()
     page.locator("#mood-length").select_option("LONG")
     page.locator("#mood-finished").check()
     page.locator('[data-action="generate-mood"]').click()
@@ -22,11 +24,11 @@ def check(page, layout):
     assert page.locator(".mood-result-summary").inner_text().strip()
     page.screenshot(path=str(DIR / f"{layout}-mood-discovery.png"), full_page=True)
     # Existing historical recommendation modes stay reachable.
-    page.locator('[data-action="rec-mode"][data-value="library"]').click()
+    page.locator('[data-action="rec-mode"][data-value="library"]:visible').first.click()
     expect(page.locator("#rec-goal")).to_be_visible()
-    page.locator('[data-action="rec-mode"][data-value="manual"]').click()
+    page.locator('[data-action="rec-mode"][data-value="manual"]:visible').first.click()
     expect(page.locator("#manual-search")).to_be_visible()
-    page.locator('[data-action="rec-mode"][data-value="mood"]').click()
+    page.locator('[data-action="rec-mode"][data-value="mood"]:visible').first.click()
     expect(page.locator('[data-action="generate-mood"]')).to_be_visible()
 
 if __name__ == "__main__":
