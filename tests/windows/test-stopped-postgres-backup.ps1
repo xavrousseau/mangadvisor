@@ -13,6 +13,7 @@ $script:NonInteractive=$false
 $script:allow=$false
 $script:running=$false
 $script:containerExists=$true
+$script:loginFixed=$false
 $script:started=0
 $script:commands=New-Object "System.Collections.Generic.List[string]"
 $original=@'
@@ -86,7 +87,14 @@ function docker {
   }
   if ($argv[0] -eq "exec" -and $argv[2] -eq "pg_isready") { return }
   if ($argv[0] -eq "exec" -and $argv[2] -eq "psql") { "manga"; return }
-  if ($argv[0] -eq "exec" -and $argv[2] -eq "sh") { "1"; return }
+  if ($argv[0] -eq "exec" -and $argv[1] -eq "-i") {
+    $script:loginFixed=$true
+    return
+  }
+  if ($argv[0] -eq "exec" -and $argv[2] -eq "sh") {
+    if ($script:loginFixed) { "1" } else { $global:LASTEXITCODE=1 }
+    return
+  }
   if ($argv[0] -eq "volume") {
     $global:LASTEXITCODE=1
     return
@@ -144,7 +152,41 @@ try {
   if (@($script:commands | Where-Object { $_ -match '^(compose|rm|create|volume rm)(\\s|$)' }).Count -gt 0) {
     throw "A missing container triggered a dangerous replacement."
   }
-  Write-Host "OK: stopped-container recovery, owner refusal, secret preservation, no recreation, missing-container blockade."
+  # 5. Authentication mismatch in persisted PGDATA must not be "fixed"
+  # without an already verified dump and a second explicit owner approval.
+  $script:containerExists=$true
+  $script:loginFixed=$false
+  $verified=Join-Path $script:backups "mangadvisor_20261022_163000_deadbeef.dump"
+  [IO.File]::WriteAllText($verified,("backupfixture" * 20),[Text.Encoding]::ASCII)
+  $hash=(Get-FileHash -LiteralPath $verified -Algorithm SHA256).Hash.ToLowerInvariant()
+  @{
+    file="mangadvisor_20261022_163000_deadbeef.dump"
+    database="mangadvisor"
+    sha256=$hash
+  } | ConvertTo-Json | Set-Content -LiteralPath "$verified.json" -Encoding UTF8
+  if (Test-Api-Password) { throw "The PGDATA password mismatch was missed." }
+  $script:NonInteractive=$true
+  $rejected=$false
+  try { Repair-Api-PasswordAfterBackup $verified } catch { $rejected=$true }
+  if (-not $rejected -or $script:loginFixed) {
+    throw "Noninteractive secret rotation must be forbidden."
+  }
+  $script:NonInteractive=$false
+  function Read-Host([string]$Prompt) { return "NO" }
+  $rejected=$false
+  try { Repair-Api-PasswordAfterBackup $verified } catch { $rejected=$true }
+  if (-not $rejected -or $script:loginFixed) { throw "Denied password change was performed." }
+  function Read-Host([string]$Prompt) { return "REPARER" }
+  Repair-Api-PasswordAfterBackup $verified
+  if (-not $script:loginFixed -or -not (Test-Api-Password)) {
+    throw "Confirmed repair did not enable authenticated TCP access."
+  }
+  $count=@($script:commands | Where-Object { $_ -match '^exec -i mangadvisor_postgres psql ' }).Count
+  if ($count -ne 1) { throw "Expected exactly one role-secret rotation." }
+  if (($script:commands -join " ") -match "ORIGINAL_SECRET_FROM_CONTAINER") {
+    throw "A PostgreSQL secret was exposed as a Docker CLI argument."
+  }
+  Write-Host "OK: stopped-container recovery, owner refusal, secret preservation, no recreation, missing-container blockade, authenticated TCP repair after verified dump."
 } finally {
   Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction SilentlyContinue
 }
