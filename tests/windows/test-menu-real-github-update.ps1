@@ -6,33 +6,33 @@ $seed=Join-Path $base "seed"
 $remote=Join-Path $base "remote.git"
 $working=Join-Path $base "working"
 New-Item -ItemType Directory -Force -Path $seed | Out-Null
-function Git([string[]]$arguments) {
+function Run-FixtureGit([string[]]$arguments) {
   & git @arguments | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Fixture Git failed: $($arguments -join ' ')" }
 }
 try {
-  Git @("init","--initial-branch=main",$seed)
-  Git @("-C",$seed,"config","user.name","Mangadvisor CI")
-  Git @("-C",$seed,"config","user.email","mangadvisor-ci@example.invalid")
+  Run-FixtureGit @("init","--initial-branch=main",$seed)
+  Run-FixtureGit @("-C",$seed,"config","user.name","Mangadvisor CI")
+  Run-FixtureGit @("-C",$seed,"config","user.email","mangadvisor-ci@example.invalid")
   New-Item -ItemType Directory -Force -Path (Join-Path $seed "cmd") | Out-Null
   Copy-Item (Join-Path $PWD "mangadvisor.cmd") (Join-Path $seed "mangadvisor.cmd")
   Copy-Item (Join-Path $PWD "cmd\github-sync.ps1") (Join-Path $seed "cmd\github-sync.ps1")
   [IO.File]::WriteAllText((Join-Path $seed "cmd\library-backup.ps1"),
     "function Prepare-Existing-Postgres { }"+[Environment]::NewLine,[Text.Encoding]::ASCII)
-  Git @("-C",$seed,"add",".")
-  Git @("-C",$seed,"commit","-m","initial")
-  Git @("init","--bare","--initial-branch=main",$remote)
-  Git @("-C",$seed,"remote","add","origin",$remote)
-  Git @("-C",$seed,"push","-u","origin","main")
-  Git @("clone",$remote,$working)
+  Run-FixtureGit @("-C",$seed,"add",".")
+  Run-FixtureGit @("-C",$seed,"commit","-m","initial")
+  Run-FixtureGit @("init","--bare","--initial-branch=main",$remote)
+  Run-FixtureGit @("-C",$seed,"remote","add","origin",$remote)
+  Run-FixtureGit @("-C",$seed,"push","-u","origin","main")
+  Run-FixtureGit @("clone",$remote,$working)
 
   [IO.File]::AppendAllText((Join-Path $seed "mangadvisor.cmd"),
     [Environment]::NewLine+"rem CI_MENU_SELF_UPDATE_SUCCESS"+[Environment]::NewLine,[Text.Encoding]::ASCII)
   [IO.File]::AppendAllText((Join-Path $seed "cmd\library-backup.ps1"),
     "rem REMOTE_BACKUP_SCRIPT"+[Environment]::NewLine,[Text.Encoding]::ASCII)
-  Git @("-C",$seed,"add",".")
-  Git @("-C",$seed,"commit","-m","new release modifies running batch file")
-  Git @("-C",$seed,"push","origin","main")
+  Run-FixtureGit @("-C",$seed,"add",".")
+  Run-FixtureGit @("-C",$seed,"commit","-m","new release modifies running batch file")
+  Run-FixtureGit @("-C",$seed,"push","origin","main")
   $expected=(& git -C $remote rev-parse refs/heads/main).Trim()
 
   $stdin=Join-Path $base "stdin.txt"
