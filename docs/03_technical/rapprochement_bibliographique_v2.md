@@ -58,9 +58,11 @@ couverture bibliographique exhaustive.**
   lors du commit `5b0a3ee52a4a029e1da0be7c1027dc0c9bdeeae1`.
 - CI « Centre de pilotage Windows » et « installation stable mono-interface » :
   réussites sur ce commit.
-- CI navigateur intégrée : échec indépendant sur un sélecteur Playwright
-  qui rencontre deux éléments `data-action=rec-mode` (aucune preuve de
-  panne de rapprochement bibliographique à partir de cet échec).
+- CI navigateur intégrée : échec hors périmètre bibliographique dans le
+  parcours conseiller IA. Le sélecteur de mode dupliqué a été précisé dans
+  le test, puis la vérification suivante a signalé `#mood-length` masqué
+  après activation du mode mood. Cette anomalie UI reste ouverte, et ne
+  permet pas de déclarer la recette navigateur intégralement verte.
 
 ## À valider avec le jeu de données sandbox
 
