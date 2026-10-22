@@ -167,3 +167,26 @@ body{background:var(--bg)}
  .releases-empty .actions{display:grid;width:100%}
 }
 @media(max-width:360px){.sidebar .nav-link{font-size:8px}.sidebar .nav-ico{font-size:18px}}
+
+
+/* The recommendation journey starts with an invitation, not a settings form. */
+.reco-stage{position:relative;isolation:isolate;min-height:330px;padding:50px clamp(29px,5vw,66px);border-radius:26px;overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));background:radial-gradient(circle at 90% 28%,rgba(255,172,99,.2),transparent 43%),linear-gradient(116deg,#252338,#182031 64%,#403048);margin-bottom:28px}
+.reco-stage .eyebrow{font-size:11px;color:var(--accent);letter-spacing:.18em}
+.reco-stage h1{color:#fff7ef;font-size:clamp(40px,4.5vw,65px);max-width:15ch;line-height:1.06;margin:16px 0}
+.reco-stage p{color:#cdd2df;max-width:57ch;line-height:1.7;font-size:14px;margin:0 0 21px}
+.reco-stage-actions{display:flex;gap:11px;flex-wrap:wrap}
+.reco-stage-actions .btn{min-height:46px}
+.reco-stage-art{position:absolute;z-index:-1;right:8%;top:3%;font-size:clamp(170px,30vw,430px);font-family:'Outfit',sans-serif;font-weight:800;color:rgba(255,179,111,.14);transform:rotate(-12deg);line-height:1}
+.reco-stage+.headline-row{margin-bottom:16px}
+.reco-stage+.headline-row .page-title{font-size:25px}
+.rec-mode-tabs{margin-bottom:19px}
+@media(max-width:740px){
+ .reco-stage{min-height:340px;padding:31px 23px;border-radius:18px}
+ .reco-stage h1{font-size:clamp(33px,9vw,47px)}
+ .reco-stage p{font-size:12px}
+ .reco-stage-art{right:-5%;top:15%;font-size:240px}
+ .reco-stage-actions{display:grid;grid-template-columns:1fr;gap:8px}
+ .reco-stage-actions .btn{width:100%}
+ .rec-mode-tabs{overflow-x:auto;max-width:100%;scrollbar-width:none}
+ .rec-mode-tabs button{flex-shrink:0}
+}
