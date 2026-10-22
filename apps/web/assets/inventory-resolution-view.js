@@ -47,12 +47,41 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
     (fr?"tomes principaux":"main volumes")+" · "+Number(original.duplicate_copies||0)+" "+
     (fr?"doublons":"duplicates")+" · "+Number(original.other_editions_unknown||0)+" "+
     (fr?"autres éditions à identifier":"other editions to identify");
+  const existing=Array.isArray(selection?.existing_declarations)?selection.existing_declarations:[];
+  const modes=Array.isArray(selection?.allowed_actions)?selection.allowed_actions:["CREATE_DECLARATION"];
+  const choice=existing.length?(state.reviewMode||""):"CREATE_DECLARATION";
+  const previous=existing.length
+    ?'<div class="collection-caveat"><strong>'+e(fr?
+      "Déclarations déjà enregistrées :":"Already in your collection:")+'</strong>'+
+      '<p>'+existing.map(row=>e(
+        (row.edition_declared||(fr?"Édition non précisée":"Unspecified edition"))+
+        " — "+row.main_volumes+" "+(fr?"tomes":"volumes")+
+        " · "+row.duplicate_copies+" "+(fr?"doublons":"duplicates")+
+        " · "+row.other_editions_unknown+" "+(fr?"autres éditions":"other editions")
+      )).join(" / ")+'</p><p>'+e(fr?
+      "Compare ces livres avant de confirmer : les mêmes volumes ne doivent pas être comptés deux fois.":
+      "Compare these books before confirming: the same volumes must never be counted twice.")+'</p></div>'
+    :"";
+  const modeSelector=existing.length
+    ?'<label for="pending-match-mode">'+e(fr?"Décision sur cette ligne :":"Choose an action:")+'</label>'+
+     '<select id="pending-match-mode" class="select">'+
+     '<option value="">'+e(fr?"Sélectionne une action":"Select an action")+'</option>'+
+     (modes.includes("CREATE_DECLARATION")?
+       '<option value="CREATE_DECLARATION"'+(choice==="CREATE_DECLARATION"?' selected':"")+'>'+
+       e(fr?"Ajouter une édition différente":"Add a separate edition")+'</option>':"")+
+     '<option value="MARK_DUPLICATE"'+(choice==="MARK_DUPLICATE"?' selected':"")+'>'+
+     e(fr?"Archiver cette ligne déjà comptée (ne rien ajouter)":"Archive already counted record (add nothing)")+
+     '</option></select>'+
+     '<label class="inventory-match-ack"><input type="checkbox" id="pending-match-existing-ack"/> '+
+     e(fr?"J'ai comparé les exemplaires déjà enregistrés":"I compared the existing copies")+'</label>'
+    :"";
   const review=selection?'<section class="inventory-match-review">'+
     '<h4>'+e(fr?"Vérification avant association":"Review before matching")+'</h4>'+
     '<p><strong>'+e(original.entry_title)+'</strong> → <strong>'+e(selected?.title)+'</strong></p>'+
     '<p>'+e(fr?"Édition déclarée : ":"Declared edition: ")+
       e(original.edition_declared||(fr?"non précisée":"unspecified"))+'</p>'+
     '<p class="muted tiny">'+e(quantities)+'</p>'+
+    previous+modeSelector+
     '<p class="collection-caveat">'+e(fr?
       "Je confirme l'œuvre choisie et cette édition. Cela n'ajoute ni ISBN, ni statut Lu, ni détails de tomes.":
       "I confirm this work and edition. No ISBN, read status or individual volumes will be added.")+'</p>'+
