@@ -33,6 +33,18 @@ Document de travail fonctionnel et recette ; **ne pas confondre plan et fonction
 - Les onglets ne modifient pas les données ; les imports conservent les parcours existants.
 - Analyse syntaxique JavaScript effectuée ; aucun audit navigateur réel ou campagne responsive complète à ce stade.
 
+## Livraison en cours — version « Mangadvisor Next » (22/10/2026)
+- Nouvelle feuille de style `apps/web/assets/next-experience.css` activée après les styles existants.
+- Bibliothèque : entrée éditoriale, parcours de démarrage depuis une collection vide, accès direct au scanner et à l'import, onglets série/éditions/envies/gestion, galerie/liste.
+- Collection vide : bouton **aperçu** qui affiche des mangas du catalogue public sans écrire dans la mangathèque. Bandeau explicite « pas ta collection » et fermeture réversible.
+- Découvrir : bannière dédiée, accès au conseiller, genres interactifs reliés au filtre réel, galerie plus visuelle.
+- Pour moi : nouvel écran d'accueil de recommandation et accès au conseiller / suggestions issues de la bibliothèque.
+- Fiche manga : couverture mise en avant, titres, actions et synopsis plus lisibles (styling ; modèles bibliographiques inchangés).
+- Sorties : destination accessible dans navigation, présentant honnêtement l'absence de planning français vérifié. **Aucune date livrée**.
+- Mobile : cinq destinations en navigation inférieure, contrôles tactiles et grilles adaptées.
+- Aucune migration SQL, aucun inventaire fictif attribué à l'utilisateur ; les cartes d'aperçu sont celles du catalogue public.
+- Syntaxe JS évaluée sur les fichiers modifiés ; l'ensemble nécessite toujours une vraie recette navigateur et mobile.
+
 ## Phases restantes avant validation finale
 1. Vérifier et corriger l'UX de ces vues dans le navigateur, notamment navigation clavier, écrans vides, accès au scanner, recherches et import.
 2. Page fiche manga : hiérarchie couverture/synopsis/édition/tomes, CTA ajout à la collection et retours visuels.
