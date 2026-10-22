@@ -30,6 +30,9 @@ def run():
         failures = []
         page.on("pageerror", lambda error: failures.append(str(error)))
         page.goto(BASE + "/library", wait_until="domcontentloaded")
+        # Imports live in the Manage tab of the maintained single Web UI.
+        page.locator('[data-action="library-view"][data-value="manage"]').last.click()
+        expect(page.locator("#library-manage-panel")).to_be_visible(timeout=30000)
         expect(page.locator("#reading-import-workspace")).to_be_visible(timeout=30000)
         page.locator("#reading-import-workspace summary").click()
         expect(page.locator("#reading-file")).to_be_visible()
