@@ -16,6 +16,7 @@ from apps.api.app.bnf_batch import connect_database
 VOLUME_PATTERNS = (
     re.compile(r"\b(?:tome|volume|vol\.?|t\.)\s*0*([1-9][0-9]{0,3})\b", re.I),
     re.compile(r"\.\s*0*([1-9][0-9]{0,3})\s*(?:/|\(|$)", re.I),
+    re.compile(r":\s*0*([1-9][0-9]{0,3})\s*(?:/|\(|$)", re.I),
 )
 
 
