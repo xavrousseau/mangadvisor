@@ -116,6 +116,7 @@ def scrinis_selection_diagnostics(conn: Any, selected: list[int]) -> dict[int, d
         for manga_id in selected:
             has_alias = False
             attempt_status = None
+            attempt_reason = None
             cooldown_active = False
             if aliases_available:
                 cur.execute(
@@ -127,7 +128,7 @@ def scrinis_selection_diagnostics(conn: Any, selected: list[int]) -> dict[int, d
                 has_alias = bool(cur.fetchone()["present"])
             if attempt_available:
                 cur.execute(
-                    """SELECT status,checked_at > NOW() -
+                    """SELECT status,reason,checked_at > NOW() -
                           CASE WHEN status IN ('PROVIDER_ERROR','DETAIL_UNAVAILABLE')
                                THEN INTERVAL '1 day' ELSE INTERVAL '45 days' END
                        AS cooldown_active
@@ -136,10 +137,12 @@ def scrinis_selection_diagnostics(conn: Any, selected: list[int]) -> dict[int, d
                 attempt = cur.fetchone()
                 if attempt:
                     attempt_status = attempt["status"]
+                    attempt_reason = attempt["reason"]
                     cooldown_active = bool(attempt["cooldown_active"])
             result[manga_id] = {
                 "already_has_source_french_alias": has_alias,
                 "previous_attempt_status": attempt_status,
+                "previous_attempt_reason": attempt_reason,
                 "attempt_cooldown_active": cooldown_active,
                 "source_retry_eligible": not has_alias and not cooldown_active,
             }
