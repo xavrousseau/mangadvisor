@@ -61,7 +61,11 @@ function Write-PublicDump([string]$name,[string[]]$tables) {
     $args = @("exec",$container,"pg_dump","-U",$script:dbUser,"-d",$script:dbName,
               "-Fc","-Z","6","--no-owner","--no-privileges","-f",$remote)
     foreach ($table in $tables) {
-        $args += @("-t","public." + $table)
+        # PowerShell 5.1 may flatten `@("-t","public." + $table)` into
+        # three native argv elements: -t, public., manga. PostgreSQL then
+        # treats "manga" as an unexpected positional database argument.
+        # Build ONE atomic --table=... argument per public table.
+        $args += ("--table=public." + [string]$table)
     }
     Write-Host ("Extraction publique : " + $name + " (" + $tables.Count + " tables)")
     try {
