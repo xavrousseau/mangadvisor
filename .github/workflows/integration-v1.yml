@@ -1204,6 +1204,23 @@ jobs:
           print("PASS source graph: MAL+non-MAL, collision, ID links, typed relations, zero legacy writes")
           PY
 
+      - name: Reproduire A-26 dans l'image API de production sans bind mount
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Base-only compose: the API image has apps/api but NOT pipelines/engine.
+          # This regression caught ModuleNotFoundError: No module named 'pipelines'.
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            run --rm --no-deps -T api python -m apps.api.app.catalogue_source_graph_cli --apply \
+            | tee /tmp/mangadvisor-catalogue-work-graph.json
+          grep -q '"mode": "APPLIED"' /tmp/mangadvisor-catalogue-work-graph.json
+          grep -q '"user_library_modified": false' /tmp/mangadvisor-catalogue-work-graph.json
+          grep -q '"external_api_requests": 0' /tmp/mangadvisor-catalogue-work-graph.json
+          # Built API image must import without relying on dev-mounted pipeline files.
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            run --rm --no-deps -T api python -m apps.api.app.catalogue_source_graph_cli --report-only \
+            | grep -q '"mode": "READ_ONLY"'
+
       - name: Journaux Docker en cas d'erreur
         if: failure()
         run: |

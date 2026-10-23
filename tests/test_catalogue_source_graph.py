@@ -123,7 +123,7 @@ class SourceGraphTests(unittest.TestCase):
         self.assertIn("26 - Reconstruire le referentiel public",menu)
         self.assertIn('if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"',menu)
         runner=(root/"cmd/rebuild-catalogue-source-graph.ps1").read_text(encoding="utf-8")
-        self.assertIn("rebuild_catalogue_source_graph --apply",runner)
+        self.assertIn("apps.api.app.catalogue_source_graph_cli --apply",runner)
         self.assertNotIn("down -v",runner)
         self.assertNotIn("docker volume prune",runner)
 
