@@ -53,7 +53,74 @@ goto menu
 :advanced
 cls
 echo ==========================================================
-echo                  OUTILS AVANCES
+echo                    OUTILS AVANCES
+echo ==========================================================
+echo.
+echo    1 - Catalogue : actualiser les nouveautes
+echo    2 - Catalogue : titres francais (Scrinis)
+echo    3 - Ma mangatheque : importer mon CSV
+echo    4 - Recommandations communautaires
+echo    5 - Scanner mobile et conseiller IA
+echo    6 - Actualiser la recherche Meilisearch
+echo.
+echo    S - Entretien et sauvegardes
+echo    T - Outils techniques historiques
+echo    0 - Retour
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto menu
+if /I "%CHOICE%"=="S" goto :maintenance
+if /I "%CHOICE%"=="T" goto :expert
+if /I "%CHOICE%"=="5" goto :features
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=catalogue-lifecycle"
+if "%CHOICE%"=="2" set "KEY=catalogue-french-scrinis"
+if "%CHOICE%"=="3" set "KEY=import"
+if "%CHOICE%"=="4" set "KEY=recommendations"
+if "%CHOICE%"=="6" set "KEY=search-index"
+if not defined KEY (
+    echo Choix inconnu.
+    pause
+    goto advanced
+)
+call :dispatch "%KEY%"
+call :result
+goto advanced
+
+:features
+cls
+echo ==========================================================
+echo               FONCTIONS FACULTATIVES
+echo ==========================================================
+echo.
+echo    1 - Activer le scanner mobile HTTPS
+echo    2 - Arreter le scanner mobile HTTPS
+echo    3 - Activer le conseiller IA local
+echo    4 - Arreter le conseiller IA local
+echo    0 - Retour
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto advanced
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=mobile"
+if "%CHOICE%"=="2" set "KEY=mobile-stop"
+if "%CHOICE%"=="3" set "KEY=ai"
+if "%CHOICE%"=="4" set "KEY=ai-stop"
+if not defined KEY (
+    echo Choix inconnu.
+    pause
+    goto features
+)
+call :dispatch "%KEY%"
+call :result
+goto features
+
+:expert
+cls
+echo ==========================================================
+echo        OUTILS TECHNIQUES HISTORIQUES
 echo ==========================================================
 echo.
 echo    1 - Actualiser le catalogue de mangas
@@ -88,7 +155,7 @@ echo    0 - Retour
 echo.
 set "CHOICE="
 set /p "CHOICE=Ton choix : "
-if /I "%CHOICE%"=="0" goto menu
+if /I "%CHOICE%"=="0" goto advanced
 if /I "%CHOICE%"=="S" goto :maintenance
 
 set "KEY="
@@ -121,11 +188,11 @@ if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"
 if not defined KEY (
     echo Choix inconnu.
     pause
-    goto advanced
+    goto expert
 )
 call :dispatch "%KEY%"
 call :result
-goto advanced
+goto expert
 
 :maintenance
 cls
