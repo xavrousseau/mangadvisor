@@ -18,9 +18,10 @@ def group(**extra):
 
 
 def link(**extra):
-    return GroupBookLink(
-        book_id=42, isbn13="9782871294146",
-        confirmation="CONFIRMER_RATTACHEMENT", **extra)
+    values = {"book_id": 42, "isbn13": "9782871294146",
+              "confirmation": "CONFIRMER_RATTACHEMENT"}
+    values.update(extra)
+    return GroupBookLink(**values)
 
 
 class FakeCursor:
