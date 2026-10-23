@@ -9,6 +9,8 @@ param(
 $ErrorActionPreference="Stop"
 Set-StrictMode -Version Latest
 $root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+. (Join-Path $PSScriptRoot "environment-safety.ps1")
+Assert-MangadvisorStableCheckout $root
 $envFile=Join-Path $root ".env"
 $backups=Join-Path $root "backups"
 $containerName="mangadvisor_postgres"

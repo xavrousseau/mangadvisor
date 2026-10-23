@@ -4,6 +4,8 @@ param([switch]$Stop)
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+. (Join-Path $PSScriptRoot "environment-safety.ps1")
+Assert-MangadvisorStableCheckout $root
 $envFile = Join-Path $root ".env"
 $compose = @("-f",(Join-Path $root "infra\compose\docker-compose.yml"),
              "-f",(Join-Path $root "infra\compose\docker-compose.local.yml"))

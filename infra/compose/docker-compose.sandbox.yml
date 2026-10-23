@@ -26,6 +26,10 @@ services:
       - manga_sandbox_logs:/workspace/data/logs
   catalog-sync:
     container_name: mangadvisor_sandbox_catalog_sync
+    # Compose >= 2.24.4: replace the inherited host checkout mount entirely.
+    volumes: !override
+      - manga_sandbox_raw:/workspace/data/raw
+      - manga_sandbox_logs:/workspace/data/logs
   ollama:
     container_name: mangadvisor_sandbox_ollama
 

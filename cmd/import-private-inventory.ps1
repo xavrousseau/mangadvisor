@@ -4,6 +4,8 @@ param([string]$CsvFile="",[switch]$PreviewOnly,[switch]$CiApply)
 $ErrorActionPreference="Stop"
 Set-StrictMode -Version Latest
 $root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+. (Join-Path $PSScriptRoot "environment-safety.ps1")
+Assert-MangadvisorStableCheckout $root
 $private=Join-Path $root "private-data"
 if (-not $CsvFile) { $CsvFile=Join-Path $private "mangatheque.csv" }
 if (-not (Test-Path -LiteralPath $CsvFile -PathType Leaf)) {

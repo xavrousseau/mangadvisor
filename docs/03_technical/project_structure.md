@@ -29,7 +29,7 @@ PostgreSQL n'est expose au menu principal.
 |---|---|
 | mangadvisor.cmd | Menu principal pour tous les utilisateurs Windows |
 | cmd/control-center.ps1 | Enchaînement installation, alimentation, mises à jour et diagnostics |
-| cmd/*.ps1 (9 scripts) | Orchestrateur Windows, sauvegarde, Git, import personnel, benchmark prive, API locale, IA et acces mobile. Plus aucun lanceur .cmd historique dans ce dossier |
+| cmd/*.ps1 | Orchestrateur Windows, sauvegarde, Git, import personnel, benchmark prive, API locale, IA, acces mobile et controles partages d'isolation. Plus aucun lanceur .cmd historique dans ce dossier |
 | infra/compose/ | `docker-compose.yml` définit les services communs, `docker-compose.local.yml` fournit la configuration stable par défaut, `docker-compose.dev.yml` la configuration de développement sans ancienne interface Streamlit |
 | infra/docker/ | Images Docker des services actifs |
 | apps/web/ | **Interface principale** HTML/CSS/JS sur port UI_PORT (8501 par défaut) |
@@ -70,6 +70,32 @@ Les arborescences _archive/ et legacy/ n'étaient jamais lancées par Docker, le
 Les dossiers ignorés .env, private-data/, backups/, mobile-local/, .env.mobile et les données dans les **volumes Docker PostgreSQL/Meilisearch** sont **hors du nettoyage Git**. Pour les préserver, faire une sauvegarde verifiee via le menu principal 4, puis en conserver une copie hors du PC.
 
 Une commande git pull supprime de l'arborescence suivie les fichiers retirés du dépôt, mais **ne supprime pas ces fichiers privés ignorés ou les volumes Docker**.
+
+## Isolation des commandes Windows
+
+Les outils stables refusent de s'executer dans un dossier dont le nom contient
+le segment `test` ou `sandbox`, ou contenant `.env.sandbox`, avant toute ecriture
+ou requete applicative. Ce marqueur reste effectif apres renommage du clone.
+La synchronisation Git du code reste disponible. Ne pas retirer le marqueur
+pour contourner ce controle.
+
+`cmd/setup-sandbox.ps1` valide le Compose resolu avant de creer `.env.sandbox` :
+projet, conteneurs, volumes internes, reseau, ports locaux et connexions SQL
+doivent correspondre a la sandbox. Les montages de dossiers du poste sont refuses.
+La recette bibliographique A -> 24 reste disponible et applique le meme controle
+avant de creer ses rapports ou lancer ses conteneurs. Elle conserve sa base
+specifique `mangadvisor_realtest`; elle ne l'initialise pas automatiquement.
+Les commandes Docker lancees manuellement ne passent pas par ces protections.
+
+La sandbox necessite Docker Compose 2.24.4 ou plus recent : `!override`
+remplace le montage du depot du worker `catalog-sync` par ses volumes sandbox
+de donnees brutes et journaux. Il utilise le code de son image ; reconstruire
+cette image apres une mise a jour. Le fonctionnement stable est conserve.
+
+Regression Windows sans Docker reel :
+`powershell.exe -NoProfile -File tests/windows/test-sandbox-safety.ps1`.
+L'option `-ValidateCompose` verifie aussi les deux combinaisons Compose sandbox
+avec des variables synthetiques, sans demarrer de conteneur.
 
 ## Documents de conception V1
 
