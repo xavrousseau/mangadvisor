@@ -98,7 +98,7 @@ def parse_title_search_response(raw: bytes, *, limit: int = MAX_BIBLIOGRAPHY_RES
                 "author_fr":"; ".join(creators[:4])[:350] or None,
                 "publisher_fr":"; ".join(publishers[:2])[:200] or None,
                 "release_date_text":dates[0][:80] if dates else None,
-                "language_recorded":languages[0][:60] if languages else None,
+                "language_recorded":"; ".join(x.strip() for x in languages if x.strip())[:60] or None,
                 "edition_kind_suggested":edition_kind_from_title(title),
                 "source_name":BNF_SOURCE,
                 "source_url":"https://catalogue.bnf.fr/"+ark,
