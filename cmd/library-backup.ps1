@@ -312,7 +312,9 @@ function Test-Api-Password {
   # Windows PowerShell 5.1 can corrupt nested quotes in native Docker args.
   # Avoid them entirely. SQL is passed on stdin and the password is expanded
   # only inside the existing container, not in the host process command line.
-  $command='PGPASSWORD=$POSTGRES_PASSWORD exec psql -h 127.0.0.1 -X -At -U $POSTGRES_USER -d $POSTGRES_DB'
+  # IMPORTANT: use the Compose DNS name, NOT 127.0.0.1. PostgreSQL can allow
+  # trusted localhost connections while requiring SCRAM for the API network.
+  $command='PGPASSWORD=$POSTGRES_PASSWORD exec psql -h postgres -X -At -U $POSTGRES_USER -d $POSTGRES_DB'
   try {
     $rows=@("SELECT 1" | & docker exec -i $containerName sh -c $command 2>$null)
     return ($LASTEXITCODE -eq 0 -and $rows.Count -eq 1 -and ([string]$rows[0]).Trim() -ceq "1")
