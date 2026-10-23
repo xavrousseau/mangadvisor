@@ -12,7 +12,7 @@ Predictions format:
  {"case_id":"...","suggested_manga_id":null,"decision":"ABSTAIN"}]
 
 No automatic SQL writes or network calls. Default acceptance REQUIRES >=48 labeled
-cases, >=20 known linkable cases and both precision+recall >=0.95.
+cases, >=20 known linkable cases and precision, recall AND total-case coverage >=0.95.
 A low-confidence suggestion never counts as an accepted prediction.
 """
 from __future__ import annotations
@@ -26,7 +26,8 @@ from typing import Any
 def evaluate(gold: list[dict[str, Any]],
              predictions: list[dict[str, Any]],
              *, min_cases: int = 48, min_linkable: int = 20,
-             min_precision: float = 0.95, min_recall: float = 0.95
+             min_precision: float = 0.95, min_recall: float = 0.95,
+             min_total_coverage: float = 0.95
              ) -> dict[str, Any]:
     indexed: dict[str, dict[str, Any]] = {}
     missing_evidence = []
@@ -76,10 +77,14 @@ def evaluate(gold: list[dict[str, Any]],
                            "suggested":pred})
     precision = correct/accepted if accepted else 0.0
     recall = correct/linkable if linkable else 0.0
+    # Total-case coverage stops a perfect score on only the easy 20/48 cases.
+    # Unmatched no-MAL cases are unresolved, not automatically correct.
+    total_coverage = correct/total if total else 0.0
     # No-match outcomes cannot become "true positive" by doing nothing.
     sufficient = (total>=min_cases and linkable>=min_linkable and
                   not missing_evidence and len(responses)==total)
-    passed = sufficient and precision>=min_precision and recall>=min_recall
+    passed = (sufficient and precision>=min_precision and
+              recall>=min_recall and total_coverage>=min_total_coverage)
     return {
         "reference_cases":total, "linkable_cases":linkable,
         "cases_with_missing_evidence":missing_evidence,
@@ -90,8 +95,10 @@ def evaluate(gold: list[dict[str, Any]],
         "false_links_to_unindexed_works":false_link,
         "abstentions_on_linkable":abstained_on_linkable,
         "precision":round(precision,6),"recall":round(recall,6),
+        "total_case_coverage":round(total_coverage,6),
         "acceptance_min_precision":min_precision,
         "acceptance_min_recall":min_recall,
+        "acceptance_min_total_case_coverage":min_total_coverage,
         "sufficient_gold_and_predictions":sufficient,
         "target_95_met":passed,
         "errors":errors,
