@@ -56,6 +56,9 @@ class SourceGraphTests(unittest.TestCase):
         self.assertNotIn("DELETE FROM manga_title_alias",BASE_BACKFILL)
         self.assertNotIn("DROP TABLE manga",BASE_BACKFILL)
         self.assertNotIn("user_manga",BASE_BACKFILL)
+        self.assertIn("CREATE TABLE IF NOT EXISTS catalogue_book_claim",SCHEMA)
+        self.assertIn("MULTI_WORK_ISBN_REVIEW",BASE_BACKFILL)
+        self.assertNotIn("INSERT INTO manga_fr_edition",BASE_BACKFILL)
 
     def test_external_sources_use_exact_mal_work_id_not_fuzzy_titles(self):
         conn=FakeConnection()
