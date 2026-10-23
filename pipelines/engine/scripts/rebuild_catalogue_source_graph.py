@@ -70,7 +70,10 @@ def public_report(conn: Any) -> dict[str, int]:
              WHERE language_code='fr') AS french_title_claims,
             (SELECT count(*) FROM catalogue_work_identifier
              WHERE identity_status='COLLISION_REVIEW') AS identifier_conflicts,
-            (SELECT count(*) FROM catalogue_work_relation) AS typed_relations
+            (SELECT count(*) FROM catalogue_work_relation) AS typed_relations,
+            (SELECT count(*) FROM catalogue_book_claim) AS book_candidates,
+            (SELECT count(*) FROM catalogue_book_claim
+             WHERE evidence_status='MULTI_WORK_ISBN_REVIEW') AS cross_work_book_claims
         """)
         counts=dict(cur.fetchone())
         return {"legacy_works":total,"source_graph_initialized":1,
