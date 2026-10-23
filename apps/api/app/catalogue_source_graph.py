@@ -183,6 +183,26 @@ ON CONFLICT(work_id,isbn13,source_name) DO UPDATE SET
 
 # Exact identifiers may identify the SAME work across sources, but imported
 # community IDs are source claims pending cross-check, not automatic merges.
+WIKIDATA_FR_BACKFILL = """
+INSERT INTO catalogue_title_claim
+(work_id,source_name,source_id,language_code,title,title_key,
+ claim_kind,evidence_status,evidence_url)
+SELECT w.id,'WIKIDATA_P4087',f.wikidata_id,'fr',btrim(f.label_fr),
+       lower(btrim(f.label_fr)),'EXTERNAL_TITLE','SOURCE_LINKED',
+       'https://www.wikidata.org/wiki/'||f.wikidata_id
+FROM manga_wikidata_fact f
+JOIN manga m ON m.id=f.manga_id AND m.source_mal_id=f.source_mal_id
+JOIN catalogue_work w ON w.legacy_manga_id=m.id
+WHERE f.label_fr IS NOT NULL
+  AND length(btrim(f.label_fr)) BETWEEN 2 AND 200
+  AND NOT EXISTS (
+    SELECT 1 FROM manga other
+    WHERE other.id<>f.manga_id
+      AND lower(btrim(other.title))=lower(btrim(f.label_fr))
+  )
+ON CONFLICT DO NOTHING;
+"""
+
 ID_CLAIM_SQL = """
 INSERT INTO catalogue_work_identifier
 (work_id,provider,media_type,external_id,source_name,evidence_url,identity_status)
