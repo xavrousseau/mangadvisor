@@ -21,7 +21,9 @@ if ($meta.'com.docker.compose.project' -cne "mangadvisor" -or
 Write-Host "Creation du referentiel public des oeuvres et des preuves..." -ForegroundColor Cyan
 Write-Host "Les donnees Jikan, les ISBN possedes et ta mangatheque restent inchanges."
 Write-Host "Aucun appel Internet n'est lance par cette etape."
-& docker exec -i $container python -m pipelines.engine.scripts.rebuild_catalogue_source_graph --apply
+# Production API image intentionally contains apps/api, NOT pipelines/engine.
+# Use the API-owned CLI rather than the engine-only module.
+& docker exec -i $container python -m apps.api.app.catalogue_source_graph_cli --apply
 if ($LASTEXITCODE -ne 0) {
     throw "Echec de reconstruction. Aucun effacement des donnees d'origine."
 }
