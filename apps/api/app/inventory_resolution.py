@@ -21,6 +21,7 @@ from apps.api.app.reconciliation_engine import (
 from apps.api.app.matching_quality import (
     search_patterns, rank_candidates, summarize_bnf_quality,
 )
+from apps.api.app.wikidata_reverse import search_wikidata_mal_titles
 from apps.api.app.edition_discovery import search_bnf_by_title, sanitize_title_query
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
@@ -476,7 +477,10 @@ def create_pending_resolution_router(
     @router.get("/pending/discover")
     def discover_pending(
         source_key: str = Query(..., min_length=1, max_length=120),
+
         include_bnf: bool = False,
+        include_mangadex: bool = False,
+        include_wikidata: bool = False,
     ) -> dict[str, Any]:
         """Explicit per-row second-pass lookup for zero-exact-title cases.
 
@@ -495,6 +499,15 @@ def create_pending_resolution_router(
                 items = []
                 truncated = False
                 ranking = rank_candidates(query, [])
+                md = {"status":"NOT_REQUESTED","items":[]}
+                if include_mangadex:
+                    try:
+                        md = {"status":"CROSS_LINK_CANDIDATES",
+                              "items":search_verified_mangadex(cur,query)}
+                    except HTTPException as exc:
+                        if exc.status_code != 503:
+                            raise
+                        md = {"status":"PROVIDER_UNAVAILABLE","items":[]}
                 if words:
                     patterns = search_patterns(words)
                     cur.execute(DISCOVERY_SQL, {"patterns": patterns})
@@ -515,6 +528,28 @@ def create_pending_resolution_router(
                             "ranking": manga["ranking"],
                             "work_identity_confirmed": False,
                         })
+        wiki = {"status":"NOT_REQUESTED","items":[]}
+        if include_wikidata:
+            try:
+                wiki = search_wikidata_mal_titles(query)
+                wikidata_ids = [item["source_mal_id"] for item in wiki["items"]]
+                if wikidata_ids:
+                    with connection_factory() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT id,source_mal_id,title,manga_type,volumes
+                                FROM manga WHERE source_mal_id=ANY(%(ids)s)
+                            """,{"ids":wikidata_ids})
+                            locally = {int(row["source_mal_id"]):dict(row)
+                                       for row in cur.fetchall()}
+                    for item in wiki["items"]:
+                        match=locally.get(item["source_mal_id"])
+                        item["local_manga_id"]=match["id"] if match else None
+                        item["local_title"]=match["title"] if match else None
+            except HTTPException as exc:
+                if exc.status_code != 503:
+                    raise
+                wiki={"status":"PROVIDER_UNAVAILABLE","items":[]}
         bnf = {"status": "NOT_REQUESTED", "items": []}
         if include_bnf:
             try:
@@ -546,6 +581,9 @@ def create_pending_resolution_router(
             "ranking_is_calibrated_probability": False,
             "catalogue_candidates_seen": ranking["candidate_count"],
             "bnf": bnf,
+            "mangadex": md,
+            "wikidata": wiki,
+            "external_lookup_requested": bool(include_bnf or include_mangadex or include_wikidata),
             "mangadex_followup": "/inventory/pending/external-candidates",
             "automatic_association": False,
             "isbn_ownership_verified": False,
