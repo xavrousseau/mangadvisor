@@ -397,6 +397,54 @@ class PendingResolutionTests(unittest.TestCase):
         self.assertTrue(all(not x.lstrip().upper().startswith(
             ("INSERT", "UPDATE", "DELETE")) for x, _ in db.calls))
 
+
+    def test_international_crosswalk_is_opt_in_and_flags_conflicting_ids(self):
+        from unittest.mock import patch
+        db=DummyDb()
+        endpoint=self.endpoints(db)["/inventory/pending/discover"]
+        with patch("apps.api.app.inventory_resolution.search_anilist") as anilist, \
+             patch("apps.api.app.inventory_resolution.search_kitsu_by_mal") as kitsu:
+            result=endpoint(source_key=PENDING["source_key"])
+            anilist.assert_not_called()
+            kitsu.assert_not_called()
+            self.assertEqual(result["anilist"]["status"],"NOT_REQUESTED")
+            self.assertEqual(result["kitsu"]["status"],"NOT_REQUESTED")
+            self.assertFalse(result["external_lookup_requested"])
+        ani={"status":"CROSS_ID_CANDIDATES","items":[{
+            "source_mal_id":42,"anilist_id":801,
+            "titles":[{"language":"romaji","title":"Dragon Ball"}],
+            "identity_confirmed":False
+        }]}
+        k={"status":"MAL_ANILIST_CROSS_ID_REVIEW","items":[{
+            "source_mal_id":42,"anilist_ids":[801],
+            "kitsu_id":998,"identity_confirmed":False
+        }]}
+        with patch("apps.api.app.inventory_resolution.search_anilist",
+                   return_value=ani) as anilist, \
+             patch("apps.api.app.inventory_resolution.search_kitsu_by_mal",
+                   return_value=k) as kitsu:
+            result=endpoint(source_key=PENDING["source_key"],
+                            include_anilist=True,include_kitsu=True)
+            anilist.assert_called_once_with("Dragon Ball")
+            kitsu.assert_called_once_with(42)
+        self.assertEqual(result["international_id_evidence"]["status"],
+                         "CROSS_ID_AGREEMENT_REVIEW")
+        self.assertFalse(result["international_id_evidence"]
+                         ["independent_identity_proven"])
+        self.assertFalse(result["writes_performed"])
+        self.assertFalse(result["automatic_association"])
+        self.assertEqual(db.commits,0)
+        with patch("apps.api.app.inventory_resolution.search_anilist",
+                   return_value=ani), \
+             patch("apps.api.app.inventory_resolution.search_kitsu_by_mal",
+                   return_value={**k, "items":[{**k["items"][0],
+                         "anilist_ids":[999]}]}):
+            conflict=endpoint(source_key=PENDING["source_key"],
+                              include_anilist=True,include_kitsu=True)
+        self.assertEqual(conflict["international_id_evidence"]["status"],
+                         "CONTRADICTION_REVIEW")
+        self.assertFalse(conflict["automatic_association"])
+
     def test_rejected_library_status_is_never_resolved(self):
         from apps.api.app.inventory_import import PendingResolvePreview
         db=DummyDb(rejected={"library_status":"NOT_INTERESTED"})
