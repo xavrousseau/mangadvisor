@@ -126,3 +126,51 @@ test("suspect alias and edition mismatch warnings are visible before selecting a
  assert.match(html,/data-action="pending-match-select"/);
  assert.doesNotMatch(html,/data-action="edition-confirm"/);
 });
+
+
+test("a pending owner entry exposes one-click ranked discovery without a confirmed link",()=>{
+ const html=inventoryResolverMarkup({
+  ...base,review:null,
+  discovery:{
+    catalogue_candidates_seen:7,catalog_truncated:false,
+    ranking_status:"AMBIGUOUS_OR_INCOMPLETE"
+  },
+  items:[{
+    id:1145,title:"Sayonara Eri",source_mal_id:145863,
+    manga_type:"Manga",volumes:1,
+    suggestion_kind:"DISCOVERY_TOKEN_ONLY",
+    ranking:{basis:"WHOLE_WORD_DISCOVERY",score:20,warnings:[]}
+  }]
+ },{escape,lang:"fr"});
+ assert.match(html,/Trouver de meilleurs candidats/);
+ assert.match(html,/Vérifier AniList, Kitsu et Wikidata/);
+ assert.match(html,/7 candidats analysés/);
+ assert.match(html,/Sayonara Eri/);
+ assert.match(html,/MAL 145863/);
+ assert.match(html,/Mots communs seulement/);
+ assert.match(html,/Candidat à confirmer, pas une identité vérifiée/);
+ assert.match(html,/data-action="pending-match-select" data-id="1145"/);
+ assert.doesNotMatch(html,/pending-match-confirm/);
+ assert.doesNotMatch(html,/score=|95%|probabilité/);
+});
+
+test("AniList and Wikidata source data are displayed safely without auto-ownership",()=>{
+ const html=inventoryResolverMarkup({
+  ...base,review:null,externalEvidence:{
+    anilist:{items:[{
+      anilist_id:15800,source_mal_id:145863,
+      titles:[{language:"english",title:'<script>alert("oops")</script>'}]
+    }]},
+    wikidata:{items:[{source_mal_id:145863}]},
+    kitsu:{status:"CROSSWALK_BATCH"},
+    international_id_evidence:{status:"CONTRADICTION_REVIEW"}
+  }
+ },{escape,lang:"fr"});
+ assert.match(html,/Vérification des identifiants internationaux/);
+ assert.match(html,/Des identifiants se contredisent/);
+ assert.match(html,/href="https:\/\/anilist.co\/manga\/15800"/);
+ assert.match(html,/&lt;script&gt;/);
+ assert.doesNotMatch(html,/<script>/);
+ assert.match(html,/Kitsu : CROSSWALK_BATCH/);
+ assert.doesNotMatch(html,/pending-match-confirm/);
+});

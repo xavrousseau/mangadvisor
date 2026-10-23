@@ -502,7 +502,8 @@ async function startPendingMatcher(button){
  const pending=state.pendingRows.find(item=>item.source_key===sourceKey);
  if(!pending)return;
  const draft={sourceKey,pending,query:pending.work_declared||pending.entry_title,
-   items:[],searched:false,review:null,loading:true,message:""};
+   items:[],searched:false,review:null,loading:true,message:"",
+   discovery:null,externalEvidence:null};
  state.pendingMatch=draft;
  renderPendingMatcher();
  document.querySelector("#inventory-match-panel")?.scrollIntoView({behavior:"smooth",block:"nearest"});
@@ -512,6 +513,7 @@ async function searchPendingMatches(form,draft=state.pendingMatch){
  if(!draft)return;
  const query=form?String(new FormData(form).get("query")||"").trim().slice(0,100):"";
  draft.loading=true;draft.message="";draft.review=null;draft.items=[];
+ draft.discovery=null;draft.externalEvidence=null;
  draft.searched=false;
  if(form)draft.query=query;
  renderPendingMatcher();
@@ -536,6 +538,7 @@ async function searchMangaDexPending(button){
  const typed=String(document.querySelector("#pending-match-query")?.value||draft.query||"").trim().slice(0,100);
  if(typed.length<2){draft.message="Recherche trop courte";renderPendingMatcher();return;}
  draft.loading=true;draft.review=null;draft.items=[];draft.searched=false;draft.message="";
+ draft.discovery=null;draft.externalEvidence=null;
  draft.query=typed;renderPendingMatcher();
  try{
   const params=new URLSearchParams({source_key:draft.sourceKey,q:typed});
@@ -547,6 +550,47 @@ async function searchMangaDexPending(button){
  }catch(err){
   if(draft!==state.pendingMatch)return;
   draft.loading=false;draft.message=err.message||"MangaDex indisponible";
+  renderPendingMatcher();
+ }
+}
+async function discoverPendingMatches(withSources=false){
+ const draft=state.pendingMatch;
+ if(!draft||draft.loading)return;
+ draft.loading=true;draft.review=null;draft.items=[];draft.searched=false;
+ draft.discovery=null;draft.externalEvidence=null;draft.message="";
+ renderPendingMatcher();
+ try{
+  const params=new URLSearchParams({source_key:draft.sourceKey});
+  if(withSources){
+    params.set("include_anilist","true");
+    params.set("include_kitsu","true");
+    params.set("include_wikidata","true");
+  }
+  const result=await request("/inventory/pending/discover?"+params.toString());
+  if(draft!==state.pendingMatch||routeInfo().view!=="library")return;
+  draft.items=(result.catalog_candidates||[]).filter(item=>
+    idNumber(item.manga_id)
+  ).map(item=>({
+    id:Number(item.manga_id),
+    title:item.title,
+    source_mal_id:item.source_mal_id,
+    manga_type:item.manga_type,
+    volumes:item.volume_count_catalog,
+    suggestion_kind:"DISCOVERY_TOKEN_ONLY",
+    ranking:item.ranking||null,
+  }));
+  draft.discovery=result;
+  draft.externalEvidence=withSources?result:null;
+  draft.searched=true;draft.loading=false;
+  if(!draft.items.length)draft.message=state.lang==="fr"?
+    "Aucun candidat local suffisamment pertinent. Consulte les sources externes pour élargir les pistes.":
+    "No suitable local candidates. Check external sources for more leads.";
+  renderPendingMatcher();
+ }catch(err){
+  if(draft!==state.pendingMatch)return;
+  draft.loading=false;
+  draft.message=err.message||(state.lang==="fr"?
+    "Recherche approfondie indisponible":"Extended search unavailable");
   renderPendingMatcher();
  }
 }
@@ -1584,6 +1628,8 @@ root.addEventListener("click",async event=>{
  if(action==="pending-match-close"){state.pendingMatch=null;renderPendingMatcher();return;}
  if(action==="pending-match-select")return selectPendingManga(button);
  if(action==="pending-match-external")return searchMangaDexPending(button);
+ if(action==="pending-match-deep")return discoverPendingMatches(false);
+ if(action==="pending-match-cross")return discoverPendingMatches(true);
  if(action==="pending-match-confirm")return confirmPendingManga(button);
  if(action==="reading-profile-load")return loadReadingProfile();
  if(action==="reading-template-csv")return downloadReadingTemplate("csv");
