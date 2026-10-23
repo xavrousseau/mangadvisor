@@ -82,6 +82,7 @@ echo   23 - Pilote bibliographique BnF + Scrinis (5 a 10 mangas)
 echo   24 - Recette bibliographique complete (3 mangas, bac a sable)
 echo   25 - Exporter toute la base manga (sans mes donnees personnelles)
 echo   26 - Reconstruire le referentiel public des oeuvres (sans perdre de donnees)
+echo   27 - Enrichir la base publique depuis AniList (64 mangas, reprise auto)
 echo.
 echo    S - Entretien, configuration et restauration
 echo    0 - Retour
@@ -118,6 +119,7 @@ if "%CHOICE%"=="23" set "KEY=bibliography-pilot"
 if "%CHOICE%"=="24" set "KEY=bibliography-acceptance"
 if "%CHOICE%"=="25" set "KEY=catalogue-export"
 if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"
+if "%CHOICE%"=="27" set "KEY=catalogue-anilist"
 if not defined KEY (
     echo Choix inconnu.
     pause
@@ -208,6 +210,7 @@ if /I "%~1"=="bibliography-pilot" set "ACTION=BibliographyPilot"
 if /I "%~1"=="bibliography-acceptance" set "ACTION=BibliographyAcceptance"
 if /I "%~1"=="catalogue-export" set "PS_SCRIPT=export-catalogue-public.ps1"
 if /I "%~1"=="catalogue-source-graph" set "PS_SCRIPT=rebuild-catalogue-source-graph.ps1"
+if /I "%~1"=="catalogue-anilist" set "PS_SCRIPT=enrich-catalogue-anilist.ps1"
 if /I "%~1"=="catalogue-lifecycle" set "ACTION=CatalogueLifecycle"
 if /I "%~1"=="search-index" set "ACTION=SearchIndex"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
@@ -274,7 +277,7 @@ echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark,
 echo          bnf-enrich, bnf-bulk, sources-benchmark, sources-benchmark-v2,
 echo          bibliographic-staging, complete-mal-catalogue,
 echo          catalogue-french-scrinis, bibliography-pilot, bibliography-acceptance,
-echo          catalogue-lifecycle, search-index, catalogue-export, catalogue-source-graph,
+echo          catalogue-lifecycle, search-index, catalogue-export, catalogue-source-graph, catalogue-anilist,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.
