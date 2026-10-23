@@ -391,8 +391,10 @@ def triage_pending_rows(
             "suggested_next_step": (
                 "DISCOVER_ALTERNATE_TITLES_AND_EXTERNAL_IDS"
                 if category == "SEARCH_REQUIRED" else
-                "REVIEW_SUSPECT_ALIAS_PROVENANCE"
-                if category in ("SUSPICIOUS_ALIAS_REVIEW", "ALIAS_SOURCE_REVIEW") else
+                "REVIEW_CONTRADICTORY_ALIAS"
+                if category == "SUSPICIOUS_ALIAS_REVIEW" else
+                "VERIFY_ALIAS_PROVENANCE"
+                if category == "ALIAS_SOURCE_REVIEW" else
                 "COMPARE_SOURCES_AND_CONFIRM_WORK_EDITION"
             ),
             "automatic_association": False,
