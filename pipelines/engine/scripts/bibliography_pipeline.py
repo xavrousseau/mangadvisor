@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter
 from functools import partial
 from typing import Any
@@ -16,11 +17,14 @@ from apps.api.app.bnf_batch import (
     connect_database, run_batch as run_bnf, WORK_SQL,
 )
 from apps.api.app.bnf_candidate_review import review
+from apps.api.app.bnf_edition_audit import volume_from_title
 from apps.api.app.edition_discovery import search_bnf_title_pages
 from pipelines.engine.scripts.enrich_catalogue_scrinis_fr import (
     run_batch as run_scrinis, french_print_isbns, lookup_work,
 )
 from pipelines.engine.scripts.benchmark_manga_sources_v2 import RateLimitedClient
+from pipelines.engine.scripts.catalogue_french_matching import edition_family
+from pipelines.engine.scripts.bnf_bulk_import import isbn13
 
 MAX_PILOT = 10
 
@@ -48,38 +52,118 @@ def scrinis_isbn_evidence(
     # Preserve source language and print-medium requirements exactly.
     supplied = set(french_print_isbns(detail))
     return correlate_bnf_scrinis_isbns(
-        candidates, supplied, supplier_coverage=coverage)
+        candidates, supplied, supplier_coverage=coverage,
+        supplier_references=detail.get("book_references") or [])
+
+
+def _numbered_tome(value: Any) -> int | None:
+    """Interpret an explicit tome or a bare bounded number, never a year."""
+    if type(value) is int:
+        return value if 1 <= value <= 9999 else None
+    label = str(value or "").strip()
+    if not label:
+        return None
+    number = volume_from_title(label)
+    if number is not None:
+        return number
+    if re.fullmatch(r"0*[1-9][0-9]{0,2}", label):
+        return int(label)
+    return None
+
+
+def _isbn_source_consistency(
+    candidate: dict[str, Any], supplier_books: list[dict[str, Any]],
+) -> tuple[str, str]:
+    """Detect explicit edition/tome disagreement; a match still needs review.
+
+    Work identity was verified separately (Scrinis MAL ID or authors).
+    Neither publisher, an unnamed edition nor an ISBN overlap proves the
+    user's exact edition or the ISBN's canonical work association.
+    """
+    own_family = (
+        edition_family(str(candidate.get("title_fr") or "")) or
+        edition_family(str(candidate.get("edition_suggested") or ""))
+    )
+    supplier_families = {
+        fam for book in supplier_books
+        if (fam := edition_family(str(book.get("edition_label") or "")))
+    }
+    own_tome = (
+        candidate.get("volume_suggested")
+        if type(candidate.get("volume_suggested")) is int
+        else _numbered_tome(candidate.get("title_fr"))
+    )
+    supplier_tomes = {
+        tome for book in supplier_books
+        if (tome := _numbered_tome(book.get("volume_label"))) is not None
+    }
+    if len(supplier_families) > 1 or len(supplier_tomes) > 1:
+        return "ISBN_SUPPLIER_REFERENCE_CONFLICT_REVIEW", "CONFLICT"
+    if own_family and supplier_families and own_family not in supplier_families:
+        return "ISBN_EDITION_CONFLICT_REVIEW", "CONFLICT"
+    if own_tome is not None and supplier_tomes and own_tome not in supplier_tomes:
+        return "ISBN_VOLUME_CONFLICT_REVIEW", "CONFLICT"
+    if own_family and supplier_families and own_tome is not None and supplier_tomes:
+        return "ISBN_IN_BOTH_SOURCES", "FAMILY_AND_TOME_CONSISTENT_UNVERIFIED"
+    if own_family and supplier_families:
+        return "ISBN_IN_BOTH_SOURCES", "FAMILY_CONSISTENT_TOME_UNVERIFIED"
+    if own_tome is not None and supplier_tomes:
+        return "ISBN_IN_BOTH_SOURCES", "TOME_CONSISTENT_FAMILY_UNVERIFIED"
+    return "ISBN_IN_BOTH_SOURCES", "EDITION_AND_TOME_UNVERIFIED"
 
 
 def correlate_bnf_scrinis_isbns(
     candidates: list[dict[str, Any]], supplied: set[str] | list[str], *,
     supplier_coverage: str,
+    supplier_references: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Compare ISBN sets after independently verifying the source work.
+    """Corroborate work-verified French print ISBNs without resolving editions.
 
-    Positive ISBN overlap is corroboration only. Missing supplier ISBNs never
-    prove absence, especially when the source only exposes bounded references.
+    A duplicated or conflicting ISBN reference is sent to manual review.
+    Missing details are unknown; never assume CLASSIC, a tome or possession.
+    The raw reference list is processed in memory and never persisted.
     """
     supplied = set(supplied)
+    by_isbn: dict[str, list[dict[str, Any]]] = {}
+    for book in supplier_references or []:
+        if not isinstance(book, dict):
+            continue
+        if (str(book.get("lang") or "").lower() != "fr" or
+                str(book.get("medium") or "").lower() != "print"):
+            continue
+        normalized = isbn13(str(book.get("isbn13") or ""))
+        if normalized and normalized in supplied:
+            by_isbn.setdefault(normalized, []).append(book)
     correlations = []
     for candidate in candidates:
+        code = candidate.get("isbn13")
+        edition_evidence = "NOT_COMPARABLE"
         if candidate["work_status"] == "REJECT_DIFFERENT_WORK":
             state = "DIFFERENT_WORK"
         elif candidate["language_status"] != "FRENCH_DECLARED":
             state = "LANGUAGE_REVIEW"
         elif candidate["work_status"] == "REVIEW_DERIVATIVE":
             state = "DERIVATIVE_REVIEW"
-        elif candidate["isbn13"] in supplied:
-            state = "ISBN_IN_BOTH_SOURCES"
+        elif code in supplied:
+            state, edition_evidence = _isbn_source_consistency(
+                candidate, by_isbn.get(code, []))
         else:
             state = "BNF_ONLY_NOT_PROOF_OF_ABSENCE"
-        correlations.append({"isbn13": candidate["isbn13"],
-                             "evidence_status": state})
-    return {"status": "COMPARED", "supplier_coverage": supplier_coverage,
-            "scrinis_french_print_isbns_seen": len(supplied),
-            "isbn_correlations": correlations,
-            "correlation_counts": dict(Counter(
-                row["evidence_status"] for row in correlations))}
+        correlations.append({
+            "isbn13": code, "evidence_status": state,
+            "edition_volume_evidence": edition_evidence,
+            "edition_identity_verified": False,
+            "isbn_ownership_verified": False,
+        })
+    return {
+        "status": "COMPARED", "supplier_coverage": supplier_coverage,
+        "scrinis_french_print_isbns_seen": len(supplied),
+        "isbn_correlations": correlations,
+        "correlation_counts": dict(Counter(
+            row["evidence_status"] for row in correlations)),
+        "confirmed_editions_written": 0,
+        "ownership_mutations": 0,
+    }
 
 
 def load_work_evidence(
@@ -240,7 +324,8 @@ def probe_scrinis_work(
         "supplier_coverage": coverage,
     })
     return diagnosis, correlate_bnf_scrinis_isbns(
-        candidates, supplied, supplier_coverage=coverage)
+        candidates, supplied, supplier_coverage=coverage,
+        supplier_references=outcome.get("french_print_references") or [])
 
 
 def run_pilot(*, limit: int = 10, manga_ids: list[int] | None = None,

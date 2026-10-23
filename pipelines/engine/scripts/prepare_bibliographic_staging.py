@@ -15,13 +15,15 @@ import hashlib
 import json
 import re
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from pipelines.engine.src.load.postgres_loader import get_postgres_connection
 from pipelines.engine.scripts.bnf_bulk_import import isbn13
+from pipelines.engine.scripts.catalogue_french_matching import edition_family
+from apps.api.app.bnf_edition_audit import volume_from_title
 
 ROOT = Path(__file__).resolve().parents[3]
 INPUT_DIR = ROOT / "data" / "logs" / "catalog_sources"
@@ -290,6 +292,58 @@ def convert_report(doc: dict, sha: str) -> dict:
             "generated_at": clean(doc.get("generated_at"), 70)}
 
 
+def _volume_number(label: str) -> int | None:
+    """Tome numbers require explicit wording or a short bare integer."""
+    number = volume_from_title(label)
+    if number is not None:
+        return number
+    value = label.strip()
+    if re.fullmatch(r"0*[1-9][0-9]{0,2}", value):
+        return int(value)
+    return None
+
+
+def isbn_staging_conflicts(stage: dict) -> dict:
+    """Report contradictory FR print ISBN claims without merging source works.
+
+    These are source *candidates*: a repeated ISBN across two series or two
+    explicit edition families is a manual-review signal, not a valid link.
+    Private inventory titles are never included in the diagnostic rows.
+    """
+    by_isbn: dict[str, list[tuple]] = defaultdict(list)
+    for key, isbn, lang, medium, label, volume, _ in stage["volumes"]:
+        if lang == "fr" and medium == "print":
+            by_isbn[isbn].append((key, edition_family(label),
+                                  _volume_number(volume)))
+    conflicts = []
+    for code, sources in sorted(by_isbn.items()):
+        families = sorted({fam for _, fam, _ in sources if fam})
+        tomes = sorted({n for _, _, n in sources if n is not None})
+        origins = {key[0] for key, _, _ in sources}
+        if len(origins) > 1:
+            reason = "COMPETING_INPUT_WORKS"
+        elif len(families) > 1:
+            reason = "CONFLICTING_EDITION_FAMILIES"
+        elif len(tomes) > 1:
+            reason = "CONFLICTING_TOME_NUMBERS"
+        else:
+            continue
+        conflicts.append({
+            "isbn13": code, "reason": reason,
+            "edition_families": families, "tome_numbers": tomes,
+            "source_candidates": [
+                {"provider": key[1], "external_id": key[2]}
+                for key in sorted({entry[0] for entry in sources})
+            ],
+            "registration_ready": False,
+        })
+    return {
+        "isbn_conflict_count": len(conflicts),
+        "isbn_conflicts_sample": conflicts[:20],
+        "isbn_conflict_sample_truncated": len(conflicts) > 20,
+    }
+
+
 def preview_summary(stage: dict) -> dict:
     works, volumes = stage["works"], stage["volumes"]
     fr_books = [row for row in volumes if row[2] == "fr" and row[3] == "print"]
@@ -306,6 +360,7 @@ def preview_summary(stage: dict) -> dict:
         "decision": "REVIEW_REQUIRED",
         "canonical_mutations": 0,
         "ownership_mutations": 0,
+        **isbn_staging_conflicts(stage),
     }
 
 
