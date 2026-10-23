@@ -312,6 +312,8 @@ class PendingResolutionTests(unittest.TestCase):
                     return []
                 if "FROM user_manga_library" in self.sql:
                     return []
+                if "FROM manga_bnf_candidate" in self.sql or "FROM manga_fr_edition" in self.sql:
+                    return []
                 raise AssertionError(self.sql)
 
         class TriageDB:
@@ -331,7 +333,12 @@ class PendingResolutionTests(unittest.TestCase):
         self.assertEqual(db.calls[0][1], {"user_id": 1})
         self.assertEqual(db.calls[1][1],
                          {"terms": ["dragon ball"], "saved_ids": [15]})
-        self.assertTrue(all("user_id" in params for _, params in db.calls[2:]))
+        self.assertTrue(all(
+            ("user_id" in params or "manga_ids" in params)
+            for _, params in db.calls[2:]
+        ))
+        self.assertTrue(all(not sql.lstrip().upper().startswith(
+            ("UPDATE", "INSERT", "DELETE")) for sql, _ in db.calls))
 
     def test_triage_incomplete_catalog_disables_single_exact_claim(self):
         from apps.api.app.inventory_resolution import triage_pending_rows, _triage_term
@@ -345,6 +352,50 @@ class PendingResolutionTests(unittest.TestCase):
         self.assertEqual(result["review_categories"], {"INCOMPLETE_LOOKUP": 1})
         self.assertTrue(result["lookup_limited"])
         self.assertFalse(result["automatic_association"])
+
+
+    def test_discover_pending_is_read_only_and_external_bnf_is_opt_in(self):
+        from apps.api.app.inventory_resolution import DISCOVERY_SQL
+        from unittest.mock import patch
+        class Cursor:
+            def __init__(self, db): self.db=db; self.sql=""
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def execute(self, sql, params=None):
+                assert sql.lstrip().upper().startswith("SELECT")
+                self.sql=sql; self.db.calls.append((sql, params))
+            def fetchone(self): return {**PENDING, "entry_title": "Adieu Eri",
+                                         "work_declared": None}
+            def fetchall(self):
+                if self.sql == DISCOVERY_SQL:
+                    return [{**MANGA, "title": "Sayonara Eri", "id": 88}]
+                return []
+        class Db:
+            def __init__(self): self.calls=[]
+            def __call__(self): return self
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def cursor(self): return Cursor(self)
+            def commit(self): raise AssertionError("Forbidden write")
+        db=Db()
+        endpoint=self.endpoints(db)["/inventory/pending/discover"]
+        with patch("apps.api.app.inventory_resolution.search_bnf_by_title") as bnf:
+            output=endpoint(source_key="Inventaire!A29",include_bnf=False)
+            bnf.assert_not_called()
+        self.assertEqual(output["query"], "Adieu Eri")
+        self.assertIn("eri",output["search_tokens"])
+        self.assertEqual(output["catalog_candidates"][0]["title"],"Sayonara Eri")
+        self.assertFalse(output["automatic_association"])
+        self.assertFalse(output["writes_performed"])
+        with patch("apps.api.app.inventory_resolution.search_bnf_by_title",
+                   return_value={"items":[{"isbn13":"9782871294146",
+                                            "status":"CANDIDATE_UNCONFIRMED"}]}) as bnf:
+            output=endpoint(source_key="Inventaire!A29",include_bnf=True)
+            bnf.assert_called_once_with("Adieu Eri")
+            self.assertEqual(output["bnf"]["status"],"BOOK_NOTICES_UNVERIFIED")
+            self.assertFalse(output["isbn_ownership_verified"])
+        self.assertTrue(all(not x.lstrip().upper().startswith(
+            ("INSERT", "UPDATE", "DELETE")) for x, _ in db.calls))
 
     def test_rejected_library_status_is_never_resolved(self):
         from apps.api.app.inventory_import import PendingResolvePreview
