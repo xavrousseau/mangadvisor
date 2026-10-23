@@ -81,7 +81,9 @@ class ReconciliationEngineTests(unittest.TestCase):
         item = work(20, "Original", alias="French Title",
                     alias_source="UNKNOWN_UNCHECKED_IMPORT")
         row = triage_pending_rows([pending("French Title")], [item], [], set())["items"][0]
-        self.assertEqual(row["review_category"], "SUSPICIOUS_ALIAS_REVIEW")
+        self.assertEqual(row["review_category"], "ALIAS_SOURCE_REVIEW")
+        self.assertEqual(row["candidates"][0]["work_reconciliation"]["assessment"],
+                         "EVIDENCE_INCOMPLETE_REVIEW")
         self.assertIn("ALIAS_UNVERIFIED_OR_UNTRACED",
                       row["candidates"][0]["work_reconciliation"]["warnings"])
 

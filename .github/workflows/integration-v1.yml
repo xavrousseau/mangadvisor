@@ -877,7 +877,7 @@ jobs:
           row=next(x for x in triage["items"] if x["source_key"]==key)
           # This CI alias is intentionally unverified: a unique alias is
           # no longer sufficient evidence to identify an edition or work.
-          assert row["review_category"]=="SUSPICIOUS_ALIAS_REVIEW",row
+          assert row["review_category"]=="ALIAS_SOURCE_REVIEW",row
           resolution=next(c for c in row["candidates"] if c["manga_id"]==work["id"])
           assert "ALIAS_UNVERIFIED_OR_UNTRACED" in resolution["work_reconciliation"]["warnings"],resolution
           assert resolution["work_reconciliation"]["ownership_confirmed"] is False,resolution
@@ -903,6 +903,99 @@ jobs:
                   cur.execute("DELETE FROM manga_title_alias WHERE manga_id=%s AND source_name='TEST_CI'",(work["id"],))
               conn.commit()
           print("Recherche FR / inventaire / ID canonique / aucun rapprochement automatique : OK")
+          PY
+
+      - name: Valider PostgreSQL word boundaries et comparer le moteur de rapprochement
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json,urllib.parse,urllib.request
+          from apps.api.app.main import get_connection
+          from apps.api.app.matching_quality import search_patterns
+          expression=search_patterns(["eri"])
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      SELECT title FROM (VALUES ('Sayonara Eri'),
+                        ('Blue Period'),('Bakemonogatari'),
+                        ('Isekaigaeri no Yuusha')) AS names(title)
+                      WHERE title ~* ANY(%s)
+                      ORDER BY title
+                  """,(expression,))
+                  found=[r["title"] for r in cur.fetchall()]
+          assert found==["Sayonara Eri"],(expression,found)
+          # API integration must remain read-only and return a ranked trace.
+          base="http://127.0.0.1:8000"
+          key="ci:matching-quality:adieu-eri"
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      INSERT INTO user_manga_inventory_pending
+                      (user_id,source_key,entry_title,source_reference,
+                       work_declared,edition_declared,format_hint,main_volumes,
+                       duplicate_copies,other_editions_unknown,review_status,
+                       candidate_ids,content_sha256)
+                      VALUES (1,%s,'Adieu Eri',%s,NULL,NULL,NULL,1,
+                              0,0,'REVIEW_MISSING',ARRAY[]::integer[],%s)
+                  """,(key,key,"8"*64))
+              conn.commit()
+          try:
+              url=base+"/inventory/pending/discover?"+urllib.parse.urlencode(
+                  {"source_key":key})
+              with urllib.request.urlopen(url,timeout=60) as response:
+                  result=json.load(response)
+              assert result["ranking_is_calibrated_probability"] is False,result
+              assert result["catalog_evidence"]=="WHOLE_WORD_RANKED_NOT_IDENTITY",result
+              assert result["automatic_association"] is False,result
+              assert result["writes_performed"] is False,result
+              assert result["isbn_ownership_verified"] is False,result
+              # Exercise the crosswalk against real SQL and the actual router,
+              # with only provider JSON substituted. Never make live requests
+              # during a deterministic integration test.
+              from unittest.mock import patch
+              from apps.api.app import inventory_resolution as resolution
+              router=resolution.create_pending_resolution_router(get_connection)
+              local=next(r.endpoint for r in router.routes
+                         if r.path=="/inventory/pending/discover")
+              a={"status":"CROSS_ID_CANDIDATES","items":[{
+                  "source_mal_id":145863,"anilist_id":123456,
+                  "titles":[{"language":"romaji","title":"Sayonara Eri"}],
+                  "identity_confirmed":False
+              }]}
+              k={"status":"MAL_ANILIST_CROSS_ID_REVIEW","items":[{
+                  "status":"MAL_ANILIST_CROSS_ID_REVIEW",
+                  "source_mal_id":145863,"anilist_ids":[123456],
+                  "kitsu_id":321,"identity_confirmed":False
+              }]}
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      cur.execute("SELECT COUNT(*) AS n FROM user_manga_inventory_pending")
+                      before=cur.fetchone()["n"]
+              with (patch.object(resolution,"search_anilist",return_value=a),
+                    patch.object(resolution,"search_anilist_by_mal_ids",
+                                 return_value={"status":"NO_LOCAL_MAL_IDS","items":[]}),
+                    patch.object(resolution,"search_kitsu_by_mal",return_value=k)):
+                  linked=local(source_key=key,include_anilist=True,include_kitsu=True)
+              assert linked["international_id_evidence"]["status"]=="CROSS_ID_AGREEMENT_REVIEW",linked
+              assert linked["international_id_evidence"]["independent_identity_proven"] is False,linked
+              assert linked["automatic_association"] is False,linked
+              assert linked["writes_performed"] is False,linked
+              assert linked["isbn_ownership_verified"] is False,linked
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      cur.execute("SELECT COUNT(*) AS n FROM user_manga_inventory_pending")
+                      assert cur.fetchone()["n"]==before,"Inventory modified"
+          finally:
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      cur.execute("""
+                          DELETE FROM user_manga_inventory_pending
+                          WHERE user_id=1 AND source_key=%s
+                      """,(key,))
+                  conn.commit()
+          print("PG regex whole-word, ranking API, zero auto match: OK")
           PY
 
       - name: Sauvegarder et valider une restauration complete de la mangatheque

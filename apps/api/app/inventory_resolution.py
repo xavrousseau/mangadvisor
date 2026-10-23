@@ -18,6 +18,14 @@ from apps.api.app.mangadex_discovery import search_verified_mangadex
 from apps.api.app.reconciliation_engine import (
     assess_work_candidate, title_key, discovery_terms, summarize_book_evidence,
 )
+from apps.api.app.matching_quality import (
+    search_patterns, rank_candidates, summarize_bnf_quality,
+)
+from apps.api.app.wikidata_reverse import search_wikidata_mal_titles
+from apps.api.app.international_crosswalk import (
+    search_anilist, search_anilist_by_mal_ids,
+    search_kitsu_by_mal, combine_cross_id_sources,
+)
 from apps.api.app.edition_discovery import search_bnf_by_title, sanitize_title_query
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
@@ -188,13 +196,15 @@ LIMIT 1001
 # per work and the total explicitly. No huge unbounded provider responses.
 TRIAGE_BNF_SQL = """
 WITH source AS (
-  SELECT manga_id,isbn13,title_fr,edition_kind_suggested,source_url,
+  SELECT manga_id,isbn13,title_fr,author_fr,publisher_fr,language_recorded,
+         edition_kind_suggested,source_url,
          COUNT(*) OVER (PARTITION BY manga_id) AS work_isbn_count,
          ROW_NUMBER() OVER (PARTITION BY manga_id ORDER BY isbn13) AS rn
   FROM manga_bnf_candidate WHERE manga_id=ANY(%(manga_ids)s)
 )
-SELECT manga_id,isbn13,title_fr,edition_kind_suggested,source_url,work_isbn_count
-FROM source WHERE rn<=3
+SELECT manga_id,isbn13,title_fr,author_fr,publisher_fr,language_recorded,
+       edition_kind_suggested,source_url,work_isbn_count
+FROM source WHERE rn<=30
 ORDER BY manga_id,isbn13
 """
 TRIAGE_REGISTERED_BOOK_SQL = """
@@ -212,17 +222,28 @@ ORDER BY manga_id,isbn13
 # not a fuzzy entity match: a shared word is only a search suggestion.
 DISCOVERY_SQL = """
 SELECT m.id,m.title,m.title_english,m.title_japanese,m.source_mal_id,
-       m.manga_type,m.volumes
+       m.manga_type,m.volumes,
+       (SELECT f.label_fr FROM manga_wikidata_fact f WHERE f.manga_id=m.id
+        AND f.source_mal_id=m.source_mal_id) AS wikidata_label_fr,
+       COALESCE((
+         SELECT jsonb_agg(jsonb_build_object('alias',a.alias,
+                    'source_name',a.source_name,'source_id',a.source_id))
+         FROM manga_title_alias a
+         WHERE a.manga_id=m.id AND a.alias ~* ANY(%(patterns)s)
+       ),'[]'::jsonb) AS matching_alias_sources
 FROM manga m
-WHERE m.title ILIKE ANY(%(patterns)s)
-   OR COALESCE(m.title_english,'') ILIKE ANY(%(patterns)s)
-   OR COALESCE(m.title_japanese,'') ILIKE ANY(%(patterns)s)
+WHERE m.title ~* ANY(%(patterns)s)
+   OR COALESCE(m.title_english,'') ~* ANY(%(patterns)s)
+   OR COALESCE(m.title_japanese,'') ~* ANY(%(patterns)s)
    OR EXISTS (
       SELECT 1 FROM manga_title_alias a
-      WHERE a.manga_id=m.id AND a.alias ILIKE ANY(%(patterns)s)
+      WHERE a.manga_id=m.id AND a.alias ~* ANY(%(patterns)s)
    )
+   OR EXISTS (SELECT 1 FROM manga_wikidata_fact f WHERE f.manga_id=m.id
+        AND f.label_fr ~* ANY(%(patterns)s)
+        AND f.source_mal_id=m.source_mal_id)
 ORDER BY m.popularity ASC NULLS LAST,m.id
-LIMIT 51
+LIMIT 101
 """
 
 
@@ -258,6 +279,19 @@ def triage_pending_rows(
     items: list[dict[str, Any]] = []
     bnf_rows = bnf_rows or []
     registered_books = registered_books or []
+    bnf_by_id: dict[int, list[dict[str, Any]]] = {}
+    for book in bnf_rows:
+        bnf_by_id.setdefault(int(book["manga_id"]), []).append(book)
+    bnf_quality: dict[int, dict[str, Any]] = {}
+    for manga in catalog_rows:
+        manga_id = int(manga["id"])
+        titles = [str(v) for v in (
+            manga.get("title"), manga.get("title_english"),
+            manga.get("title_japanese"), manga.get("wikidata_label_fr")
+        ) if v]
+        bnf_quality[manga_id] = summarize_bnf_quality(
+            bnf_by_id.get(manga_id, []), titles,
+        )
     canonically_identified: dict[str, set[int]] = {}
     for other in catalog_rows:
         for name in (other.get("title"), other.get("title_english"),
@@ -309,9 +343,12 @@ def triage_pending_rows(
                 "edition_verified": False,
                 "isbn_verified": False,
                 "work_reconciliation": assessment,
-                "bibliography": summarize_book_evidence(
-                    manga_id, bnf_rows, registered_books,
-                ),
+                "bibliography": {
+                    **summarize_book_evidence(
+                        manga_id, bnf_rows, registered_books,
+                    ),
+                    "quality_review": bnf_quality.get(manga_id, {}),
+                },
             }
             (exact if primary_exact or alias_exact else prior).append(record)
         exact.sort(key=lambda x: (x["suggestion_basis"] != "EXACT_CATALOG_TITLE",
@@ -330,6 +367,9 @@ def triage_pending_rows(
                 "SUSPICIOUS_ALIAS_REVIEW"
                 if exact[0]["suggestion_basis"] == "EXACT_ALIAS" and
                 exact[0]["work_reconciliation"]["assessment"] == "CONFLICT_REVIEW"
+                else "ALIAS_SOURCE_REVIEW"
+                if exact[0]["suggestion_basis"] == "EXACT_ALIAS" and
+                exact[0]["work_reconciliation"]["assessment"] == "EVIDENCE_INCOMPLETE_REVIEW"
                 else "SINGLE_EXACT_SUGGESTION"
             )
         elif prior:
@@ -355,8 +395,10 @@ def triage_pending_rows(
             "suggested_next_step": (
                 "DISCOVER_ALTERNATE_TITLES_AND_EXTERNAL_IDS"
                 if category == "SEARCH_REQUIRED" else
-                "REVIEW_SUSPECT_ALIAS_PROVENANCE"
+                "REVIEW_CONTRADICTORY_ALIAS"
                 if category == "SUSPICIOUS_ALIAS_REVIEW" else
+                "VERIFY_ALIAS_PROVENANCE"
+                if category == "ALIAS_SOURCE_REVIEW" else
                 "COMPARE_SOURCES_AND_CONFIRM_WORK_EDITION"
             ),
             "automatic_association": False,
@@ -366,6 +408,7 @@ def triage_pending_rows(
         "SINGLE_EXACT_SUGGESTION": 0,
         "CONFLICTING_SUGGESTIONS": 1,
         "SUSPICIOUS_ALIAS_REVIEW": 2,
+        "ALIAS_SOURCE_REVIEW": 2,
         "SAVED_SUGGESTIONS_ONLY": 3,
         "AMBIGUOUS_EXACT": 4,
         "SEARCH_REQUIRED": 5,
@@ -444,7 +487,12 @@ def create_pending_resolution_router(
     @router.get("/pending/discover")
     def discover_pending(
         source_key: str = Query(..., min_length=1, max_length=120),
+
         include_bnf: bool = False,
+        include_mangadex: bool = False,
+        include_wikidata: bool = False,
+        include_anilist: bool = False,
+        include_kitsu: bool = False,
     ) -> dict[str, Any]:
         """Explicit per-row second-pass lookup for zero-exact-title cases.
 
@@ -462,14 +510,26 @@ def create_pending_resolution_router(
                 words = discovery_terms(query)
                 items = []
                 truncated = False
+                ranking = rank_candidates(query, [])
+                md = {"status":"NOT_REQUESTED","items":[]}
+                if include_mangadex:
+                    try:
+                        md = {"status":"CROSS_LINK_CANDIDATES",
+                              "items":search_verified_mangadex(cur,query)}
+                    except HTTPException as exc:
+                        if exc.status_code != 503:
+                            raise
+                        md = {"status":"PROVIDER_UNAVAILABLE","items":[]}
                 if words:
-                    patterns = ["%" + (word.replace("%", r"\%")
-                                             .replace("_", r"\_")) + "%"
-                                for word in words]
+                    patterns = search_patterns(words)
                     cur.execute(DISCOVERY_SQL, {"patterns": patterns})
-                    rows = list(cur.fetchall())
-                    truncated = len(rows) > 50
-                    for manga in rows[:50]:
+                    rows = [dict(row) for row in cur.fetchall()]
+                    truncated = len(rows) > 100
+                    ranking = rank_candidates(
+                        query, rows[:100], pending.get("main_volumes"),
+                        total_limited=truncated,
+                    )
+                    for manga in ranking["candidates"]:
                         items.append({
                             "manga_id": int(manga["id"]),
                             "title": manga["title"],
@@ -477,8 +537,101 @@ def create_pending_resolution_router(
                             "manga_type": manga.get("manga_type"),
                             "volume_count_catalog": manga.get("volumes"),
                             "status": "DISCOVERY_TOKEN_ONLY",
+                            "ranking": manga["ranking"],
                             "work_identity_confirmed": False,
                         })
+        ani = {"status":"NOT_REQUESTED","items":[]}
+        ani_by_mal = {"status":"NOT_REQUESTED","items":[]}
+        if include_anilist:
+            try:
+                ani = search_anilist(query)
+                ids = sorted({a["source_mal_id"] for a in ani["items"]
+                              if a.get("source_mal_id")})[:12]
+                if ids:
+                    with connection_factory() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT id,source_mal_id,title,manga_type,volumes
+                                FROM manga WHERE source_mal_id=ANY(%(ids)s)
+                            """, {"ids":ids})
+                            catalog = {int(r["source_mal_id"]):dict(r)
+                                       for r in cur.fetchall()}
+                    for candidate in ani["items"]:
+                        local = catalog.get(candidate.get("source_mal_id"))
+                        candidate["local_manga_id"] = local["id"] if local else None
+                        candidate["local_title"] = local["title"] if local else None
+            except HTTPException as exc:
+                if exc.status_code != 503:
+                    raise
+                ani = {"status":"PROVIDER_UNAVAILABLE","items":[]}
+            # A known catalogue MAL ID is a stronger lookup key than a
+            # translated title. Both queries stay read-only and opt-in.
+            local_mal_ids = list(dict.fromkeys(
+                int(item["source_mal_id"]) for item in items
+                if item.get("source_mal_id")
+            ))[:8]
+            if local_mal_ids:
+                try:
+                    ani_by_mal = search_anilist_by_mal_ids(local_mal_ids)
+                except HTTPException as exc:
+                    if exc.status_code != 503:
+                        raise
+                    ani_by_mal = {"status":"PROVIDER_UNAVAILABLE","items":[]}
+            else:
+                ani_by_mal = {"status":"NO_LOCAL_MAL_IDS","items":[]}
+        kitsu = {"status":"NOT_REQUESTED","items":[]}
+        kitsu_results = []
+        if include_kitsu:
+            mids = list(dict.fromkeys(
+                [a["source_mal_id"] for a in ani["items"]
+                 if a.get("source_mal_id")] +
+                [a["source_mal_id"] for a in ani_by_mal["items"]
+                 if a.get("source_mal_id")] +
+                [x["source_mal_id"] for x in items
+                 if x.get("source_mal_id")]
+            ))[:3]
+            if not mids:
+                kitsu = {"status":"NEED_MAL_MANGA_ID","items":[]}
+            else:
+                for mid in mids:
+                    try:
+                        kitsu_results.append(search_kitsu_by_mal(mid))
+                    except HTTPException as exc:
+                        if exc.status_code != 503:
+                            raise
+                        kitsu_results.append({
+                            "status":"PROVIDER_UNAVAILABLE","items":[],
+                            "requested_mal_id":mid
+                        })
+                kitsu={"status":"CROSSWALK_BATCH",
+                       "requested_mal_ids":mids,
+                       "results":kitsu_results}
+        combined_ani={
+            "items": ani.get("items",[]) + ani_by_mal.get("items",[]),
+        }
+        international=combine_cross_id_sources(combined_ani,kitsu_results)
+        wiki = {"status":"NOT_REQUESTED","items":[]}
+        if include_wikidata:
+            try:
+                wiki = search_wikidata_mal_titles(query)
+                wikidata_ids = [item["source_mal_id"] for item in wiki["items"]]
+                if wikidata_ids:
+                    with connection_factory() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT id,source_mal_id,title,manga_type,volumes
+                                FROM manga WHERE source_mal_id=ANY(%(ids)s)
+                            """,{"ids":wikidata_ids})
+                            locally = {int(row["source_mal_id"]):dict(row)
+                                       for row in cur.fetchall()}
+                    for item in wiki["items"]:
+                        match=locally.get(item["source_mal_id"])
+                        item["local_manga_id"]=match["id"] if match else None
+                        item["local_title"]=match["title"] if match else None
+            except HTTPException as exc:
+                if exc.status_code != 503:
+                    raise
+                wiki={"status":"PROVIDER_UNAVAILABLE","items":[]}
         bnf = {"status": "NOT_REQUESTED", "items": []}
         if include_bnf:
             try:
@@ -488,6 +641,9 @@ def create_pending_resolution_router(
                     "status": "BOOK_NOTICES_UNVERIFIED",
                     "items": result["items"][:20],
                     "scope": "ISBN_AND_PRINT_NOT_WORK_IDENTITY",
+                    "quality_review": summarize_bnf_quality(
+                        result["items"][:20], [query],
+                    ),
                 }
             except ValueError:
                 bnf = {"status": "INVALID_BNF_QUERY", "items": []}
@@ -501,8 +657,21 @@ def create_pending_resolution_router(
             "search_tokens": words,
             "catalog_candidates": items,
             "catalog_truncated": truncated,
-            "catalog_evidence": "WORD_OVERLAP_NOT_IDENTITY",
+            "catalog_evidence": "WHOLE_WORD_RANKED_NOT_IDENTITY",
+            "ranking_status": ranking["status"],
+            "ranking_margin": ranking["ranking_margin"],
+            "ranking_is_calibrated_probability": False,
+            "catalogue_candidates_seen": ranking["candidate_count"],
             "bnf": bnf,
+            "mangadex": md,
+            "wikidata": wiki,
+            "anilist": ani,
+            "anilist_by_mal_id": ani_by_mal,
+            "kitsu": kitsu,
+            "international_id_evidence": international,
+            "external_lookup_requested": bool(include_bnf or include_mangadex or
+                                              include_wikidata or include_anilist or
+                                              include_kitsu),
             "mangadex_followup": "/inventory/pending/external-candidates",
             "automatic_association": False,
             "isbn_ownership_verified": False,
