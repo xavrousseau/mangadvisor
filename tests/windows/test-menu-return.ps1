@@ -10,7 +10,7 @@ Copy-Item -LiteralPath (Join-Path $PWD "mangadvisor.cmd") -Destination (Join-Pat
 $stub=@'
 param([string]$Action)
 Write-Output ("MA_FIXTURE_ACTION_"+$Action)
-if ($Action -eq "BnF") { exit 37 }
+if ($Action -eq "Inventory") { exit 37 }
 exit 0
 '@
 [IO.File]::WriteAllText((Join-Path $actionDir "control-center.ps1"),$stub,[Text.Encoding]::ASCII)
@@ -54,10 +54,11 @@ function Check-Menu([string]$Name, [string]$InputText,
 
 $crlf=([string][char]13)+([string][char]10)
 # Extra zero lines tolerate how cmd.exe reads redirected pause / set /p.
-Check-Menu "wikidata" ((@("A","11","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Wikidata" "OUTILS AVANCES" $false
-Check-Menu "library_enrich" ((@("A","12","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_LibraryEnrichment" "OUTILS AVANCES" $false
-Check-Menu "multilingual_aliases" ((@("A","13","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Aliases" "OUTILS AVANCES" $false
-Check-Menu "bnf_failure" ((@("A","10","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_BnF" "OUTILS AVANCES" $true
+Check-Menu "catalogue_lifecycle" ((@("A","1","1","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_CatalogueLifecycle" "CATALOGUE ET RECHERCHE" $false
+Check-Menu "search_index" ((@("A","1","2","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_SearchIndex" "CATALOGUE ET RECHERCHE" $false
+Check-Menu "import_failure" ((@("A","2","1","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Inventory" "MA BIBLIOTHEQUE" $true
+Check-Menu "recommendations" ((@("A","3","5","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Recommendations" "FONCTIONS FACULTATIVES" $false
+Check-Menu "maintenance_status" ((@("A","S","1","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Status" "ENTRETIEN ET SECOURS" $false
 Check-Menu "github_sync" ((@("7","","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_SYNC_FINISHED" "MANGADVISOR" $false
 Check-Menu "normal_update" ((@("3","","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Update" "MANGADVISOR" $false
 Write-Host "Tests de retours interactifs Windows reussis sans Git ni Docker."

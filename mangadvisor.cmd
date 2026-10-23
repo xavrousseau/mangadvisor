@@ -53,79 +53,111 @@ goto menu
 :advanced
 cls
 echo ==========================================================
-echo                  OUTILS AVANCES
+echo                ESPACE DE GESTION
 echo ==========================================================
 echo.
-echo    1 - Actualiser le catalogue de mangas
-echo    2 - Actualiser les recommandations communautaires
-echo    3 - Importer ma mangatheque depuis le CSV
-echo    4 - Tester ma mangatheque sans la modifier
-echo    5 - Activer le scanner mobile HTTPS
-echo    6 - Arreter le scanner mobile HTTPS
-echo    7 - Activer le conseiller IA local
-echo    8 - Arreter le conseiller IA local
-echo    9 - Consulter les journaux Docker
-echo   10 - Enrichir les fiches via la BnF (candidats a verifier)
-echo   11 - Completer les informations depuis Wikidata (titres FR, genres)
-echo   12 - Enrichir ma mangatheque automatiquement (Wikidata et BnF)
-echo   13 - Recuperer les titres alternatifs FR, EN et JA
-echo   14 - Etendre le catalogue Tenrai (mangas et one-shots)
-echo   15 - Importer des fichiers bibliographiques BnF (candidats)
-echo   16 - Comparatif sources (ancien raccourci vers V2)
-echo   17 - Comparatif V2 : mangas FR papier et editions, scores distincts
-echo   18 - Preparer les fiches bibliographiques (sans modifier la mangatheque)
-echo   19 - Charger tout le catalogue MAL/Jikan via Tenrai (avec reprise)
-echo   20 - Enrichir les titres FR du catalogue via Scrinis (direct)
-echo   21 - Catalogue vivant : nouveautes et veille automatique
-echo   22 - Actualiser la recherche intelligente Meilisearch
-echo   23 - Pilote bibliographique BnF + Scrinis (5 a 10 mangas)
-echo   24 - Recette bibliographique complete (3 mangas, bac a sable)
-echo   25 - Exporter toute la base manga (sans mes donnees personnelles)
-echo   26 - Reconstruire le referentiel public des oeuvres (sans perdre de donnees)
-echo.
-echo    S - Entretien, configuration et restauration
+echo    1 - Catalogue general et recherche
+echo    2 - Ma bibliotheque et mes imports
+echo    3 - Fonctions facultatives
+echo    S - Entretien, diagnostic et restauration
 echo    0 - Retour
 echo.
 set "CHOICE="
 set /p "CHOICE=Ton choix : "
 if /I "%CHOICE%"=="0" goto menu
+if /I "%CHOICE%"=="1" goto :catalogue_menu
+if /I "%CHOICE%"=="2" goto :library_menu
+if /I "%CHOICE%"=="3" goto :optional_menu
 if /I "%CHOICE%"=="S" goto :maintenance
-
+echo Choix inconnu.
+pause
+goto advanced
+:catalogue_menu
+cls
+echo ==========================================================
+echo             CATALOGUE ET RECHERCHE
+echo ==========================================================
+echo.
+echo    1 - Actualiser les mangas et les nouveautes
+echo    2 - Actualiser le moteur de recherche
+echo    3 - Exporter la base bibliographique publique
+echo    4 - Lire le bilan du referentiel public
+echo    0 - Retour
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto advanced
 set "KEY="
-if "%CHOICE%"=="1" set "KEY=catalogue"
-if "%CHOICE%"=="2" set "KEY=recommendations"
-if "%CHOICE%"=="3" set "KEY=import"
-if "%CHOICE%"=="4" set "KEY=benchmark"
-if "%CHOICE%"=="5" set "KEY=mobile"
-if "%CHOICE%"=="6" set "KEY=mobile-stop"
-if "%CHOICE%"=="7" set "KEY=ai"
-if "%CHOICE%"=="8" set "KEY=ai-stop"
-if "%CHOICE%"=="9" set "KEY=logs"
-if "%CHOICE%"=="10" set "KEY=bnf-enrich"
-if "%CHOICE%"=="11" set "KEY=wikidata-enrich"
-if "%CHOICE%"=="12" set "KEY=library-enrich"
-if "%CHOICE%"=="13" set "KEY=multilingual-aliases"
-if "%CHOICE%"=="14" set "KEY=catalogue-extended"
-if "%CHOICE%"=="15" set "KEY=bnf-bulk"
-if "%CHOICE%"=="16" set "KEY=sources-benchmark-v2"
-if "%CHOICE%"=="17" set "KEY=sources-benchmark-v2"
-if "%CHOICE%"=="18" set "KEY=bibliographic-staging"
-if "%CHOICE%"=="19" set "KEY=complete-mal-catalogue"
-if "%CHOICE%"=="20" set "KEY=catalogue-french-scrinis"
-if "%CHOICE%"=="21" set "KEY=catalogue-lifecycle"
-if "%CHOICE%"=="22" set "KEY=search-index"
-if "%CHOICE%"=="23" set "KEY=bibliography-pilot"
-if "%CHOICE%"=="24" set "KEY=bibliography-acceptance"
-if "%CHOICE%"=="25" set "KEY=catalogue-export"
-if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"
+if "%CHOICE%"=="1" set "KEY=catalogue-lifecycle"
+if "%CHOICE%"=="2" set "KEY=search-index"
+if "%CHOICE%"=="3" set "KEY=catalogue-export"
+if "%CHOICE%"=="4" set "KEY=catalogue-graph-report"
 if not defined KEY (
     echo Choix inconnu.
     pause
-    goto advanced
+    goto catalogue_menu
 )
 call :dispatch "%KEY%"
 call :result
-goto advanced
+goto catalogue_menu
+
+:library_menu
+cls
+echo ==========================================================
+echo                 MA BIBLIOTHEQUE
+echo ==========================================================
+echo.
+echo    1 - Importer mon inventaire CSV
+echo    2 - Simuler mon import sans rien modifier
+echo    3 - Sauvegarder mes donnees
+echo    0 - Retour
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto advanced
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=import"
+if "%CHOICE%"=="2" set "KEY=benchmark"
+if "%CHOICE%"=="3" set "KEY=backup"
+if not defined KEY (
+    echo Choix inconnu.
+    pause
+    goto library_menu
+)
+call :dispatch "%KEY%"
+call :result
+goto library_menu
+
+:optional_menu
+cls
+echo ==========================================================
+echo               FONCTIONS FACULTATIVES
+echo ==========================================================
+echo.
+echo    1 - Activer le scanner mobile
+echo    2 - Arreter le scanner mobile
+echo    3 - Activer le conseiller IA local
+echo    4 - Arreter le conseiller IA local
+echo    5 - Actualiser les recommandations
+echo    0 - Retour
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto advanced
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=mobile"
+if "%CHOICE%"=="2" set "KEY=mobile-stop"
+if "%CHOICE%"=="3" set "KEY=ai"
+if "%CHOICE%"=="4" set "KEY=ai-stop"
+if "%CHOICE%"=="5" set "KEY=recommendations"
+if not defined KEY (
+    echo Choix inconnu.
+    pause
+    goto optional_menu
+)
+call :dispatch "%KEY%"
+call :result
+goto optional_menu
 
 :maintenance
 cls
@@ -208,6 +240,7 @@ if /I "%~1"=="bibliography-pilot" set "ACTION=BibliographyPilot"
 if /I "%~1"=="bibliography-acceptance" set "ACTION=BibliographyAcceptance"
 if /I "%~1"=="catalogue-export" set "PS_SCRIPT=export-catalogue-public.ps1"
 if /I "%~1"=="catalogue-source-graph" set "PS_SCRIPT=rebuild-catalogue-source-graph.ps1"
+if /I "%~1"=="catalogue-graph-report" set "PS_SCRIPT=report-catalogue-source-graph.ps1"
 if /I "%~1"=="catalogue-lifecycle" set "ACTION=CatalogueLifecycle"
 if /I "%~1"=="search-index" set "ACTION=SearchIndex"
 if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"
@@ -275,6 +308,7 @@ echo          bnf-enrich, bnf-bulk, sources-benchmark, sources-benchmark-v2,
 echo          bibliographic-staging, complete-mal-catalogue,
 echo          catalogue-french-scrinis, bibliography-pilot, bibliography-acceptance,
 echo          catalogue-lifecycle, search-index, catalogue-export, catalogue-source-graph,
+echo          catalogue-graph-report,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,
 echo          environment, database, network, verify-backup, restore.

@@ -31,8 +31,16 @@ Double-cliquer sur **`mangadvisor.cmd`** à la racine du dépôt.
 | **5** | Diagnostiquer la base, les services et l'application |
 | **6** | Arrêter sans supprimer les volumes Docker |
 | **7** | Synchroniser uniquement le code depuis `main` |
-| **A** | Opérations avancées ; entretien, catalogue, enrichissement, scanner |
+| **A** | Espace de gestion : catalogue, bibliothèque, options facultatives, entretien |
 | **0** | Quitter le menu |
+
+Le menu avancé ne présente plus 26 opérations internes. Les
+anciens traitements et outils d'audit restent accessibles en
+commandes expertes `mangadvisor.cmd <commande>`
+(voir `mangadvisor.cmd help`) sans polluer le parcours habituel.
+La stratégie de **reconstruction du catalogue V2**, indépendant de la base
+actuelle et sans fusion par similarité de titres, est décrite dans
+[Décision d'architecture catalogue V2](docs/03_technical/catalogue_v2_reconstruction_decision.md).
 
 Adresse par défaut : **http://localhost:8501**. Les ports réels sont définis
 dans le fichier privé `.env`. La commande **2** réutilise la base et les

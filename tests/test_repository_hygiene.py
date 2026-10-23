@@ -82,7 +82,7 @@ class RepositoryHygieneTests(unittest.TestCase):
         self.assertIn("Load-Complete-MAL-Catalogue",
             (ROOT/"cmd/control-center.ps1").read_text(encoding="utf-8"))
         self.assertNotIn(" -Action Nuke", menu)
-        self.assertIn('if "%CHOICE%"=="11" set "KEY=wikidata-enrich"', menu)
+        self.assertIn('if /I "%~1"=="wikidata-enrich" set "ACTION=Wikidata"', menu)
         self.assertNotIn('if "%CHOICE%"=="11" set "KEY=nuke"', menu)
         self.assertIn(':advanced', menu)
         self.assertIn(':maintenance', menu)
