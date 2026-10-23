@@ -15,6 +15,7 @@ from apps.api.app.library_seed_selection import (
     choose_representative_sources, evidence_summary,
 )
 from apps.api.app.collection import create_collection_router, ensure_collection_schema
+from apps.api.app.edition_groups import create_edition_group_router, ensure_edition_group_schema
 from apps.api.app.collection_bulk import collection_import_router
 from apps.api.app.inventory_import import inventory_router,ensure_inventory_schema
 from apps.api.app.inventory_resolution import create_pending_resolution_router
@@ -3809,6 +3810,7 @@ def get_manga_covers(
 @app.on_event("startup")
 def prepare_fr_collection() -> None:
     ensure_collection_schema(get_connection)
+    ensure_edition_group_schema(get_connection)
     ensure_inventory_schema(get_connection)
     ensure_bnf_schema(get_connection)
     ensure_wikidata_schema(get_connection)
@@ -3884,6 +3886,7 @@ def prepare_fr_collection() -> None:
 
 
 app.include_router(create_collection_router(get_connection, DEFAULT_USER_ID))
+app.include_router(create_edition_group_router(get_connection))
 app.include_router(collection_import_router(get_connection, DEFAULT_USER_ID))
 app.include_router(inventory_router(get_connection, DEFAULT_USER_ID))
 app.include_router(create_pending_resolution_router(get_connection, DEFAULT_USER_ID))
