@@ -133,8 +133,9 @@ class SourceGraphTests(unittest.TestCase):
         from pathlib import Path
         root=Path(__file__).resolve().parents[1]
         menu=(root/"mangadvisor.cmd").read_text(encoding="utf-8")
-        self.assertIn("26 - Reconstruire le referentiel public",menu)
-        self.assertIn('if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"',menu)
+        self.assertIn("1 - Catalogue general et recherche",menu)
+        self.assertIn('if /I "%~1"=="catalogue-source-graph"',menu)
+        self.assertNotIn("26 - Reconstruire le referentiel public",menu)
         runner=(root/"cmd/rebuild-catalogue-source-graph.ps1").read_text(encoding="utf-8")
         self.assertIn("apps.api.app.catalogue_source_graph_cli --apply",runner)
         self.assertNotIn("down -v",runner)
