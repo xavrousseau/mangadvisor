@@ -31,11 +31,12 @@ class IndependentThresholdTests(unittest.TestCase):
         self.assertEqual(outcome["correct_suggestions"],46)
         self.assertTrue(outcome["target_95_met"])
         predicted[45]["suggested_manga_id"]=999
+        predicted[44]["suggested_manga_id"]=998
         predicted[46]["suggested_manga_id"]=47
         predicted[46]["decision"]="STRONG_REVIEW_SUGGESTION"
         bad=evaluate(gold,predicted)
         self.assertFalse(bad["target_95_met"])
-        self.assertEqual(bad["false_positives"],1)
+        self.assertEqual(bad["false_positives"],2)
 
     def test_omitted_labels_and_no_match_suggestions_cannot_fake_precision(self):
         gold=[{"case_id":str(i),"expected_manga_id":i+1 if i<25 else None,
@@ -46,10 +47,11 @@ class IndependentThresholdTests(unittest.TestCase):
                     "decision":"STRONG_REVIEW_SUGGESTION" if i<25 else "ABSTAIN"}
                    for i in range(48)]
         self.assertTrue(evaluate(gold,predicted)["target_95_met"])
-        predicted[47]={"case_id":"47","suggested_manga_id":400,
-                       "decision":"STRONG_REVIEW_SUGGESTION"}
+        for i in (46,47):
+            predicted[i]={"case_id":str(i),"suggested_manga_id":400+i,
+                          "decision":"STRONG_REVIEW_SUGGESTION"}
         out=evaluate(gold,predicted)
-        self.assertEqual(out["false_links_to_unindexed_works"],1)
+        self.assertEqual(out["false_links_to_unindexed_works"],2)
         self.assertFalse(out["target_95_met"])
         self.assertFalse(evaluate(gold,predicted[:-1])["target_95_met"])
 
