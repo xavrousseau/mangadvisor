@@ -146,6 +146,15 @@ VALUES (%(work_id)s,%(provider)s,'manga',%(external_id)s,
         %(source_name)s,%(evidence_url)s,'SOURCE_CLAIM')
 ON CONFLICT DO NOTHING
 """
+IDENTITY_COLLISIONS_SQL = """
+UPDATE catalogue_work_identifier ident SET identity_status='COLLISION_REVIEW'
+WHERE ident.identity_status <> 'REJECTED'
+  AND EXISTS (
+    SELECT 1 FROM catalogue_work_identifier other
+    WHERE other.provider=ident.provider AND other.media_type=ident.media_type
+      AND other.external_id=ident.external_id AND other.work_id<>ident.work_id
+  )
+"""
 TITLE_CLAIM_SQL = """
 INSERT INTO catalogue_title_claim
 (work_id,source_name,source_id,language_code,title,title_key,
@@ -191,6 +200,7 @@ def rebuild_legacy_sources(conn: Any) -> None:
     """Idempotent, source-preserving rebuild. Caller chooses commit/rollback."""
     with conn.cursor() as cur:
         cur.execute(BASE_BACKFILL)
+        cur.execute(IDENTITY_COLLISIONS_SQL)
 
 
 def register_non_mal_work(conn: Any, title: str, *,
@@ -235,6 +245,7 @@ def stage_external_facts(conn: Any, mal_id: int, *,
             "external_id":str(source_id),"source_name":provider,
             "evidence_url":url,
         })
+        cur.execute(IDENTITY_COLLISIONS_SQL)
         added=1
         for record in (titles or [])[:40]:
             language=LANGUAGES.get(record.get("language") or record.get("language_code"))
@@ -247,6 +258,17 @@ def stage_external_facts(conn: Any, mal_id: int, *,
                 "title":title,"title_key":title_key(title),
                 "evidence_url":url,
             })
+            cur.execute("""
+              UPDATE catalogue_title_claim claim
+              SET evidence_status='COLLISION_REVIEW'
+              WHERE claim.work_id=%s AND claim.source_name=%s
+                AND claim.source_id=%s
+                AND EXISTS (
+                  SELECT 1 FROM catalogue_work other
+                  WHERE other.id<>claim.work_id AND
+                    lower(btrim(other.canonical_title))=claim.title_key
+                )
+            """,(work_id,provider,str(source_id)))
             added+=1
         for relation in (relations or [])[:40]:
             target=checked_int(relation.get("mal_id")) or checked_int(relation.get("anilist_id"))
