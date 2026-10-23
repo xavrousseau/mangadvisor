@@ -330,7 +330,12 @@ def list_mangas(
             with connection.cursor() as cur:
                 search_ranked = ranked_catalogue_ids(cur, q)
         if search_ranked is None:
-            search_ranked = meili_search_ids(q, limit=500)
+            fuzzy_ids = meili_search_ids(q, limit=500)
+            # Preserve existing SQL fallback for an empty/unavailable index.
+            # A deliberately empty *ranked multiword* result stays empty:
+            # do not substitute unrelated fuzzy results.
+            if fuzzy_ids:
+                search_ranked = fuzzy_ids
         if search_ranked is not None:
             conditions[-1] = "m.id = ANY(%(search_ids)s::int[])"
             params.pop("q", None)
