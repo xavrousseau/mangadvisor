@@ -22,6 +22,9 @@ from apps.api.app.matching_quality import (
     search_patterns, rank_candidates, summarize_bnf_quality,
 )
 from apps.api.app.wikidata_reverse import search_wikidata_mal_titles
+from apps.api.app.international_crosswalk import (
+    search_anilist, search_kitsu_by_mal, combine_cross_id_sources,
+)
 from apps.api.app.edition_discovery import search_bnf_by_title, sanitize_title_query
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
@@ -487,6 +490,8 @@ def create_pending_resolution_router(
         include_bnf: bool = False,
         include_mangadex: bool = False,
         include_wikidata: bool = False,
+        include_anilist: bool = False,
+        include_kitsu: bool = False,
     ) -> dict[str, Any]:
         """Explicit per-row second-pass lookup for zero-exact-title cases.
 
@@ -534,6 +539,55 @@ def create_pending_resolution_router(
                             "ranking": manga["ranking"],
                             "work_identity_confirmed": False,
                         })
+        ani = {"status":"NOT_REQUESTED","items":[]}
+        if include_anilist:
+            try:
+                ani = search_anilist(query)
+                ids = sorted({a["source_mal_id"] for a in ani["items"]
+                              if a.get("source_mal_id")})[:12]
+                if ids:
+                    with connection_factory() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT id,source_mal_id,title,manga_type,volumes
+                                FROM manga WHERE source_mal_id=ANY(%(ids)s)
+                            """, {"ids":ids})
+                            catalog = {int(r["source_mal_id"]):dict(r)
+                                       for r in cur.fetchall()}
+                    for candidate in ani["items"]:
+                        local = catalog.get(candidate.get("source_mal_id"))
+                        candidate["local_manga_id"] = local["id"] if local else None
+                        candidate["local_title"] = local["title"] if local else None
+            except HTTPException as exc:
+                if exc.status_code != 503:
+                    raise
+                ani = {"status":"PROVIDER_UNAVAILABLE","items":[]}
+        kitsu = {"status":"NOT_REQUESTED","items":[]}
+        kitsu_results = []
+        if include_kitsu:
+            mids = list(dict.fromkeys(
+                [a["source_mal_id"] for a in ani["items"]
+                 if a.get("source_mal_id")] +
+                [x["source_mal_id"] for x in items
+                 if x.get("source_mal_id")]
+            ))[:3]
+            if not mids:
+                kitsu = {"status":"NEED_MAL_MANGA_ID","items":[]}
+            else:
+                for mid in mids:
+                    try:
+                        kitsu_results.append(search_kitsu_by_mal(mid))
+                    except HTTPException as exc:
+                        if exc.status_code != 503:
+                            raise
+                        kitsu_results.append({
+                            "status":"PROVIDER_UNAVAILABLE","items":[],
+                            "requested_mal_id":mid
+                        })
+                kitsu={"status":"CROSSWALK_BATCH",
+                       "requested_mal_ids":mids,
+                       "results":kitsu_results}
+        international=combine_cross_id_sources(ani,kitsu_results)
         wiki = {"status":"NOT_REQUESTED","items":[]}
         if include_wikidata:
             try:
@@ -589,7 +643,12 @@ def create_pending_resolution_router(
             "bnf": bnf,
             "mangadex": md,
             "wikidata": wiki,
-            "external_lookup_requested": bool(include_bnf or include_mangadex or include_wikidata),
+            "anilist": ani,
+            "kitsu": kitsu,
+            "international_id_evidence": international,
+            "external_lookup_requested": bool(include_bnf or include_mangadex or
+                                              include_wikidata or include_anilist or
+                                              include_kitsu),
             "mangadex_followup": "/inventory/pending/external-candidates",
             "automatic_association": False,
             "isbn_ownership_verified": False,
