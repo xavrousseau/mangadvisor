@@ -877,7 +877,7 @@ jobs:
           row=next(x for x in triage["items"] if x["source_key"]==key)
           # This CI alias is intentionally unverified: a unique alias is
           # no longer sufficient evidence to identify an edition or work.
-          assert row["review_category"]=="SUSPICIOUS_ALIAS_REVIEW",row
+          assert row["review_category"]=="ALIAS_SOURCE_REVIEW",row
           resolution=next(c for c in row["candidates"] if c["manga_id"]==work["id"])
           assert "ALIAS_UNVERIFIED_OR_UNTRACED" in resolution["work_reconciliation"]["warnings"],resolution
           assert resolution["work_reconciliation"]["ownership_confirmed"] is False,resolution
