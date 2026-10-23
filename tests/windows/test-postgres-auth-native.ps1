@@ -14,7 +14,7 @@ if not "%~2"=="-i" exit /b 52
 if not "%~3"=="mangadvisor_postgres" exit /b 53
 if not "%~4"=="sh" exit /b 54
 if not "%~5"=="-c" exit /b 55
-if not "%~6"=="PGPASSWORD=$POSTGRES_PASSWORD exec psql -h 127.0.0.1 -X -At -U $POSTGRES_USER -d $POSTGRES_DB" exit /b 56
+if not "%~6"=="PGPASSWORD=$POSTGRES_PASSWORD exec psql -h postgres -X -At -U $POSTGRES_USER -d $POSTGRES_DB" exit /b 56
 set /p INPUT_SQL=
 if not "%INPUT_SQL%"=="SELECT 1" exit /b 57
 if "%MA_AUTH_SHIM_FAIL%"=="1" exit /b 58
