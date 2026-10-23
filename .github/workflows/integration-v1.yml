@@ -1124,6 +1124,86 @@ jobs:
           path: tests/smoke/screenshots/
           if-no-files-found: ignore
 
+      - name: Reconstruire le graphe public sur PostgreSQL réel, sans toucher aux collections
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          from apps.api.app.main import get_connection
+          from apps.api.app.catalogue_source_graph import (
+              ensure_schema,rebuild_legacy_sources,stage_external_facts,
+              register_non_mal_work,
+          )
+          from pipelines.engine.scripts.rebuild_catalogue_source_graph import public_report
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("SELECT count(*) n FROM manga")
+                  legacy=cur.fetchone()["n"]
+                  cur.execute("SELECT count(*) n FROM user_manga_library")
+                  owners=cur.fetchone()["n"]
+                  cur.execute("SELECT count(*) n FROM jikan_manga_source")
+                  raw=cur.fetchone()["n"]
+                  cur.execute("""
+                      SELECT id,source_mal_id,title FROM manga
+                      WHERE title IS NOT NULL AND length(btrim(title)) BETWEEN 4 AND 120
+                      ORDER BY id LIMIT 100
+                  """)
+                  rows=list(cur.fetchall())
+                  first=rows[0]
+                  second=next(x for x in rows if x["title"].casefold()!=first["title"].casefold())
+                  cur.execute("""
+                      INSERT INTO manga_title_alias
+                      (manga_id,source_name,source_id,language_code,
+                       alias,alias_key,source_url)
+                      VALUES (%s,'TENRAI_MAL',%s,'und',%s,%s,%s)
+                      ON CONFLICT DO NOTHING
+                  """,(first["id"],str(first["source_mal_id"]),second["title"],
+                       second["title"].lower().strip(),
+                       'https://myanimelist.net/manga/'+str(first["source_mal_id"])))
+              ensure_schema(conn)
+              rebuild_legacy_sources(conn)
+              before=public_report(conn)
+              assert before["works"]==legacy,before
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      SELECT evidence_status FROM catalogue_title_claim claim
+                      JOIN catalogue_work work ON work.id=claim.work_id
+                      WHERE work.legacy_manga_id=%s AND claim.title_key=%s
+                        AND claim.source_name='TENRAI_MAL'
+                  """,(first["id"],second["title"].lower().strip()))
+                  row=cur.fetchone()
+              assert row and row["evidence_status"]=="COLLISION_REVIEW",row
+              nonmal=register_non_mal_work(
+                  conn,'Radiant',source='PUBLISHER',
+                  external_id='https://www.ankama-shop.com/fr/radiant')
+              assert nonmal>0
+              out=stage_external_facts(conn,first["source_mal_id"],
+                  provider='ANILIST',source_id='51234',
+                  url='https://anilist.co/manga/51234',
+                  titles=[{"language":"english","title":"CI English title"},
+                          {"language":"unspecified","title":"Untrusted claim"}],
+                  relations=[{"relation_type":"SIDE_STORY","mal_id":125678,
+                              "media_type":"MANGA"}])
+              assert out["status"]=="STAGED_SOURCE_CLAIMS",out
+              rebuild_legacy_sources(conn)
+              after=public_report(conn)
+              assert after["works"]==legacy+1,after
+              assert after["non_mal_works"]==1,after
+              assert after["typed_relations"]>=1,after
+              assert after["title_collisions"]>=1,after
+              with conn.cursor() as cur:
+                  cur.execute("SELECT count(*) n FROM manga")
+                  assert cur.fetchone()["n"]==legacy
+                  cur.execute("SELECT count(*) n FROM jikan_manga_source")
+                  assert cur.fetchone()["n"]==raw
+                  cur.execute("SELECT count(*) n FROM user_manga_library")
+                  assert cur.fetchone()["n"]==owners
+              # Deliberately never infer a French edition or ownership.
+              conn.commit()
+          print("PASS source graph: MAL+non-MAL, collision, ID links, typed relations, zero legacy writes")
+          PY
+
       - name: Journaux Docker en cas d'erreur
         if: failure()
         run: |
