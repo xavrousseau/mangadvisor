@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS catalogue_work (
   CHECK (length(btrim(canonical_title)) BETWEEN 1 AND 500),
   CHECK (length(origin_id) BETWEEN 1 AND 150)
 );
+CREATE INDEX IF NOT EXISTS catalogue_legacy_canonical_key_idx
+ ON manga((lower(btrim(title))));
+CREATE INDEX IF NOT EXISTS catalogue_work_title_key_idx
+ ON catalogue_work((lower(btrim(canonical_title))));
 CREATE TABLE IF NOT EXISTS catalogue_work_identifier (
   work_id BIGINT NOT NULL REFERENCES catalogue_work(id) ON DELETE CASCADE,
   provider TEXT NOT NULL,
