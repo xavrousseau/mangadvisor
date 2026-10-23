@@ -36,6 +36,12 @@ jobs:
             Write-Host "OK : $($script.Name)"
           }
 
+      - name: Tester le vrai export public pg_dump sous PowerShell 5.1 (Docker simule)
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-public-catalogue-export.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Export public PostgreSQL invalide sur Windows." }
+
       - name: Verifier les actions du menu simplifie
         shell: powershell
         run: |
