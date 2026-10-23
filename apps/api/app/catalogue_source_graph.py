@@ -188,18 +188,17 @@ INSERT INTO catalogue_title_claim
 (work_id,source_name,source_id,language_code,title,title_key,
  claim_kind,evidence_status,evidence_url)
 SELECT w.id,'WIKIDATA_P4087',f.wikidata_id,'fr',btrim(f.label_fr),
-       lower(btrim(f.label_fr)),'EXTERNAL_TITLE','SOURCE_LINKED',
+       lower(btrim(f.label_fr)),'EXTERNAL_TITLE',
+       CASE WHEN EXISTS (SELECT 1 FROM manga other
+         WHERE other.id<>f.manga_id
+           AND lower(btrim(other.title))=lower(btrim(f.label_fr)))
+       THEN 'COLLISION_REVIEW' ELSE 'SOURCE_LINKED' END,
        'https://www.wikidata.org/wiki/'||f.wikidata_id
 FROM manga_wikidata_fact f
 JOIN manga m ON m.id=f.manga_id AND m.source_mal_id=f.source_mal_id
 JOIN catalogue_work w ON w.legacy_manga_id=m.id
 WHERE f.label_fr IS NOT NULL
   AND length(btrim(f.label_fr)) BETWEEN 2 AND 200
-  AND NOT EXISTS (
-    SELECT 1 FROM manga other
-    WHERE other.id<>f.manga_id
-      AND lower(btrim(other.title))=lower(btrim(f.label_fr))
-  )
 ON CONFLICT DO NOTHING;
 """
 
