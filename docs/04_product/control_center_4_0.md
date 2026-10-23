@@ -37,25 +37,29 @@ code ; en cas d'échec de la sauvegarde, la mise à jour est interrompue.
 Le choix **7** ne sauvegarde pas la base : il ne convient pas à une mise
 à jour de structure SQL qui doit être précédée d'une sauvegarde.
 
-## Options avancées
+## Options avancées : les six actions utiles
 
-| Choix | Action |
+Le menu utilisateur n'affiche plus les 26 actions techniques accumulées
+pendant le développement. Les chemins usuels sont désormais :
+
+| Choix dans A | Action |
 | --- | --- |
-| 1–2 | Catalogue partiel et recommandations communautaires |
-| 3–4 | Import CSV de la mangathèque physique et aperçu non destructif |
-| 5–6 | Démarrer/arrêter la session de scanner mobile HTTPS |
-| 7–8 | Démarrer/arrêter le conseiller IA local facultatif |
-| 9 | Journaux Docker |
-| 10–11 | Candidats BnF et métadonnées Wikidata |
-| 12–13 | Enrichir la mangathèque et récupérer les alias FR/EN/JA |
-| 14–15 | Extension Tenrai et import de fichiers BnF |
-| 16–17 | Comparatif de sources V2, deux raccourcis vers le même outil |
-| 18 | Préparer les fiches bibliographiques sans toucher aux possessions |
-| 19 | Charger le catalogue MAL/Jikan complet via Tenrai avec reprise |
-| 20 | Enrichir les titres FR avec Scrinis |
-| 21 | Catalogue vivant : nouveautés et synchronisation incrémentale |
-| 22 | Réindexer les titres et alias publics dans Meilisearch |
-| 23–24 | Pilote et recette bibliographique BnF/Scrinis en sandbox |
+| 1 | Actualiser les nouveautés du catalogue, sans recharger toutes les sources |
+| 2 | Chercher les titres français sourcés via le connecteur Scrinis existant |
+| 3 | Importer la mangathèque personnelle depuis son CSV, avec sa sauvegarde |
+| 4 | Actualiser les recommandations communautaires |
+| 5 | Accéder au sous-menu scanner mobile et conseiller IA |
+| 6 | Réindexer la recherche Meilisearch |
+| S | Entretien, sauvegardes, configuration, diagnostic, restauration |
+| T | **Outils techniques historiques**, réservés aux opérations avancées |
+| 0 | Retour |
+
+**A → T** conserve temporairement les anciens numéros 1 à 26 pour les
+développeurs et les procédures de maintenance. Le code reste accessible par
+ses noms de commande (ex. `mangadvisor.cmd catalogue-export`), sans
+exposer ces outils au quotidien. **Il ne faut plus empiler d'options au
+menu utilisateur** : le futur chargement du catalogue neuf sera une
+procédure unique, guidée et reprenable, dans un environnement isolé.
 
 **A → S** ouvre les opérations de secours : état Docker, fichier
 `.env`, tables SQL, vérification/restauration de sauvegarde et test réseau.
@@ -71,8 +75,8 @@ fournisseur **Tenrai** selon `MANGA_API_BASE_URL` (par défaut
 Une panne réseau ou un quota fournisseur ne justifie jamais la suppression
 de PostgreSQL ni une réinitialisation de la collection.
 
-Pour le premier chargement complet, préférer **1** (assistant) ou **A → 19**.
-Pour les nouveautés, utiliser **A → 21** au lieu de retélécharger
+Pour le premier chargement complet, préférer **1** (assistant) ; le raccourci historique **A → T → 19** reste réservé à la maintenance.
+Pour les nouveautés, utiliser **A → 1** au lieu de retélécharger
 systématiquement l'ensemble du catalogue. Les correspondances entre
 œuvres, éditions, tomes et ISBN sont distinctes ; un titre ressemblant
 à un autre ne suffit pas à attribuer un tome possédé.
