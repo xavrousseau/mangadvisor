@@ -62,7 +62,15 @@ def work_candidate_status(title: str, known_titles: list[str]) -> str:
         return "REVIEW_VOLUME_CANDIDATE"
     if re.match(r"^ed(?:ition|\.)?\b", descriptor):
         return "REVIEW_EDITION_CANDIDATE"
-    return "REVIEW_UNNUMBERED"
+    # A short author credit after an exact title is still unnumbered.
+    # A DIFFERENT substantive subtitle (e.g. Naruto vs Hitachi) is NOT
+    # positive work/title evidence merely because a series name prefixes it.
+    if not descriptor or suffix.lstrip().startswith("/") or re.match(
+        r"^(?:\s*/\s*|\s*\(\s*(?:auteur|dessin|scenario)\b)",
+        suffix, re.I
+    ):
+        return "REVIEW_UNNUMBERED"
+    return "REVIEW_OTHER_TITLE"
 
 
 def volume_from_known_title(title: str, known_titles: list[str]) -> int | None:
@@ -147,7 +155,8 @@ def classify_candidate(
     # Numbering on another work or a derivative is not a volume of this manga.
     # Keep the documentary candidate for review but do not suggest a tome.
     volume = None
-    if work not in {"REJECT_DIFFERENT_WORK", "REVIEW_DERIVATIVE"}:
+    if work not in {"REJECT_DIFFERENT_WORK", "REVIEW_DERIVATIVE",
+                    "REVIEW_OTHER_TITLE"}:
         volume = volume_from_title(str(row.get("title_fr") or ""))
         if volume is None and work == "REVIEW_VOLUME_CANDIDATE":
             volume = volume_from_known_title(str(row.get("title_fr") or ""), known_titles)
