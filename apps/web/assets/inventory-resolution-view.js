@@ -9,6 +9,8 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
   const selection=state.review;
   const selected=selection?.manga;
   const original=selection?.source||state.pending||{};
+  const discovery=state.discovery;
+  const external=state.externalEvidence;
   const info=fr
     ?"Sélectionne l'œuvre exacte du catalogue. L'édition et les quantités déclarées restent inchangées. Aucun ISBN ni tome précis n'est inventé."
     :"Choose the exact catalogue work. Your edition and quantities remain unchanged. No ISBN or exact volume is inferred.";
@@ -18,6 +20,20 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
       const id=Number(manga.id);
       if(!Number.isSafeInteger(id)||id<=0)return "";
       const riskCodes=manga.reconciliation?.warnings||[];
+      const rank=manga.ranking;
+      const rankLabels={
+        EXACT_CATALOG_TITLE:fr?"Titre original exact":"Exact original title",
+        EXACT_WIKIDATA_LINKED_TITLE:fr?"Titre Wikidata lié à MAL":"Wikidata title linked to MAL",
+        EXACT_SOURCE_CHECKED_ALIAS:fr?"Alias sourcé lié à MAL":"Source-linked MAL alias",
+        EXACT_UNVERIFIED_ALIAS:fr?"Alias non corroboré":"Unverified alias",
+        WHOLE_WORD_DISCOVERY:fr?"Mots communs seulement":"Shared words only",
+      };
+      const rankNote=rank?
+        '<p class="muted tiny">'+e(rankLabels[rank.basis]||"")+
+        ' · '+e(fr?"Candidat à confirmer, pas une identité vérifiée":"Candidate only, not confirmed identity")+'</p>':"";
+      const rankWarnings=rank&&Array.isArray(rank.warnings)&&rank.warnings.length?
+        '<p class="collection-caveat">'+e(fr?
+          "Indices contradictoires : examen indispensable.":"Conflicting clues: review required.")+'</p>':"";
       const riskTexts={
         ALIAS_CONFLICTS_WITH_OTHER_CANONICAL_TITLE: fr?
           "Alias en conflit avec un titre canonique" : "Alias conflicts with a canonical title",
@@ -57,7 +73,7 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
         '</p>'+
         (manga.source_name==="MANGADEX" && /^https:\/\/mangadex\.org\/title\/[a-f0-9-]{36}$/i.test(String(manga.source_url||""))?
           '<a href="'+e(manga.source_url)+'" target="_blank" rel="noopener noreferrer">MangaDex ↗</a>':"")+
-        riskNote+
+        rankNote+rankWarnings+riskNote+
         '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-select" data-id="'+e(id)+'">'+
           (fr?"Examiner cette œuvre":"Review this work")+'</button></article>';
     }).join("")+'</div>';
@@ -65,6 +81,51 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
     items='<p class="collection-caveat">'+e(fr?
       "Aucun résultat. Essaie le titre international ou un autre mot-clé.":"No results. Try an international name or another keyword.")+'</p>';
   }
+  const discoveryInfo=discovery?
+    '<div class="collection-caveat" role="status"><strong>'+
+    e(fr?"Recherche approfondie : ":"Extended search: ")+
+    e(discovery.catalogue_candidates_seen||0)+' '+
+    e(fr?"candidats analysés":"candidates reviewed")+'</strong>'+
+    '<p>'+e(discovery.catalog_truncated?
+      (fr?"Résultats partiels : ne pas conclure à une correspondance unique.":
+          "Partial results: do not infer a unique match."):
+      (fr?"Résultats triés par indices, sans attribution automatique.":
+          "Ranked clues only, without automatic matching."))+'</p></div>':"";
+  const cross=external;
+  const aniRows=Array.isArray(cross?.anilist?.items)?cross.anilist.items.slice(0,5):[];
+  const wikiRows=Array.isArray(cross?.wikidata?.items)?cross.wikidata.items.slice(0,4):[];
+  const crossStatus=cross?.international_id_evidence?.status||"";
+  const sourcesInfo=cross?
+    '<section class="inventory-match-review" aria-label="'+e(fr?"Sources internationales":"International sources")+'">'+
+    '<h4>'+e(fr?"Vérification des identifiants internationaux":"International identity checks")+'</h4>'+
+    '<p class="muted tiny">'+e(fr?
+      "Ces liens permettent de vérifier une œuvre. Ils ne certifient aucune édition ni aucun livre possédé.":
+      "These links can help check a work. They do not certify editions or ownership.")+'</p>'+
+    (crossStatus==="CONTRADICTION_REVIEW"?
+      '<p class="collection-caveat">'+e(fr?
+        "Des identifiants se contredisent : aucune conclusion automatique.":
+        "Conflicting identifiers: no automatic conclusion.")+'</p>':"")+
+    (aniRows.length?
+      '<p><strong>AniList</strong> · '+e(aniRows.length)+
+      e(fr?" pistes documentées":" documented leads")+'</p>'+
+      '<ul>'+aniRows.map(item=>{
+        const n=Number(item.anilist_id);
+        const safe=Number.isSafeInteger(n)&&n>0;
+        const name=item.titles?.find(x=>x.language==="english")?.title||
+                   item.titles?.find(x=>x.language==="romaji")?.title||"";
+        return '<li>'+e(name)+
+          ' · MAL '+e(item.source_mal_id||"—")+
+          (safe?' <a target="_blank" rel="noopener noreferrer" href="https://anilist.co/manga/'+n+'">AniList ↗</a>':"")+
+          '</li>';
+      }).join("")+'</ul>':
+      '<p class="muted tiny">'+e(fr?
+        "AniList : aucune identité exploitable ou source indisponible.":
+        "AniList: no usable identity or provider unavailable.")+'</p>')+
+    (wikiRows.length?
+      '<p><strong>Wikidata</strong> · '+e(wikiRows.length)+
+      e(fr?" correspondances possibles":" possible cross-links")+'</p>':"")+
+    '<p class="muted tiny">Kitsu : '+e(cross?.kitsu?.status||"—")+'</p>'+
+    '</section>':"";
   const quantities=Number(original.main_volumes||0)+" "+
     (fr?"tomes principaux":"main volumes")+" · "+Number(original.duplicate_copies||0)+" "+
     (fr?"doublons":"duplicates")+" · "+Number(original.other_editions_unknown||0)+" "+
@@ -125,6 +186,10 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
       (state.loading?' disabled':"")+'/>'+
       '<button class="btn btn-soft" type="submit"'+(state.loading?' disabled':"")+'>'+
       e(fr?"Rechercher":"Search")+'</button></div></form>'+
+      '<button class="btn btn-small btn-soft" type="button" data-action="pending-match-deep"'+(state.loading?' disabled':"")+'>'+
+      e(fr?"Trouver de meilleurs candidats":"Find better candidates")+'</button> '+
+      '<button class="btn btn-small btn-soft" type="button" data-action="pending-match-cross"'+(state.loading?' disabled':"")+'>'+
+      e(fr?"Vérifier AniList, Kitsu et Wikidata":"Check AniList, Kitsu and Wikidata")+'</button> '+
       '<button class="btn btn-small btn-soft" type="button" data-action="pending-match-external"'+(state.loading?' disabled':"")+'>'+
       e(fr?"Recherche étendue MangaDex (facultative)":"Extended MangaDex search (optional)")+'</button>'+
       '<p class="muted tiny">'+e(fr?
@@ -132,5 +197,5 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
         "Public MangaDex source: personal non-commercial use only; no automatic matches.")+'</p>'+
       (state.loading?'<p class="info">'+e(fr?"Recherche en cours…":"Searching…")+'</p>':"")+
       (state.message?'<p class="message" role="alert">'+e(state.message)+'</p>':"")+
-      items+review+'</section>';
+      discoveryInfo+sourcesInfo+items+review+'</section>';
 }
