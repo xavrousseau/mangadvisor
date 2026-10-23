@@ -4,7 +4,8 @@ import unittest
 from unittest.mock import patch
 from fastapi import HTTPException
 from apps.api.app.international_crosswalk import (
-    ANILIST_QUERY,parse_anilist,search_anilist,_kitsu_item_ids,
+    ANILIST_QUERY,ANILIST_MAL_QUERY,parse_anilist,search_anilist,
+    search_anilist_by_mal_ids,_kitsu_item_ids,
     _parse_kitsu_mapping,search_kitsu_by_mal,combine_cross_id_sources,
 )
 
@@ -34,6 +35,60 @@ class InternationalCrosswalkTests(unittest.TestCase):
         self.assertEqual(item["source_mal_id"],145863)
         self.assertEqual(item["titles"][3]["title"],"Adieu Eri")
         self.assertFalse(item["identity_confirmed"])
+
+
+    def test_anilist_mal_batch_queries_identity_not_translated_title(self):
+        self.assertIn("idMal_in: $ids", ANILIST_MAL_QUERY)
+        self.assertIn("relations",ANILIST_MAL_QUERY)
+        payload={"data":{"Page":{"media":[
+            anilist_item(aid=150,mal=145863),
+            anilist_item(aid=777,mal=99999,name="Another manga"),
+        ]}}}
+        with patch("apps.api.app.international_crosswalk._read_json",
+                   return_value=payload) as read:
+            found=search_anilist_by_mal_ids([145863,145863])
+        self.assertEqual(found["requested_mal_ids"],[145863])
+        self.assertEqual(found["lookup_basis"],"EXACT_MAL_ID_NOT_TITLE")
+        self.assertEqual(len(found["items"]),1)
+        self.assertEqual(found["items"][0]["source_mal_id"],145863)
+        sent=read.call_args.args[0]
+        import json
+        body=json.loads(sent.data.decode("utf-8"))
+        self.assertEqual(body["variables"]["ids"],[145863])
+        self.assertNotIn("Adieu Eri",body["query"])
+        self.assertFalse(found["items"][0]["identity_confirmed"])
+
+    def test_relations_are_typed_and_do_not_merge_derivatives(self):
+        raw=anilist_item()
+        raw["relations"]={"edges":[
+            {"relationType":"SIDE_STORY","node":{
+                "id":1234,"idMal":None,"type":"MANGA",
+                "title":{"romaji":"Different supplementary story"}}},
+            {"relationType":"ADAPTATION","node":{
+                "id":5678,"idMal":12,"type":"ANIME",
+                "title":{"romaji":"Anime adaptation"}}},
+            {"relationType":"UNKNOWN","node":{
+                "id":0,"idMal":None,"type":"MANGA"}},
+        ]}
+        result=parse_anilist({"data":{"Page":{"media":[raw]}}})
+        relations=result["items"][0]["relations"]
+        self.assertEqual(len(relations),2)
+        self.assertEqual(relations[0]["relation_type"],"SIDE_STORY")
+        self.assertTrue(all(x["evidence_only"] for x in relations))
+        self.assertEqual(relations[1]["media_type"],"ANIME")
+
+    def test_kitsu_asks_to_include_related_manga_type(self):
+        payload={"data":[kitsu_mapping("myanimelist/manga",145863)]}
+        with patch("apps.api.app.international_crosswalk._read_json",
+                   side_effect=[payload,{"data":[
+                       kitsu_mapping("myanimelist/manga",145863),
+                       kitsu_mapping("anilist/manga",150),
+                   ]}]) as read:
+            result=search_kitsu_by_mal(145863)
+        self.assertEqual(result["status"],"MAL_ANILIST_CROSS_ID_REVIEW")
+        req=read.call_args_list[0].args[0]
+        self.assertIn("include=item",req.full_url)
+        self.assertIn("myanimelist%2Fmanga",req.full_url)
 
     def test_anilist_graphql_errors_are_unavailable_not_no_match(self):
         with self.assertRaises(ValueError):
