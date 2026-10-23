@@ -54,10 +54,13 @@ function Check-Menu([string]$Name, [string]$InputText,
 
 $crlf=([string][char]13)+([string][char]10)
 # Extra zero lines tolerate how cmd.exe reads redirected pause / set /p.
-Check-Menu "wikidata" ((@("A","11","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Wikidata" "OUTILS AVANCES" $false
-Check-Menu "library_enrich" ((@("A","12","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_LibraryEnrichment" "OUTILS AVANCES" $false
-Check-Menu "multilingual_aliases" ((@("A","13","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Aliases" "OUTILS AVANCES" $false
-Check-Menu "bnf_failure" ((@("A","10","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_BnF" "OUTILS AVANCES" $true
+Check-Menu "wikidata" ((@("A","T","11","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Wikidata" "OUTILS TECHNIQUES HISTORIQUES" $false
+Check-Menu "library_enrich" ((@("A","T","12","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_LibraryEnrichment" "OUTILS TECHNIQUES HISTORIQUES" $false
+Check-Menu "multilingual_aliases" ((@("A","T","13","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Aliases" "OUTILS TECHNIQUES HISTORIQUES" $false
+Check-Menu "bnf_failure" ((@("A","T","10","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_BnF" "OUTILS TECHNIQUES HISTORIQUES" $true
+Check-Menu "catalogue_new" ((@("A","1","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_CatalogueLifecycle" "OUTILS AVANCES" $false
+Check-Menu "french_new" ((@("A","2","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_CatalogueFrenchScrinis" "OUTILS AVANCES" $false
+Check-Menu "recs_new" ((@("A","4","","0","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Recommendations" "OUTILS AVANCES" $false
 Check-Menu "github_sync" ((@("7","","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_SYNC_FINISHED" "MANGADVISOR" $false
 Check-Menu "normal_update" ((@("3","","0","0","0") -join $crlf)+$crlf) "MA_FIXTURE_ACTION_Update" "MANGADVISOR" $false
 Write-Host "Tests de retours interactifs Windows reussis sans Git ni Docker."
