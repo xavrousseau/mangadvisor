@@ -18,7 +18,7 @@ class SingleWebStackTests(unittest.TestCase):
         self.assertNotIn("/workspace",local.split("\n  api:",1)[1].split("\n  web:",1)[0])
         self.assertIn("../../data/raw:/workspace/data/raw",local)
         self.assertNotIn('profiles: ["legacy"]',dev)
-        self.assertNotIn("\\n  ui:\\n",dev)
+        self.assertNotIn("\n  ui:\n",dev)
         self.assertNotIn("8502",dev)
         self.assertIn("--reload",dev)
 
@@ -35,6 +35,9 @@ class SingleWebStackTests(unittest.TestCase):
     def test_only_main_controller_migrates_legacy_ui_safely(self):
         ps=(ROOT/"cmd/control-center.ps1").read_text("utf-8")
         self.assertIn('@("rm","-f","mangadvisor_ui")',ps)
+        self.assertIn("function Remove-Legacy-Ui",ps)
+        self.assertIn("com.docker.compose.project",ps)
+        self.assertIn("com.docker.compose.service",ps)
         self.assertNotIn('legacyArgs',ps)
         self.assertNotIn("down --volumes",ps)
         self.assertNotIn("down -v",ps)

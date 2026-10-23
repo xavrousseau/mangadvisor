@@ -154,17 +154,35 @@ function Initialize-Database {
   }
   Write-Host "Tables initialisees. Operation additive : aucun volume efface."
 }
+function Remove-Legacy-Ui {
+  # A container name is not proof of ownership. Never remove a foreign container.
+  $oldUi=@(& docker container ls -a --format "{{.Names}}" |
+    Where-Object { $_ -ceq "mangadvisor_ui" })
+  Assert-Exit "Liste des conteneurs Docker indisponible"
+  if ($oldUi.Count -eq 0) { return }
+  $raw=@(& docker container inspect --format '{{json .Config.Labels}}' mangadvisor_ui)
+  Assert-Exit "Inspection de l'ancien conteneur UI impossible"
+  if ($raw.Count -ne 1) { throw "Etiquettes de l'ancien conteneur UI absentes." }
+  try {
+    $labels=ConvertFrom-Json -InputObject ([string]$raw[0]) -ErrorAction Stop
+  } catch {
+    throw "Etiquettes de l'ancien conteneur UI invalides. Suppression annulee."
+  }
+  if ($null -eq $labels) { throw "Ancien conteneur UI sans proprietaire Compose." }
+  $project=$labels.PSObject.Properties['com.docker.compose.project']
+  $service=$labels.PSObject.Properties['com.docker.compose.service']
+  if ($null -eq $project -or ([string]$project.Value) -cne "mangadvisor" -or
+      $null -eq $service -or ([string]$service.Value) -cne "ui") {
+    throw "Le conteneur mangadvisor_ui ne correspond pas au service historique Mangadvisor. Suppression refusee."
+  }
+  # Only the verified obsolete UI container is deleted; volumes stay untouched.
+  Run "docker" @("rm","-f","mangadvisor_ui") "Impossible de retirer l'ancien conteneur UI"
+}
 function Start-Application([bool]$Build=$true) {
   Say "Demarrage des services Mangadvisor"
   Ensure-Environment
   Check-Docker
-  # Retire a container left by old installations WITHOUT removing volumes.
-  # The legacy Compose service no longer exists in the maintained repository.
-  $oldUi=(& docker container ls -a --format "{{.Names}}" 2>$null |
-    Where-Object { $_ -eq "mangadvisor_ui" })
-  if ($oldUi) {
-    Run "docker" @("rm","-f","mangadvisor_ui") "Impossible de retirer l'ancien conteneur UI"
-  }
+  Remove-Legacy-Ui
   $args=@("up","-d")
   if ($Build) { $args+=@("--build") }
   Compose $args
