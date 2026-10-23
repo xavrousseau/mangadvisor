@@ -402,12 +402,15 @@ class PendingResolutionTests(unittest.TestCase):
         from unittest.mock import patch
         db=DummyDb()
         endpoint=self.endpoints(db)["/inventory/pending/discover"]
-        with patch("apps.api.app.inventory_resolution.search_anilist") as anilist, \
-             patch("apps.api.app.inventory_resolution.search_kitsu_by_mal") as kitsu:
+        with (patch("apps.api.app.inventory_resolution.search_anilist") as anilist,
+              patch("apps.api.app.inventory_resolution.search_anilist_by_mal_ids") as bymal,
+              patch("apps.api.app.inventory_resolution.search_kitsu_by_mal") as kitsu):
             result=endpoint(source_key=PENDING["source_key"])
             anilist.assert_not_called()
+            bymal.assert_not_called()
             kitsu.assert_not_called()
             self.assertEqual(result["anilist"]["status"],"NOT_REQUESTED")
+            self.assertEqual(result["anilist_by_mal_id"]["status"],"NOT_REQUESTED")
             self.assertEqual(result["kitsu"]["status"],"NOT_REQUESTED")
             self.assertFalse(result["external_lookup_requested"])
         ani={"status":"CROSS_ID_CANDIDATES","items":[{
@@ -420,13 +423,16 @@ class PendingResolutionTests(unittest.TestCase):
             "source_mal_id":42,"anilist_ids":[801],
             "kitsu_id":998,"identity_confirmed":False
         }]}
-        with patch("apps.api.app.inventory_resolution.search_anilist",
-                   return_value=ani) as anilist, \
-             patch("apps.api.app.inventory_resolution.search_kitsu_by_mal",
-                   return_value=k) as kitsu:
+        with (patch("apps.api.app.inventory_resolution.search_anilist",
+                    return_value=ani) as anilist,
+              patch("apps.api.app.inventory_resolution.search_anilist_by_mal_ids",
+                    return_value=ani) as bymal,
+              patch("apps.api.app.inventory_resolution.search_kitsu_by_mal",
+                    return_value=k) as kitsu):
             result=endpoint(source_key=PENDING["source_key"],
                             include_anilist=True,include_kitsu=True)
             anilist.assert_called_once_with("Dragon Ball")
+            bymal.assert_called_once_with([42])
             kitsu.assert_called_once_with(42)
         self.assertEqual(result["international_id_evidence"]["status"],
                          "CROSS_ID_AGREEMENT_REVIEW")
@@ -435,11 +441,13 @@ class PendingResolutionTests(unittest.TestCase):
         self.assertFalse(result["writes_performed"])
         self.assertFalse(result["automatic_association"])
         self.assertEqual(db.commits,0)
-        with patch("apps.api.app.inventory_resolution.search_anilist",
-                   return_value=ani), \
-             patch("apps.api.app.inventory_resolution.search_kitsu_by_mal",
-                   return_value={**k, "items":[{**k["items"][0],
-                         "anilist_ids":[999]}]}):
+        with (patch("apps.api.app.inventory_resolution.search_anilist",
+                    return_value=ani),
+              patch("apps.api.app.inventory_resolution.search_anilist_by_mal_ids",
+                    return_value=ani),
+              patch("apps.api.app.inventory_resolution.search_kitsu_by_mal",
+                    return_value={**k, "items":[{**k["items"][0],
+                          "anilist_ids":[999]}]})):
             conflict=endpoint(source_key=PENDING["source_key"],
                               include_anilist=True,include_kitsu=True)
         self.assertEqual(conflict["international_id_evidence"]["status"],
