@@ -363,6 +363,9 @@ def triage_pending_rows(
                 "SUSPICIOUS_ALIAS_REVIEW"
                 if exact[0]["suggestion_basis"] == "EXACT_ALIAS" and
                 exact[0]["work_reconciliation"]["assessment"] == "CONFLICT_REVIEW"
+                else "ALIAS_SOURCE_REVIEW"
+                if exact[0]["suggestion_basis"] == "EXACT_ALIAS" and
+                exact[0]["work_reconciliation"]["assessment"] == "EVIDENCE_INCOMPLETE_REVIEW"
                 else "SINGLE_EXACT_SUGGESTION"
             )
         elif prior:
@@ -389,7 +392,7 @@ def triage_pending_rows(
                 "DISCOVER_ALTERNATE_TITLES_AND_EXTERNAL_IDS"
                 if category == "SEARCH_REQUIRED" else
                 "REVIEW_SUSPECT_ALIAS_PROVENANCE"
-                if category == "SUSPICIOUS_ALIAS_REVIEW" else
+                if category in ("SUSPICIOUS_ALIAS_REVIEW", "ALIAS_SOURCE_REVIEW") else
                 "COMPARE_SOURCES_AND_CONFIRM_WORK_EDITION"
             ),
             "automatic_association": False,
@@ -399,6 +402,7 @@ def triage_pending_rows(
         "SINGLE_EXACT_SUGGESTION": 0,
         "CONFLICTING_SUGGESTIONS": 1,
         "SUSPICIOUS_ALIAS_REVIEW": 2,
+        "ALIAS_SOURCE_REVIEW": 2,
         "SAVED_SUGGESTIONS_ONLY": 3,
         "AMBIGUOUS_EXACT": 4,
         "SEARCH_REQUIRED": 5,
