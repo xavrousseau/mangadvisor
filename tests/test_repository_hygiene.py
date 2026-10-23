@@ -6,6 +6,8 @@ are never examined, altered or deleted.
 from pathlib import Path
 import unittest
 
+from tools.audit_repository import has_compose_service
+
 ROOT = Path(__file__).resolve().parents[1]
 
 RETIRED = (
@@ -58,6 +60,12 @@ class RepositoryHygieneTests(unittest.TestCase):
         for path in RETIRED:
             with self.subTest(path=path):
                 self.assertFalse((ROOT / path).exists(), f"Historical duplicate restored: {path}")
+
+    def test_compose_service_detection_catches_retired_ui(self):
+        self.assertTrue(has_compose_service("services:\n  ui:\n    image: old\n", "ui"))
+        self.assertTrue(has_compose_service("services:\n  ui : {}\n", "ui"))
+        self.assertFalse(has_compose_service("services:\n  ui_backup:\n", "ui"))
+        self.assertFalse(has_compose_service("services:\n  web:\n", "ui"))
 
     def test_one_catalogue_menu_path(self):
         menu = (ROOT / "mangadvisor.cmd").read_text(encoding="utf-8")

@@ -34,6 +34,31 @@ conservant d'abord une copie du fichier `.env` dans
 
 La restauration des paramètres ne modifie ni la base ni les ISBN.
 
+### Si le conteneur PostgreSQL a disparu mais que ses données existent
+
+L'option 3 ne peut pas sauvegarder un conteneur absent. Le programme vérifie
+maintenant le **contexte Docker courant**, la présence du volume nommé
+`mangadvisor_mangadvisor_pgdata`, ses étiquettes Compose et son contenu
+PostgreSQL 16 **en lecture seule**, sans réseau.
+
+Trois cas sont distingués :
+
+- **Volume historique absent** : arrêt, aucun nouveau cluster PostgreSQL créé ;
+  vérifier Docker Desktop et les sauvegardes disponibles.
+- **Volume déjà attaché à un autre conteneur** : arrêt pour ne jamais démarrer
+  deux serveurs utilisant le même répertoire de données.
+- **Volume historique reconnu et sauvegarde antérieure valide (SHA256)** :
+  le programme demande la confirmation explicite `RECUPERER` avant de
+  recréer uniquement le conteneur PostgreSQL avec **ce même volume**.
+
+Après le rattachement, le script contrôle le montage, démarre PostgreSQL,
+effectue une nouvelle sauvegarde puis restaure ce dump dans une base de test
+isolée. Il réutilise ensuite le contrôle d'authentification réseau de l'API.
+Aucun volume Docker n'est supprimé et aucune table n'est réinitialisée.
+
+Le rattachement n'est jamais réalisé en mode non interactif, et un simple
+fichier `.dump` dépourvu de manifeste valide ne permet pas de le déclencher.
+
 ### Si PostgreSQL est Healthy mais que l'API refuse le mot de passe
 
 Sur une base persistante, `POSTGRES_PASSWORD` dans Docker peut avoir été

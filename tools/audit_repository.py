@@ -21,6 +21,11 @@ SCANNED = {".py", ".js", ".mjs", ".css", ".html", ".sql", ".yml",
 EXPECTED_SERVICES = ("postgres:", "meilisearch:", "api:", "web:", "engine:")
 
 
+def has_compose_service(source: str, service: str) -> bool:
+    """Detect actual YAML service keys, including colon spacing."""
+    return re.search(r"(?m)^  " + re.escape(service) + r"[ \t]*:", source) is not None
+
+
 def inventory():
     result = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT,
                             check=True, capture_output=True)
@@ -93,7 +98,7 @@ def check():
         "Web depends on healthy API": re.search(
             r"(?ms)^  web:.*?^    depends_on:\s*\n      api:\s*\n        condition: service_healthy",
             compose) is not None,
-        "No Streamlit service in user Compose": "\\n  ui:\\n" not in compose,
+        "No Streamlit service in user Compose": not has_compose_service(compose, "ui"),
         "Stable local overlay has no Streamlit port": "8502" not in
             (ROOT / "infra/compose/docker-compose.local.yml").read_text(encoding="utf-8"),
         "No legacy Streamlit profile or image": 'profiles: ["legacy"]' not in

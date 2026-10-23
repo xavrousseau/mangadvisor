@@ -1,6 +1,6 @@
 # Structure actuelle de Mangadvisor (4.x)
 
-> Ce document décrit les fichiers exécutés **aujourd'hui**, et non le plan d'architecture V1. Voir [l'inventaire transversal actuel](inventaire_transversal_2026_10_21.md) pour la liste des fichiers suivis et les limites de la revue.
+> Ce document décrit les fichiers actifs, et non les promesses de conception V1. L'inventaire des fichiers suivis est régénéré par la CI via `python tools/audit_repository.py --strict`, pour éviter une photographie périmée.
 
 ## Point d'entree Windows
 
@@ -20,7 +20,7 @@ Double-cliquer sur **mangadvisor.cmd** : c'est l'unique menu utilisateur.
 
 Les anciens lanceurs Docker de `cmd/` et les cinq scripts historiques
 utilisant `--reset-library` ont ete retires de la branche de nettoyage.
-Leur couverture fonctionnelle exhaustive reste a verifier avant fusion. Aucun effacement de volume
+Aucun effacement de volume
 PostgreSQL n'est expose au menu principal.
 
 ## Arborescence utile
@@ -29,7 +29,7 @@ PostgreSQL n'est expose au menu principal.
 |---|---|
 | mangadvisor.cmd | Menu principal pour tous les utilisateurs Windows |
 | cmd/control-center.ps1 | Enchaînement installation, alimentation, mises à jour et diagnostics |
-| cmd/*.ps1 (8 scripts) | Orchestrateur Windows, sauvegarde, Git, import personnel, benchmark prive, API locale, IA et acces mobile. Plus aucun lanceur .cmd historique dans ce dossier |
+| cmd/*.ps1 (9 scripts) | Orchestrateur Windows, sauvegarde, Git, import personnel, benchmark prive, API locale, IA et acces mobile. Plus aucun lanceur .cmd historique dans ce dossier |
 | infra/compose/ | `docker-compose.yml` définit les services communs, `docker-compose.local.yml` fournit la configuration stable par défaut, `docker-compose.dev.yml` la configuration de développement sans ancienne interface Streamlit |
 | infra/docker/ | Images Docker des services actifs |
 | apps/web/ | **Interface principale** HTML/CSS/JS sur port UI_PORT (8501 par défaut) |
@@ -75,7 +75,24 @@ Une commande git pull supprime de l'arborescence suivie les fichiers retirés du
 
 Les fichiers data_pipeline_v1.md, data_model_v1.md et mangadvisor_architecture_v1.md portent désormais un avertissement : leurs diagrammes et promesses décrivent le plan initial, pas nécessairement les fonctionnalités branchées.
 
-## Nettoyage `pipelines/` (PR #89, non fusionnee)
+## Frontière de livraison : V1 fonctionnelle / V2 UX
+
+La **V1** sera considérée prête après validation des parcours réels, et non
+seulement après le succès de la CI : réinstallation/reprise Windows avec
+sauvegarde/restauration, catalogue international complet et actualisation
+incrémentale, recherche/recommandations, enrichissements français avec preuves
+édition/tome/ISBN, mangathèque personnelle et ambiguïtés résolues ou
+explicitement conservées, scanner et conseiller IA facultatifs. La recette
+doit confirmer que les données privées sont intactes et qu'un rollback est
+possible. Le suivi bibliographique détaillé reste dans
+[l'issue #71](https://github.com/xavrousseau/mangadvisor/issues/71).
+
+La **V2 portera exclusivement sur l'expérience utilisateur** : navigation,
+lisibilité, accessibilité, ergonomie des fiches, mobile et performances
+perçues. Elle ne doit pas servir à repousser des bogues fonctionnels V1 ou à
+modifier les contrats et données sans couverture de non-régression.
+
+## État du nettoyage des pipelines
 
 - Ancien orchestrateur `run_jikan_pipeline.py` retire. Les deux scripts SQL de consolidation sont appeles depuis le centre de pilotage, puis verifies sur une base CI jetable.
 - Cinq anciens lanceurs de tests destructeurs `run_library_*_tests.py` retires ; des tests modernes non destructifs subsistent dans `tests/`. Leur equivalence complete reste a confirmer.

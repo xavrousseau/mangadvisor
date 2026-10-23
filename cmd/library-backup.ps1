@@ -81,9 +81,107 @@ function Assert-Managed-Container([string]$container,[string]$service) {
     throw "Le conteneur $container appartient a un autre projet Docker. Sauvegarde annulee."
   }
 }
+function Assert-Recovery-Backup {
+  # Require a previous local dump with matching manifest and SHA256 before
+  # permitting a missing-container recovery. Never restore it to production.
+  if (!(Test-Path -LiteralPath $backups -PathType Container)) {
+    throw "Pas de sauvegarde locale : reprise du conteneur refusee."
+  }
+  $expected=Config-Setting "POSTGRES_DB"
+  foreach ($file in @(Get-ChildItem -LiteralPath $backups -Filter "mangadvisor_*.dump" -File |
+      Sort-Object LastWriteTimeUtc -Descending)) {
+    if ($file.Name -notmatch '^mangadvisor_[0-9]{8}_[0-9]{6}_[a-f0-9]{8}\.dump$') { continue }
+    $manifest=$file.FullName+".json"
+    if (!(Test-Path -LiteralPath $manifest -PathType Leaf)) { continue }
+    try {
+      $info=Get-Content -LiteralPath $manifest -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+      if ($info.file -cne $file.Name -or $info.database -cne $expected -or
+          $info.sha256 -notmatch '^[a-f0-9]{64}$' -or $file.Length -lt 100) { continue }
+      $hash=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+      if ($hash -cne $info.sha256) { continue }
+      Write-Host ("Sauvegarde precedente verifiee (SHA256) : "+$file.Name)
+      return
+    } catch { continue }
+  }
+  throw "Pas de sauvegarde avec manifeste SHA256 valide pour cette base. Aucun conteneur cree."
+}
+function Recover-Missing-Postgres {
+  $volume="mangadvisor_mangadvisor_pgdata"
+  $context=@(& docker context show)
+  Assert-Ok "Contexte Docker indisponible"
+  Write-Host ("Contexte Docker : "+($context -join ", "))
+  $volumes=@(& docker volume ls --format "{{.Name}}")
+  Assert-Ok "Impossible d'inventorier les volumes Docker"
+  if ($volumes -notcontains $volume) {
+    $near=@($volumes | Where-Object { $_ -match '(?i)mangadvisor|postgres|pgdata' } |
+      Select-Object -First 12)
+    Write-Host ("Volumes similaires : "+$(if ($near.Count) { $near -join ", " } else { "aucun" }))
+    throw "Conteneur absent ET volume PostgreSQL historique introuvable. Refus de creer une base vide."
+  }
+  $attached=@(& docker container ls -a --filter ("volume="+$volume) --format "{{.Names}}")
+  Assert-Ok "Impossible de controler les conteneurs du volume"
+  if ($attached.Count -gt 0) {
+    throw ("Le volume existe mais appartient deja a un conteneur : "+($attached -join ", ")+". Aucun second PostgreSQL ne sera lance.")
+  }
+  $raw=@(& docker volume inspect --format '{{json .Labels}}' $volume)
+  Assert-Ok "Inspection du volume historique impossible"
+  if ($raw.Count -ne 1) { throw "Metadonnees du volume incompletes." }
+  try { $labels=ConvertFrom-Json -InputObject ([string]$raw[0]) -ErrorAction Stop }
+  catch { throw "Etiquettes du volume non valides : aucune operation." }
+  if ($null -ne $labels) {
+    $project=$labels.PSObject.Properties['com.docker.compose.project']
+    $service=$labels.PSObject.Properties['com.docker.compose.volume']
+    if (($null -ne $project -and ([string]$project.Value) -cne "mangadvisor") -or
+        ($null -ne $service -and ([string]$service.Value) -cne "mangadvisor_pgdata")) {
+      throw "Volume appartenant a un autre projet Docker. Reprise refusee."
+    }
+  }
+  $image="pgvector/pgvector:pg16"
+  $images=@(& docker image ls --format "{{.Repository}}:{{.Tag}}")
+  Assert-Ok "Impossible de lister les images Docker"
+  if ($images -notcontains $image) {
+    throw "Image PostgreSQL 16 introuvable localement pour controler l'ancien volume en lecture seule."
+  }
+  # No network and a read-only mount: this NEVER initializes PostgreSQL.
+  $mount="type=volume,source="+$volume+",target=/data,readonly"
+  & docker run --rm --pull never --network none --read-only --mount $mount --entrypoint sh $image -c 'test -s /data/PG_VERSION && test "$(cat /data/PG_VERSION)" = "16" && test -d /data/base && test -d /data/global' 1>$null
+  Assert-Ok "Le volume n'est pas un cluster PostgreSQL 16 reconnu. Reprise interdite."
+  Write-Host "Ancienne base PostgreSQL reconnue en lecture seule dans le volume."
+  Assert-Recovery-Backup
+  if ($NonInteractive) {
+    throw "Rattachement d'un ancien volume : accord interactif indispensable."
+  }
+  Write-Host "Le conteneur a disparu, mais la base historique et une sauvegarde valide existent."
+  Write-Host "Le programme peut rattacher le volume EXISTANT sans le supprimer."
+  if ((Read-Host "Saisir exactement RECUPERER pour autoriser le rattachement") -cne "RECUPERER") {
+    throw "Rattachement annule. Aucun volume modifie."
+  }
+  $volumes2=@(& docker volume ls --format "{{.Name}}")
+  Assert-Ok "Impossible de reverifier l'ancien volume"
+  $attached2=@(& docker container ls -a --filter ("volume="+$volume) --format "{{.Names}}")
+  Assert-Ok "Impossible de reverifier les montages"
+  if ($volumes2 -notcontains $volume -or $attached2.Count -gt 0) {
+    throw "Etat Docker modifie depuis le diagnostic. Rattachement annule."
+  }
+  # Explicit user consent, existing volume and validated prior backup only.
+  & docker compose @compose up -d --no-deps --no-build postgres | Out-Null
+  Assert-Ok "Rattachement PostgreSQL impossible. Aucune suppression de volume."
+  if (!(Container-Exists $containerName)) { throw "PostgreSQL non disponible apres rattachement." }
+  Assert-Managed-Container $containerName "postgres"
+  $mountsRaw=@(& docker container inspect --format '{{json .Mounts}}' $containerName)
+  Assert-Ok "Impossible de verifier le volume monte dans PostgreSQL"
+  if ($mountsRaw.Count -ne 1) { throw "Montages PostgreSQL invalides." }
+  $mounts=@(ConvertFrom-Json -InputObject ([string]$mountsRaw[0]))
+  $matched=@($mounts | Where-Object { $_.Type -ceq "volume" -and
+      $_.Name -ceq $volume -and $_.Destination -ceq "/var/lib/postgresql/data" })
+  if ($matched.Count -ne 1) {
+    throw "PostgreSQL ne monte pas le volume historique. Operation interrompue."
+  }
+  Write-Host "Ancien volume PostgreSQL rattache et verifie. Sauvegarde de controle a suivre."
+}
 function Repair-Installed-Environment {
   if (-not (Container-Exists $containerName)) {
-    throw "Le conteneur PostgreSQL $containerName est absent. Refus de creer une base vide pendant la sauvegarde. Verifier docker ps -a et les volumes."
+    Recover-Missing-Postgres
   }
   Assert-Managed-Container $containerName "postgres"
   $installed=@{}

@@ -1,9 +1,9 @@
-# MangaAdvisor — Instructions for coding agents
+# Mangadvisor — Instructions for coding agents
 
 This file applies to the whole repository. Read the relevant code and documentation before changing behavior; avoid unnecessary scaffolding or duplicated planning files.
 
 ## Product and architecture
-- MangaAdvisor is a local-first Windows 10/11 manga catalogue, recommendation and physical-library application.
+- Mangadvisor is a local-first Windows 10/11 manga catalogue, recommendation and physical-library application.
 - User entry point: `mangadvisor.cmd`; orchestration: `cmd/control-center.ps1`.
 - Frontend: `apps/web/` (HTML/CSS/JavaScript); API: `apps/api/` (FastAPI).
 - Acquisition and enrichment: `pipelines/engine/`; schema and migrations: `sql/schema/`.
