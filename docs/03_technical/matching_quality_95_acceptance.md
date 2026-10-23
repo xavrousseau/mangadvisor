@@ -73,6 +73,16 @@ this gold set with zero unauthorized inventory writes; publish numerator,
 denominator and all errors. If the gold labels are incomplete or the
 threshold is not reached, the feature remains experimental.
 
+## Unverified vs contradicted aliases
+
+An alias from an upstream source that has not independently corroborated the
+work is `EVIDENCE_INCOMPLETE_REVIEW` / `ALIAS_SOURCE_REVIEW`, NOT a proven
+conflict. An unrelated one-volume work presented for a 19-volume declaration,
+or an alias that conflicts with another canonical work title, is a
+`CONFLICT_REVIEW` / `SUSPICIOUS_ALIAS_REVIEW` case. This distinction
+prevents innocent cases such as Nekomajin or Animal Human from being labeled
+as incompatible without evidence.
+
 ## Remaining hard limits
 
 A correct answer about a French title absent from Jikan cannot be proven
