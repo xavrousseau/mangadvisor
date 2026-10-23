@@ -39,6 +39,34 @@ def main():
     for key in ("owned_volumes","read_volumes","user_score","notes","library_status","is_favorite"):
         assert library_before[key]==library_after[key],(key,library_before[key],library_after[key])
 
+    # Canonical edition groups are a separate, manual, zero-ownership write.
+    # The existing CI book stays linked by ID; no legacy book is rewritten.
+    start=request("/collection/mangas/1/edition-groups")
+    assert start["group_count"]==0 and start["ungrouped_registered_books"]==1,start
+    group=request("/collection/mangas/1/edition-groups","POST",{
+        "edition_key":"classic-original","label":"Édition classique originale",
+        "edition_kind":"CLASSIC","confirmation":"CONFIRMER_EDITION"})
+    assert group["ownership_mutations"]==0 and group["books_linked"]==0,group
+    mapping=request("/collection/mangas/1/edition-groups/"+str(group["id"])+"/books","POST",{
+        "book_id":edition["id"],"isbn13":edition["isbn13"],
+        "confirmation":"CONFIRMER_RATTACHEMENT"})
+    assert mapping["ownership_mutations"]==0 and mapping["isbn13"]==edition["isbn13"],mapping
+    tree=request("/collection/mangas/1/edition-groups")
+    assert tree["group_count"]==1 and tree["ungrouped_registered_books"]==0,tree
+    assert tree["groups"][0]["books"][0]["book_id"]==edition["id"],tree
+    try:
+        request("/collection/mangas/1/edition-groups/"+str(group["id"])+"/books","POST",{
+            "book_id":edition["id"],"isbn13":edition["isbn13"],
+            "confirmation":"CONFIRMER_RATTACHEMENT"})
+        raise AssertionError("Duplicate book grouping accepted")
+    except urllib.error.HTTPError as exc:
+        assert exc.code==409
+    library_after_group=request("/library?q=Naruto")["items"][0]
+    for key in ("owned_volumes","read_volumes","user_score","notes","library_status","is_favorite"):
+        assert library_before[key]==library_after_group[key],key
+    book_after_group=request("/collection/mangas/1/editions")["editions"][0]
+    assert book_after_group["is_owned"] and book_after_group["is_read"]
+
     # A wrongly linked ISBN cannot be accepted as the correct manga without conflict.
     try:
         request("/collection/mangas/99999/editions")
