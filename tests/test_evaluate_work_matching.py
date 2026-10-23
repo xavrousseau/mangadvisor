@@ -30,6 +30,7 @@ class IndependentThresholdTests(unittest.TestCase):
         outcome=evaluate(gold,predicted)
         self.assertEqual(outcome["correct_suggestions"],46)
         self.assertTrue(outcome["target_95_met"])
+        self.assertAlmostEqual(outcome["total_case_coverage"],46/48,places=5)
         predicted[45]["suggested_manga_id"]=999
         predicted[44]["suggested_manga_id"]=998
         predicted[46]["suggested_manga_id"]=47
@@ -46,7 +47,11 @@ class IndependentThresholdTests(unittest.TestCase):
                     "suggested_manga_id":i+1 if i<25 else None,
                     "decision":"STRONG_REVIEW_SUGGESTION" if i<25 else "ABSTAIN"}
                    for i in range(48)]
-        self.assertTrue(evaluate(gold,predicted)["target_95_met"])
+        all_correct=evaluate(gold,predicted)
+        self.assertEqual(all_correct["precision"],1.0)
+        self.assertEqual(all_correct["recall"],1.0)
+        self.assertEqual(all_correct["total_case_coverage"],round(25/48,6))
+        self.assertFalse(all_correct["target_95_met"])
         for i in (46,47):
             predicted[i]={"case_id":str(i),"suggested_manga_id":400+i,
                           "decision":"STRONG_REVIEW_SUGGESTION"}
