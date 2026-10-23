@@ -5,7 +5,8 @@ import unittest
 from unittest.mock import patch
 
 from apps.api.app.catalogue_source_graph import (
-    SCHEMA, BASE_BACKFILL, IDENTITY_COLLISIONS_SQL, title_key,
+    SCHEMA, BASE_BACKFILL, IDENTITY_COLLISIONS_SQL,
+    WIKIDATA_FR_BACKFILL, SCRINIS_FR_BACKFILL, title_key,
     register_non_mal_work, stage_external_facts, ensure_schema,
 )
 from pipelines.engine.scripts.rebuild_catalogue_source_graph import (
@@ -59,6 +60,18 @@ class SourceGraphTests(unittest.TestCase):
         self.assertIn("CREATE TABLE IF NOT EXISTS catalogue_book_claim",SCHEMA)
         self.assertIn("MULTI_WORK_ISBN_REVIEW",BASE_BACKFILL)
         self.assertNotIn("INSERT INTO manga_fr_edition",BASE_BACKFILL)
+
+    def test_french_titles_require_source_identity_not_title_similarity(self):
+        for sql in (WIKIDATA_FR_BACKFILL, SCRINIS_FR_BACKFILL):
+            self.assertIn("m.source_mal_id=",sql)
+            self.assertIn("JOIN catalogue_work w ON w.legacy_manga_id=m.id",sql)
+            self.assertIn("'COLLISION_REVIEW'",sql)
+            self.assertIn("language_code",sql)
+            self.assertNotIn("user_manga",sql)
+            self.assertNotIn("INSERT INTO manga_fr_edition",sql)
+        self.assertIn("f.label_fr",WIKIDATA_FR_BACKFILL)
+        self.assertIn("f.work_evidence IN",SCRINIS_FR_BACKFILL)
+        self.assertIn("f.french_print_isbn_count>0",SCRINIS_FR_BACKFILL)
 
     def test_external_sources_use_exact_mal_work_id_not_fuzzy_titles(self):
         conn=FakeConnection()

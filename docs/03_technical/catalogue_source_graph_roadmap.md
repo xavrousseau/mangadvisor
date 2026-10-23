@@ -91,6 +91,29 @@ La requête réseau ne se produit que lorsque `--providers` est demandé.
 Cette commande reste un **pilote borné**, pas le téléchargement massif
 qui reste à industrialiser.
 
+## Enrichissement FR conservateur et droits des sources
+
+La reconstruction A → 26 recharge maintenant également les libellés français
+de `manga_wikidata_fact.label_fr` (lien P4087/MAL contrôlé) et les
+titres `manga_scrinis_fr_fact.title_fr` pour les œuvres dont l'identité
+MAL et les indices bibliographiques sont cohérents. Elle **ne crée aucun
+ISBN ni édition possédée**, et marque les libellés qui recoupent le
+titre principal d'une autre œuvre comme `COLLISION_REVIEW`.
+
+Le bilan affiche les nombres `works_with_sourced_french_titles`,
+`wikidata_french_titles` et `scrinis_french_titles`.
+Ces nombres mesurent la couverture des titres sourcés, pas les éditions
+françaises commercialisées.
+
+**Restriction majeure :** les conditions officielles AniList interdisent
+la collecte en masse de ses données et limitent leur utilisation dans
+les applications de suivi/listes de mangas concurrentes.
+**Ne pas lancer d'enrichissement massif AniList** sans autorisation écrite
+du fournisseur. La limitation technique à 30 requêtes/minute ne suffit
+pas à rendre cette collecte autorisée.
+
+Source : https://docs.anilist.co/guide/terms-of-use
+
 ## Validation obligatoire avant toute correction finale de base
 
 - tests Python : typage des sources, absence de jointure textuelle,

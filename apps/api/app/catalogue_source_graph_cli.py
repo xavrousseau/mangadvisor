@@ -33,6 +33,16 @@ def public_report(conn: Any) -> dict[str, int]:
                AND evidence_status='DISCOVERY_ONLY') AS unverified_synonyms,
             (SELECT count(*) FROM catalogue_title_claim
              WHERE language_code='fr') AS french_title_claims,
+            (SELECT count(DISTINCT work_id) FROM catalogue_title_claim
+             WHERE language_code='fr'
+               AND evidence_status NOT IN ('REJECTED','COLLISION_REVIEW'))
+               AS works_with_sourced_french_titles,
+            (SELECT count(*) FROM catalogue_title_claim
+             WHERE source_name='WIKIDATA_P4087' AND language_code='fr')
+               AS wikidata_french_titles,
+            (SELECT count(*) FROM catalogue_title_claim
+             WHERE source_name='SCRINIS_FR' AND language_code='fr')
+               AS scrinis_french_titles,
             (SELECT count(*) FROM catalogue_work_identifier
              WHERE identity_status='COLLISION_REVIEW') AS identifier_conflicts,
             (SELECT count(*) FROM catalogue_work_relation) AS typed_relations,
