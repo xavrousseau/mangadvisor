@@ -18,7 +18,7 @@ class FakeCursor:
     def execute(self, query, params=None):
         self.queries.append((query,params))
     def fetchall(self): return self.rows
-    def fetchone(self):return {"locked":True}
+    def fetchone(self):return {"locked":True,"ready":True}
 
 
 class FakeDB:
