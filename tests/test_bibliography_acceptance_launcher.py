@@ -9,10 +9,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BibliographyAcceptanceLauncherTests(unittest.TestCase):
-    def test_advanced_menu_exposes_one_click_sandbox_recipe(self):
+    def test_expert_cli_keeps_sandbox_recipe_accessible(self):
         cmd = (ROOT / "mangadvisor.cmd").read_text(encoding="utf-8-sig")
-        self.assertIn("24 - Recette bibliographique complete", cmd)
-        self.assertIn('if "%CHOICE%"=="24" set "KEY=bibliography-acceptance"', cmd)
+        self.assertNotIn("24 - Recette bibliographique complete", cmd)
+        self.assertIn("Catalogue general et recherche", cmd)
         self.assertIn('if /I "%~1"=="bibliography-acceptance" set "ACTION=BibliographyAcceptance"', cmd)
 
     def test_recipe_stays_on_sandbox_without_inventory_mutation(self):
