@@ -234,6 +234,118 @@ class PendingResolutionTests(unittest.TestCase):
         declaration=next(p for q,p in db.queries if "INSERT INTO user_manga_inventory_declaration" in q)
         self.assertEqual(declaration["edition_key"],"deluxe")
 
+
+    def test_read_only_bulk_triage_distinguishes_work_and_edition_risks(self):
+        from apps.api.app.inventory_resolution import triage_pending_rows
+        rows = [
+            {**PENDING, "source_key": "A", "work_declared": "Dragon Ball",
+             "edition_declared": "Deluxe", "candidate_ids": [15, 99]},
+            {**PENDING, "source_key": "B", "entry_title": "Berserk",
+             "work_declared": "Berserk", "edition_declared": "Prestige",
+             "candidate_ids": []},
+            {**PENDING, "source_key": "C", "entry_title": "Bleach",
+             "work_declared": "Bleach", "edition_declared": "Classic",
+             "candidate_ids": []},
+            {**PENDING, "source_key": "D", "entry_title": "Title missing",
+             "work_declared": "Title missing", "candidate_ids": []},
+            {**PENDING, "source_key": "E", "entry_title": "Unknown alias",
+             "work_declared": "Unknown alias", "candidate_ids": [80]},
+        ]
+        catalog = [
+            {**MANGA, "exact_aliases": []},
+            {"id": 99, "title": "Dragon Ball GT", "title_english": None,
+             "title_japanese": None, "source_mal_id": 99,
+             "manga_type": "Manga", "volumes": 3, "exact_aliases": []},
+            {"id": 25, "title": "Berserk", "title_english": None,
+             "title_japanese": None, "source_mal_id": 25,
+             "manga_type": "Manga", "volumes": 42, "exact_aliases": []},
+            {"id": 36, "title": "Bleach", "title_english": None,
+             "title_japanese": None, "source_mal_id": 36,
+             "manga_type": "Manga", "volumes": 74, "exact_aliases": []},
+            {"id": 37, "title": "Another Bleach", "title_english": None,
+             "title_japanese": None, "source_mal_id": 37,
+             "manga_type": "Manga", "volumes": None, "exact_aliases": ["bleach"]},
+            {"id": 80, "title": "Another title", "title_english": None,
+             "title_japanese": None, "source_mal_id": 80,
+             "manga_type": "Manga", "volumes": None, "exact_aliases": []},
+        ]
+        result = triage_pending_rows(
+            rows, catalog, [{"manga_id": 15, "edition_key": "deluxe"},
+                            {"manga_id": 25, "edition_key": "classic"}], {36},
+        )
+        indexed = {r["source_key"]: r for r in result["items"]}
+        self.assertEqual(indexed["A"]["review_category"], "CONFLICTING_SUGGESTIONS")
+        self.assertTrue(indexed["A"]["candidates"][0]["same_edition_already_declared"])
+        self.assertEqual(indexed["B"]["review_category"], "SINGLE_EXACT_SUGGESTION")
+        self.assertTrue(indexed["B"]["candidates"][0]["has_existing_declaration"])
+        self.assertFalse(indexed["B"]["candidates"][0]["same_edition_already_declared"])
+        self.assertEqual(indexed["C"]["review_category"], "AMBIGUOUS_EXACT")
+        self.assertTrue(indexed["C"]["candidates"][0]["library_not_interested"])
+        self.assertEqual(indexed["D"]["review_category"], "SEARCH_REQUIRED")
+        self.assertEqual(indexed["E"]["review_category"], "SAVED_SUGGESTIONS_ONLY")
+        self.assertEqual(result["count"], 5)
+        self.assertEqual(result["confirmed_editions_written"], 0)
+        self.assertEqual(result["inventory_mutations"], 0)
+        self.assertTrue(all(r["manual_confirmation_required"] and
+                            not r["automatic_association"] for r in result["items"]))
+        self.assertTrue(all(not c["isbn_verified"] for r in result["items"]
+                            for c in r["candidates"]))
+
+    def test_pending_triage_endpoint_reads_only_current_user_and_no_supplier(self):
+        from apps.api.app.inventory_resolution import TRIAGE_PENDING_SQL, TRIAGE_CATALOG_SQL
+
+        class TriageCursor:
+            def __init__(self, db): self.db = db
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def execute(self, sql, params=None):
+                if not sql.lstrip().upper().startswith(("SELECT", "WITH")):
+                    raise AssertionError("Triage must remain SQL read-only")
+                self.db.calls.append((sql, params))
+                self.sql = sql
+            def fetchall(self):
+                if self.sql == TRIAGE_PENDING_SQL:
+                    return [{**PENDING, "candidate_ids": [15]}]
+                if self.sql == TRIAGE_CATALOG_SQL:
+                    return [{**MANGA, "exact_aliases": []}]
+                if "FROM user_manga_inventory_declaration" in self.sql:
+                    return []
+                if "FROM user_manga_library" in self.sql:
+                    return []
+                raise AssertionError(self.sql)
+
+        class TriageDB:
+            def __init__(self): self.calls = []; self.commits = 0
+            def __call__(self): return self
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def cursor(self): return TriageCursor(self)
+            def commit(self): self.commits += 1
+
+        db = TriageDB()
+        fn = self.endpoints(db)["/inventory/pending/triage"]
+        output = fn()
+        self.assertEqual(output["review_categories"], {"SINGLE_EXACT_SUGGESTION": 1})
+        self.assertEqual(output["count"], 1)
+        self.assertEqual(db.commits, 0)
+        self.assertEqual(db.calls[0][1], {"user_id": 1})
+        self.assertEqual(db.calls[1][1],
+                         {"terms": ["dragon ball"], "saved_ids": [15]})
+        self.assertTrue(all("user_id" in params for _, params in db.calls[2:]))
+
+    def test_triage_incomplete_catalog_disables_single_exact_claim(self):
+        from apps.api.app.inventory_resolution import triage_pending_rows, _triage_term
+        self.assertEqual(_triage_term({
+            "entry_title": "Dragon Ball (34 tomes)", "work_declared": None
+        }), "dragon ball (34 tomes)")
+        result = triage_pending_rows(
+            [PENDING], [{**MANGA, "exact_aliases": []}], [], set(),
+            lookup_limited=True,
+        )
+        self.assertEqual(result["review_categories"], {"INCOMPLETE_LOOKUP": 1})
+        self.assertTrue(result["lookup_limited"])
+        self.assertFalse(result["automatic_association"])
+
     def test_rejected_library_status_is_never_resolved(self):
         from apps.api.app.inventory_import import PendingResolvePreview
         db=DummyDb(rejected={"library_status":"NOT_INTERESTED"})
