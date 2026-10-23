@@ -1,84 +1,68 @@
-# Mangadvisor — rapprochement bibliographique prudent (v2)
+# Mangadvisor — identité bibliographique et rapprochements prudents
 
-## Périmètre de cette livraison
+## Source de vérité et limites
 
-Branche de travail `cleanup/pipelines-2026-10-21`, sans fusion dans `main`.
+- **Œuvre** : catalogue canonique `manga` construit à partir d'identifiants MAL/Tenrai. Une identité Scrinis n'est rapprochée qu'après confrontation de l'identifiant MAL explicite ou du titre exact avec les auteurs. Les œuvres concurrentes restent distinctes.
+- **Édition** : la catégorie (Deluxe, Perfect, intégrale, « Pastel » déclaré, etc.) est un **indice de publication**, jamais une identité prouvée sans source et sans validation. Une édition inconnue n'est jamais assimilée à l'édition classique.
+- **Tome** : un numéro lu explicitement dans une notice ou un champ `volume_label` reste un indice. Une année « 2024 » ou un titre dérivé ne devient pas un numéro de tome.
+- **ISBN** : identifiant d'un livre (validation ISBN-10/13 et checksum). Un ISBN commun à deux sources corrobore la référence, pas l'édition exacte ni la possession.
+- **Mangathèque** : `user_manga_*` et `manga_fr_edition` ne sont jamais alimentés par un simple rapprochement de titres ou de références.
 
-L'amélioration concerne le **choix d'une oeuvre Scrinis** lorsque plusieurs fiches
-portent des titres comparables. La preuve bibliographique BnF reste une
-**zone de candidats**, distincte de la mangathèque et des éditions vérifiées.
+La préparation documentaire est isolée dans `bib_stage_batch`,
+`bib_stage_candidate`, `bib_stage_edition` et `bib_stage_volume`.
+Les livres BnF peuvent également être conservés dans `bnf_bulk_notice`,
+et les propositions de recherche par titre dans `manga_bnf_candidate`.
+Aucune de ces tables ne vaut association canonique à une édition possédée.
 
-## Règle de décision — trois candidats maximum
+## Règles de vérification multi-sources
 
-Le classement Scrinis existant compare identifiant MAL, titre exact et
-similarité textuelle. Auparavant, un classement `AMBIGUOUS` bloquait
-immédiatement, sans consulter les détails des fiches concurrentes.
+1. **Identité de l'œuvre** : rejeter les identifiants MAL contradictoires, les œuvres dérivées identifiables et les candidats concurrents non départagés. En cas de titre exact sans identifiant, exiger la concordance des auteurs pour le lien œuvre Scrinis.
+2. **Langue et support** : ne rapprocher que les références explicitement `fr` et `print`; les ebooks et livres japonais ne corroborent pas une édition française papier.
+3. **ISBN** : filtrer les identifiants invalides, croiser uniquement les ISBN publiés avec des références d'œuvre Scrinis vérifiée; l'absence n'est jamais une preuve qu'un livre n'existe pas.
+4. **Famille d'édition** : quand les deux notices disent explicitement Deluxe / Pastel / Perfect / intégrale etc., marquer `ISBN_EDITION_CONFLICT_REVIEW` si les familles divergent.
+5. **Tome** : si les numéros explicites se contredisent, marquer `ISBN_VOLUME_CONFLICT_REVIEW`. Si le même ISBN est donné pour plusieurs familles ou tomes distincts côté fournisseur, marquer `ISBN_SUPPLIER_REFERENCE_CONFLICT_REVIEW`.
+6. **Données incomplètes** : conserver `EDITION_AND_TOME_UNVERIFIED` ou une preuve partielle lorsque l'un des champs manque. Même `FAMILY_AND_TOME_CONSISTENT_UNVERIFIED` n'autorise pas l'enregistrement automatique.
+7. **Staging** : signaler les ISBN cités pour plusieurs œuvres d'entrée, familles d'édition ou numéros de tomes distincts dans `isbn_staging_conflicts`, sans supprimer ni fusionner les propositions concurrentes.
 
-Désormais, lorsque **la totalité des concurrents** tient dans une borne de
-trois fiches :
-1. Écarter un candidat dont l'identifiant MAL déclaré contredit notre MAL.
-2. Télécharger le détail de chaque candidat encore admissible sous la
-   limitation de débit du fournisseur.
-3. Vérifier la cohérence du type d'oeuvre (manga/manhwa/roman/artbook).
-4. Comparer les auteurs connus et les auteurs fournisseur, après normalisation
-   du nom.
-5. Exiger au moins un ISBN déclaré français imprimé par Scrinis.
-6. Accepter le rapprochement de **l'oeuvre** uniquement si un seul candidat
-   satisfait tous ces critères et qu'aucune vérification concurrente est
-   indisponible ou incomplète.
+Le retour API/rapport conserve `registration_ready = false`, et le pipeline
+annonce `confirmed_editions_written=0` et `user_inventory_written=0`.
 
-Deux auteurs concordants, plus de trois candidats plausibles, réponse
-inaccessible, conflit d'identifiant, auteurs non vérifiables ou absence
-d'ISBN FR papier : **aucune association automatique par cette voie**.
+## Sources et provenance
 
-L'ISBN n'est **jamais ajouté comme volume possédé** ni associé à une édition
-canonique du seul fait du rapprochement de l'oeuvre.
+La BnF diffuse les livres en lots mensuels ISO 2709 / UNIMARC, notamment en
+UTF-8 : https://api.bnf.fr/fr/produits_bibliographiques_mensuels .
+Ces lots contiennent de **nouvelles notices**, pas un catalogue historique
+complet. La BnF n'a pas publié de produit en avril ni en mai 2026 et
+signale une phase de stabilisation ultérieure. Ne jamais traiter ces mois
+manquants comme des mois à zéro nouvelle parution.
 
-## Séries longues
+Les métadonnées BnF sont en Licence Ouverte; conserver notamment
+`801$b` (organisme catalogueur) et `801$c` (date) pour l'attribution
+UNIMARC, ainsi que l'identifiant FRBNF et l'empreinte de fichier.
+Référence : https://www.bnf.fr/fr/conditions-de-reutilisations-des-donnees-de-la-bnf .
 
-L'enveloppe des réponses de détail Scrinis est désormais limitée à 2,5 Mo
-(contre 600 Ko auparavant). La limite des réponses de recherche demeure
-600 Ko. Cette modification n'implique PAS que le cas One Piece soit résolu :
-un nouveau résultat API réel est requis, et toute réponse dépassant 2,5 Mo
-demeure rejetée. Aucune pagination fictive n'est ajoutée.
+Scrinis donne accès à la recherche, aux séries et à la recherche par ISBN,
+avec un débit anonyme déclaré de **15 requêtes/minute** :
+https://scrin.is/fr/api . Respecter les plafonds et marquer les listes de
+références tronquées; l'absence d'un tome dans une réponse bornée ne prouve
+rien. Wikidata peut fournir des titres et des alias liés aux identifiants
+vérifiés; un alias à lui seul ne valide pas une édition. MangaUpdates peut
+aider la recherche mais ne prouve pas une possession.
 
-L'adaptateur Scrinis sait examiner au plus 250 entrées volume par réponse,
-avec indicateurs de troncature. **Ne pas considérer cette limite comme une
-couverture bibliographique exhaustive.**
+## Vérification sans installer ou réinstaller Windows
 
-## Tests et recette
+Le code, les rapports synthétiques et les contrôles de CI peuvent évoluer
+sans Docker Desktop utilisateur. Les tests offline ciblent les variantes
+Dragon Ball (noms d'éditions distincts), les tomes contradictoires,
+les ISBN répétés et les sources numériques ou étrangères.
 
-- `tests/test_scrinis_competing_works.py` : choix unique sur auteur,
-  égalité des auteurs, information concurrente indisponible, plus de trois
-  concurrents, conflit MAL explicite.
-- `tests/test_scrinis_response_limits.py` : réponse longue acceptable en
-  détail, plafond toujours en vigueur, recherche toujours limitée.
-- Mise à jour des régressions BnF et capacité Scrinis.
-- CI GitHub Actions « Vérifications Python » : réussite, **441 tests**
-  lors du commit `5b0a3ee52a4a029e1da0be7c1027dc0c9bdeeae1`.
-- CI « Centre de pilotage Windows » et « installation stable mono-interface » :
-  réussites sur ce commit.
-- CI navigateur intégrée : échec hors périmètre bibliographique dans le
-  parcours conseiller IA. Le sélecteur de mode dupliqué a été précisé dans
-  le test, puis la vérification suivante a signalé `#mood-length` masqué
-  après activation du mode mood. Cette anomalie UI reste ouverte, et ne
-  permet pas de déclarer la recette navigateur intégralement verte.
+Pour valider les **véritables notices du fournisseur et les données de la
+mangathèque**, la sandbox `mangadvisor_realtest` puis la machine Windows
+restent nécessaires. Voir [recette de bout en bout](../04_product/bibliographic_validation_integrated.md).
+Les étapes non certifiées restent suivies dans
+[l'issue #71](https://github.com/xavrousseau/mangadvisor/issues/71).
 
-## À valider avec le jeu de données sandbox
+## Frontière V1 / V2
 
-Exécuter sur le sandbox les tests et un **nouveau** lot Scrinis éligible.
-Les états `AMBIGUOUS` existants ne sont pas reclassifiés sans nouvelle
-collecte. Les contrôles de temporisation restent actifs ; aucune relance
-massive forcée n'est introduite.
-
-Vérifier en priorité : Chainsaw Man, Solo Leveling et One Piece, puis un
-échantillon plus varié incluant des éditions multiples. Réaliser un audit
-manuel des rapprochements réellement produits avant de passer à 100 mangas.
-
-## Limites assumées
-
-La résolution des ambiguïtés est conservatrice et fondée sur les auteurs
-et ISBN FR papier ; elle ne constitue pas encore le graphe transversal
-complet `oeuvre -> langue -> édition -> tome -> ISBN`. Les recherches BnF
-exactes par ISBN et la validation fine des éditions sont les évolutions
-suivantes. Les données de la collection utilisateur restent isolées.
+Ces règles relèvent de la fiabilité **fonctionnelle V1**, pas du design.
+La V2 sera exclusivement consacrée à l'expérience utilisateur.

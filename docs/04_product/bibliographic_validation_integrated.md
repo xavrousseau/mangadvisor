@@ -61,6 +61,25 @@ Le rapport de la sonde contient, pour chaque œuvre, `scrinis_probe.status`, le 
 | `DETAIL_UNAVAILABLE` | Détail inaccessible ou incomplet | Revoir, sans écriture |
 | `ISBN_IN_BOTH_SOURCES` | Deux fournisseurs mentionnent cet ISBN après vérification de l'œuvre Scrinis | Corroboré seulement |
 
+### Contrôle des contradictions d'édition et de tome (octobre 2026)
+
+Une concordance d'ISBN peut désormais être contredite par la fiche détaillée
+Scrinis elle-même. Lorsqu'une référence imprimée française mentionne une
+**famille d'édition différente** (p. ex. Deluxe contre Pastel) ou un
+**numéro de tome différent** de la notice BnF, la corrélation est marquée
+`ISBN_EDITION_CONFLICT_REVIEW` ou `ISBN_VOLUME_CONFLICT_REVIEW`.
+Un ISBN présenté par Scrinis dans plusieurs éditions ou tomes divergents
+est `ISBN_SUPPLIER_REFERENCE_CONFLICT_REVIEW`.
+
+Le champ `edition_volume_evidence` précise le niveau de cohérence; même
+`FAMILY_AND_TOME_CONSISTENT_UNVERIFIED` reste une simple preuve de
+référence, **sans valider la possession ni écrire un tome canonique**.
+La préparation des rapports V2 signale également les collisions entre
+différentes œuvres candidates, familles et tomes sous
+`isbn_conflict_count` et `isbn_conflicts_sample` (max. 20 détails).
+Ces contrôles utilisent des métadonnées de publication et ne modifient
+pas les tables personnelles.
+
 Le libellé `confirmed_editions_written=0` et `user_inventory_written=0` reste le comportement voulu de ce pilote. La création de tables œuvre / édition / tome / ISBN certifiées nécessitera un workflow de validation et des preuves complémentaires, distinct de la présente recette.
 
 ## Validation attendue avant fusion
