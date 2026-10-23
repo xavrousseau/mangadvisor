@@ -22,7 +22,7 @@ class ReverseLinkTests(unittest.TestCase):
         data={"results":{"bindings":[
             {"item":{"value":"https://www.wikidata.org/entity/Q1234"},
              "malId":{"value":"145863"}},
-            {"item":{"value":"https://www.wikidata.org/entity/Q1234"},
+            {"item":{"value":"http://www.wikidata.org/entity/Q1234"},
              "malId":{"value":"145863"}},
             {"item":{"value":"https://www.wikidata.org/entity/Q2"},
              "malId":{"value":"invalid"}},
