@@ -1,175 +1,38 @@
-# Mangadvisor
+# Mangadvisor — reconstruction propre
 
-**Découvrir, recommander et organiser ses mangas — avec des références sourcées.**
+**Statut : chantier de reconstruction, pas encore une application exécutable.**
 
-Mangadvisor est une application **locale** pour gérer une mangathèque physique et une
-bibliothèque de lecture, rechercher des mangas et recevoir des recommandations
-personnalisées. L'interface est un **site Web** servi localement ; Docker
-orchestré par `mangadvisor.cmd` héberge les services. Aucune installation
-de Python ou de PostgreSQL n'est nécessaire sur Windows.
+## Ce que nous construisons
+Mangadvisor est une application locale Windows/Docker permettant de découvrir des mangas, consulter des fiches **en français lorsque la source est attestée**, retrouver les éditions françaises et leurs volumes/ISBN, gérer une collection physique, obtenir des recommandations expliquées et utiliser un conseiller de lecture.
 
-> **Données :** le catalogue des œuvres, les notices bibliographiques
-> candidates et les livres que tu déclares posséder sont **trois choses
-> différentes**. Un ISBN croisé entre BnF et Scrinis ne prouve ni une édition
-> exacte ni la possession d'un tome. Les rapprochements ambigus restent
-> soumis à validation.
+**La V1 livrera le fonctionnement complet. La V2 sera consacrée uniquement à l'UX.**
 
-## Démarrer sous Windows
+## Notre stratégie
+1. Construire un catalogue général propre, sans utiliser la mangathèque personnelle comme référentiel.
+2. Importer les sources en conservant les documents bruts, leurs IDs et leurs dates.
+3. Identifier les œuvres via des identifiants externes *scopés au fournisseur* et des preuves bibliographiques, jamais par un titre seul.
+4. Séparer œuvre, édition, tome/publication, exemplaire possédé.
+5. Construire ensuite l'application Web, l'import privé et les recommandations.
 
-Prérequis : **Windows 10/11**, Docker Desktop démarré, accès Internet lors
-de la première collecte. Git pour Windows est requis pour les mises à jour
-automatiques d'un dépôt cloné.
+**Source « sûre » ne veut pas dire source unique** : MAL/Jikan porte des fiches internationales ; Wikidata sert aux liens explicites (P4087) et aux libellés multilingues ; BnF et éditeurs sont le point de départ bibliographique des livres français. Aucune source seule n'identifie toutes les œuvres et tous les tirages.
 
-Double-cliquer sur **`mangadvisor.cmd`** à la racine du dépôt.
+## Dossiers de départ
+- `db/schema.sql` : modèle relationnel V1 à faire valider par PostgreSQL isolé.
+- `docs/architecture.md` : composants, règles de rapprochement, protection des données.
+- `docs/roadmap.md` : huit étapes, chacune avec un résultat observable.
+- `docs/retour-experience.md` : erreurs à ne pas répéter d'après les précédents échanges.
+- `docs/sources-et-licences.md` : API et conditions de réutilisation.
+- `fixtures/cas_reference.json` : cas difficiles qui doivent guider nos contrôles.
 
-| Menu | Fonction |
-| --- | --- |
-| **1** | Première installation guidée, création des tables et catalogue |
-| **2** | Démarrer l'application et ouvrir le site |
-| **3** | Sauvegarder, récupérer la version stable `main`, reconstruire, vérifier |
-| **4** | Sauvegarder PostgreSQL avec restauration de vérification |
-| **5** | Diagnostiquer la base, les services et l'application |
-| **6** | Arrêter sans supprimer les volumes Docker |
-| **7** | Synchroniser uniquement le code depuis `main` |
-| **A** | Espace de gestion : catalogue, bibliothèque, options facultatives, entretien |
-| **0** | Quitter le menu |
+## Règles de projet
+- Une branche de travail pour la reconstruction ; pas de branche ni PR par petite tâche.
+- Menu `mangadvisor.cmd` avec 6–7 opérations maximum, **ajouté seulement quand les opérations fonctionnent**.
+- Un seul `compose.yaml`, un schéma SQL, une API, une UI Web, un pipeline de données.
+- Tests limités aux flux critiques : base/identité, éditions/ISBN, import personnel, application de bout en bout.
+- Aucun `down -v`, suppression de volume, reset ou modification des données personnelles pendant la reconstruction.
+- Les autres outils sont des fonctions internes du pipeline et non de nouveaux boutons.
 
-Le menu avancé ne présente plus 26 opérations internes. Les
-anciens traitements et outils d'audit restent accessibles en
-commandes expertes `mangadvisor.cmd <commande>`
-(voir `mangadvisor.cmd help`) sans polluer le parcours habituel.
-La stratégie de **reconstruction du catalogue V2**, indépendant de la base
-actuelle et sans fusion par similarité de titres, est décrite dans
-[Décision d'architecture catalogue V2](docs/03_technical/catalogue_v2_reconstruction_decision.md).
+## Sauvegarde de l'ancien projet
+Le `main` de l'ancien projet est préservé sur `archive/mangadvisor-pre-reconstruction-20261023`. **Cette archive Git ne contient pas** les volumes Docker, `.env`, `backups/`, `private-data/` ni les fichiers Jikan locaux. Ils doivent rester conservés séparément et ne pas être écrasés.
 
-Adresse par défaut : **http://localhost:8501**. Les ports réels sont définis
-dans le fichier privé `.env`. La commande **2** réutilise la base et les
-images existantes, sans retélécharger le catalogue.
-
-Pour la **première mangathèque physique**, placer un CSV conforme dans
-`private-data/mangatheque.csv` et suivre la simulation d'import. Les
-quantités et éditions sont conservées telles que déclarées ; aucune
-association incertaine n'est imposée.
-
-- [Importer la mangathèque physique](docs/04_product/safe_inventory_import_3_8.md)
-- [Rapprocher une ligne en attente](docs/04_product/manual_pending_inventory_reconciliation_4_3.md)
-- [Sauvegarder et restaurer](docs/04_product/library_backup_recovery_3_2.md)
-
-## Fonctions disponibles
-
-| Fonction | Description |
-| --- | --- |
-| **Découverte** | Fiches, couvertures, recherche multilingue, genres, filtres |
-| **Ma bibliothèque** | Statuts de lecture, favoris, notes, import CSV/XLSX |
-| **Mangathèque physique** | Quantités par édition déclarée, doublons, lignes en attente |
-| **Recommandations** | Par ambiance, par profil, par collection et par œuvre |
-| **Conseiller** | Échanges guidés, résultats sourcés par le catalogue |
-| **Scan ISBN** | Recherche et enrichissement à partir du code-barres, selon les permissions navigateur |
-| **Sources françaises** | Wikidata, BnF et Scrinis, avec provenance et ambiguïtés |
-| **Options facultatives** | Conseiller IA local Ollama, scanner mobile HTTPS, veille automatique |
-
-Le conseiller et les recommandations ne doivent pas inventer des éditions,
-des ISBN, des notes, des livres possédés ni des lectures. Le modèle IA local,
-lorsqu'il est activé, reste subordonné aux résultats contrôlés de l'application.
-
-### Catalogue, sources et édition française
-
-- **Tenrai / identifiants MAL** : collecte et reprise du catalogue international
-  dans PostgreSQL. [Guide du catalogue](docs/04_product/catalogue_mal_complet.md).
-- **Meilisearch** : recherche tolérante aux fautes sur des métadonnées
-  **publiques** et retour à PostgreSQL si nécessaire. Les possessions,
-  notes et préférences personnelles ne sont pas indexées.
-- **Wikidata** : libellés et alias complémentaires, avec identifiant MAL
-  vérifié quand disponible.
-- **BnF** : notices de livres et ISBN **candidats**, import UNIMARC/ISO 2709
-  contrôlé et traçable. [Guide BnF](docs/04_product/bnf_bulk_import_4_8.md).
-- **Scrinis** : enrichissement de titres et références françaises imprimées
-  après vérification de l'identité de l'œuvre. [Guide Scrinis](docs/04_product/enrichissement_fr_direct_scrinis.md).
-
-Pour investiguer des sources, le menu **A → 17** dispose d'un comparatif
-documenté, et **A → 23** d'un pilote bibliographique.
-Le menu **A → 24** lance une **recette isolée** BnF/Scrinis sur la
-sandbox `mangadvisor_realtest`, si celle-ci a été initialisée.
-Cette recette ne modifie pas la collection personnelle.
-[Recette BnF/Scrinis](docs/04_product/bibliographic_validation_integrated.md).
-
-**Limite actuelle :** le modèle complet *œuvre → édition → tome → ISBN*
-avec association automatique sûre et exhaustive n'est pas encore validé.
-Les rapprochements non prouvés restent des propositions. Le suivi est
-dans [l'issue bibliographique #71](https://github.com/xavrousseau/mangadvisor/issues/71).
-Les éditions classiques, Deluxe, Pastel, collectors et intégrales ne
-doivent jamais être mélangées par défaut.
-
-## Sécurité des données et mises à jour
-
-- PostgreSQL est la source de vérité. Docker conserve ses **volumes persistants**.
-  Ne jamais effacer ces volumes pour corriger un problème de code.
-- `.env`, `private-data/`, `backups/` et les fichiers bruts privés
-  sont exclus de Git. **Ne jamais envoyer de sauvegardes ou secrets sur GitHub.**
-- L'option **3** vérifie une sauvegarde PostgreSQL avant la mise à jour ;
-  l'option **7** met seulement le code à jour. La synchronisation refuse
-  les historiques divergents et les branches autres que `main`.
-- La restauration d'une sauvegarde n'est **jamais automatique** :
-  elle exige une confirmation explicite sous **A → S → 5**.
-- Conserver une copie du dossier `backups/` sur un autre support physique.
-
-Il est préférable d'utiliser le **clone Git** du dépôt plutôt qu'un ZIP
-pour bénéficier des mises à jour sécurisées.
-
-## Architecture et maintenance
-
-```text
-mangadvisor.cmd                 Menu utilisateur Windows
-cmd/control-center.ps1          Orchestration et maintenance
-apps/web/                      Site Web (HTML / CSS / JavaScript)
-apps/api/                      API FastAPI et logique applicative
-pipelines/engine/              Acquisition et enrichissement
-sql/schema/                    Modèle SQL et migrations additives
-infra/compose/                 Docker Compose (stable et sandbox)
-infra/docker/                  Images des services
-tests/                         Python, JavaScript et tests navigateur
-.github/workflows/             Contrôles CI GitHub Actions
-docs/                          Documentation ciblée par usage
-```
-
-L'ancien prototype Streamlit a été retiré de la configuration maintenue.
-Les scripts historiquement nommés « Jikan » conservent leurs noms quand
-cela évite de casser les pipelines ; le fournisseur utilisé est Tenrai.
-
-Tests du code (dans un environnement ayant installé les dépendances) :
-
-```text
-python -m compileall -q apps/api pipelines/engine tests tools
-python -m unittest discover -s tests -p "test_*.py" -v
-node --test tests/web/*.test.mjs
-```
-
-La CI vérifie aussi l'interface sous Playwright, Docker, PostgreSQL,
-les parcours API et Windows. **CI verte ≠ recette réelle de ta base privée** :
-la dernière doit être vérifiée séparément lorsque le comportement dépend
-de données locales ou des réponses actuelles des fournisseurs.
-
-- [Architecture technique](docs/03_technical/project_structure.md)
-- [Contrôles bibliographiques](docs/04_product/bibliographic_validation_integrated.md)
-- [État de GitHub et tâches ouvertes](https://github.com/xavrousseau/mangadvisor/issues/71)
-
-## Travailler sur le code avec Codex
-
-Les consignes techniques destinées aux agents de développement se trouvent dans [AGENTS.md](AGENTS.md). Codex peut les lire lorsqu'il travaille dans ce dépôt. Ce fichier **n'autorise pas à lui seul l'accès GitHub**.
-
-1. Dans [Codex](https://chatgpt.com/codex), connecte ton compte GitHub et autorise l'accès au dépôt `xavrousseau/mangadvisor`.
-2. Crée et publie un environnement Codex Cloud associé à ce dépôt, ou ouvre le clone dans Codex local sur Windows (de préférence le dossier de test `mangadvisor-test`).
-3. Commence par demander : « Lis AGENTS.md et le README, audite le dépôt et propose la correction la plus prioritaire. Travaille sur une branche, exécute les tests applicables et prépare une pull request sans fusionner dans main. »
-
-**Important :** un environnement Codex Cloud n'a pas automatiquement accès à Docker Desktop, aux volumes ni aux fichiers privés de ton PC Windows. Les opérations sur la mangathèque réelle restent soumises à une validation locale et à une sauvegarde vérifiée. Les secrets et données personnelles ne doivent pas être copiés dans un environnement cloud.
-
-Pour la connexion et la préparation d'environnement, voir [la documentation officielle Codex Cloud](https://help.openai.com/fr-fr/articles/20001545-using-codex-cloud).
-
-## Méthode de contribution
-
-`main` est la branche stable. Une évolution cohérente est développée
-sur une branche courte, testée, documentée et intégrée dans **une PR**,
-de préférence par *squash* pour conserver un historique lisible.
-Les données personnelles et rapports de test générés ne sont pas
-versionnés. Ne jamais fusionner une ancienne branche divergente sans
-auditer les fonctionnalités uniques qu'elle contient.
+Consulter `docs/roadmap.md` avant de commencer le moindre téléchargement.

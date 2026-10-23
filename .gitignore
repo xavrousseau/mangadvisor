@@ -1,48 +1,23 @@
-# Environnement local
+# Project and user secrets
 .env
-.env.sandbox
-venv/
-.venv/
-
-# Python cache
+.env.*
+!.env.example
+private-data/
+backups/
+data/raw/
+data/cache/
+data/logs/
+*.log
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Données générées / temporaires
-data/raw/*
-data/staging/*
-data/curated/*
-data/features/*
-data/logs/*
-
-# Jupyter
-.ipynb_checkpoints/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-Thumbs.db
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+dist/
+build/
+*.dump
+*.sql.gz
+*.sqlite3
 .DS_Store
-
-# Old historical directories can remain untracked after git pull.
-# Ignore them to prevent accidental recommit or upload of old secrets.
-_archive/
-legacy/
-
-# Credentials and local CA exported for mobile HTTPS setup
-.env.mobile
-mobile-local/
-
-# Archives de mangatheque privees : ne jamais les envoyer sur GitHub.
-backups/
-
-# Personal manga lists and local evaluation results (never push to public GitHub)
-private-data/
-
-# Private (real) manga reference exports and local evaluation reports.
-private-evaluations/
-mangatheque_reference_*.csv
-mangatheque_extraite_*.xlsx
+Thumbs.db

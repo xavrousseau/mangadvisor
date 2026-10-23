@@ -1,4 +1,0 @@
-fastapi
-uvicorn[standard]
-psycopg[binary]
-openpyxl>=3.1,<4

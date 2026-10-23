@@ -1,0 +1,44 @@
+{
+  "purpose": "Non-regression identity and edition examples; expected relationships need verifiable source evidence.",
+  "cases": [
+    {
+      "id": "adiou_eri",
+      "input": "Adieu Eri",
+      "known_catalogue_label": "Sayonara Eri",
+      "mal_manga_id": 145863,
+      "expected": "Candidate work by sourced French/JP cross-title, not token fuzzy result",
+      "never": "Blue Period by substring"
+    },
+    {
+      "id": "radiant",
+      "input": "Radiant",
+      "expected": "French comic/work can exist without MAL ID; not Ikujitsu",
+      "never": "Treat title_synonyms from an unrelated anthology as same work"
+    },
+    {
+      "id": "fairy_tail",
+      "input": "Fairy Tail",
+      "expected": "Own canonical work, no title-only link to Bishoujo Hatsu Shibori"
+    },
+    {
+      "id": "dragon_ball_editions",
+      "input": "Dragon Ball éditions pastel et Deluxe",
+      "expected": "Same parent work, two distinct French editions; identify publications by edition+volume+ISBN"
+    },
+    {
+      "id": "tokyo_ghoul",
+      "input": "Tokyo Ghoul vs Tokyo Ghoul:re",
+      "expected": "Two distinct works related, their respective ISBNs not shared"
+    },
+    {
+      "id": "berserk_editions",
+      "input": "Berserk Prestige, Collector, volumes originaux, artbook, Berserk of Gluttony",
+      "expected": "Separate editions or distinct works; candidates unresolved without publication evidence"
+    },
+    {
+      "id": "csv_pending",
+      "input": "One ambiguous personal inventory row",
+      "expected": "Pending review with quantity conserved; no invented ISBN/edition"
+    }
+  ]
+}
