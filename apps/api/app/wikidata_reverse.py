@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import HTTPException
 
 ENDPOINT="https://query.wikidata.org/sparql"
-QID=re.compile(r"^https://www\.wikidata\.org/entity/(Q[1-9]\d{0,11})$")
+QID=re.compile(r"^https?://www\.wikidata\.org/entity/(Q[1-9]\d{0,11})$")
 MAL=re.compile(r"^[1-9]\d{0,8}$")
 MAX_BYTES=300_000
 MAX_RESULTS=25
