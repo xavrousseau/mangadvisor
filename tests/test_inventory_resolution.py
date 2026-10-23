@@ -416,6 +416,7 @@ class PendingResolutionTests(unittest.TestCase):
             "identity_confirmed":False
         }]}
         k={"status":"MAL_ANILIST_CROSS_ID_REVIEW","items":[{
+            "status":"MAL_ANILIST_CROSS_ID_REVIEW",
             "source_mal_id":42,"anilist_ids":[801],
             "kitsu_id":998,"identity_confirmed":False
         }]}
