@@ -24,7 +24,11 @@ def volume_from_title(title: str) -> int | None:
     for pattern in VOLUME_PATTERNS:
         match = pattern.search(title or "")
         if match:
-            return int(match.group(1))
+            number = int(match.group(1))
+            # Publication years frequently follow periods/colons in SRU titles.
+            # An apparent 1900-2099 must never become a proposed tome.
+            if not 1900 <= number <= 2099:
+                return number
     return None
 
 
