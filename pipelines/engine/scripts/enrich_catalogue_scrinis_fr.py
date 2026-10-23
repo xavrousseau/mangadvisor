@@ -287,6 +287,17 @@ def lookup_work(item: dict, client: Any) -> dict:
         # In-memory read-only evidence used by the explicit bibliography probe.
         # The existing SQL saver ignores these extra fields.
         "french_print_isbns": isbns,
+        # Evidence only, never persisted by save_one. Used by the read-only
+        # bibliography probe to expose tome/edition source contradictions.
+        "french_print_references": [
+            {"isbn13": book.get("isbn13"), "edition_label": book.get("edition_label"),
+             "volume_label": book.get("volume_label"), "lang": "fr", "medium": "print"}
+            for book in detail.get("book_references") or []
+            if isinstance(book, dict) and
+            str(book.get("lang") or "").lower() == "fr" and
+            str(book.get("medium") or "").lower() == "print" and
+            str(book.get("isbn13") or "") in isbns
+        ],
         "book_references_truncated": bool(detail.get("book_references_truncated")),
         "url": "https://scrin.is/api/v1/series/" + str(first["id"]),
         "manga_id": int(item["id"]),

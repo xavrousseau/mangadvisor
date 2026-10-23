@@ -29,6 +29,78 @@ class PipelineTests(unittest.TestCase):
             "ISBN_IN_BOTH_SOURCES": 1, "DIFFERENT_WORK": 1})
         self.assertNotIn("registration_ready", output)
 
+    def test_edition_and_volume_disagreement_override_isbn_overlap(self):
+        """Dragon Ball Deluxe and a distinct edition must not be merged."""
+        code = "9782344067802"
+        candidate = {"isbn13": code, "title_fr": "Dragon Ball Deluxe, tome 1",
+                     "work_status": "REVIEW_VOLUME_CANDIDATE",
+                     "language_status": "FRENCH_DECLARED",
+                     "volume_suggested": 1}
+        def compare(label, volume):
+            return pipeline.correlate_bnf_scrinis_isbns(
+                [candidate], {code}, supplier_coverage="BOUNDED_SUPPLIER_DETAIL",
+                supplier_references=[{"isbn13": code, "lang": "fr",
+                                      "medium": "print", "edition_label": label,
+                                      "volume_label": volume}])["isbn_correlations"][0]
+
+        self.assertEqual(compare("Pastel", "1")["evidence_status"],
+                         "ISBN_EDITION_CONFLICT_REVIEW")
+        self.assertEqual(compare("Deluxe", "2")["evidence_status"],
+                         "ISBN_VOLUME_CONFLICT_REVIEW")
+        matched = compare("Deluxe", "Tome 1")
+        self.assertEqual(matched["evidence_status"], "ISBN_IN_BOTH_SOURCES")
+        self.assertEqual(matched["edition_volume_evidence"],
+                         "FAMILY_AND_TOME_CONSISTENT_UNVERIFIED")
+        self.assertFalse(matched["edition_identity_verified"])
+        self.assertFalse(matched["isbn_ownership_verified"])
+
+    def test_duplicate_supplier_isbn_with_incompatible_editions_is_conflict(self):
+        code = "9782344067802"
+        result = pipeline.correlate_bnf_scrinis_isbns(
+            [{"isbn13": code, "title_fr": "Dragon Ball Deluxe, tome 1",
+              "work_status": "REVIEW_VOLUME_CANDIDATE",
+              "language_status": "FRENCH_DECLARED"}], {code},
+            supplier_coverage="INCOMPLETE_SUPPLIER_DETAIL",
+            supplier_references=[
+                {"isbn13": code, "lang": "fr", "medium": "print",
+                 "edition_label": "Deluxe", "volume_label": "1"},
+                {"isbn13": code, "lang": "fr", "medium": "print",
+                 "edition_label": "Pastel", "volume_label": "1"}])
+        self.assertEqual(result["correlation_counts"],
+                         {"ISBN_SUPPLIER_REFERENCE_CONFLICT_REVIEW": 1})
+        self.assertEqual(result["confirmed_editions_written"], 0)
+        self.assertEqual(result["ownership_mutations"], 0)
+
+    def test_supplier_ebook_and_foreign_references_cannot_conflict_with_print(self):
+        code = "9782344067802"
+        result = pipeline.correlate_bnf_scrinis_isbns(
+            [{"isbn13": code, "title_fr": "Dragon Ball Deluxe, tome 1",
+              "work_status": "REVIEW_VOLUME_CANDIDATE",
+              "language_status": "FRENCH_DECLARED"}], {code},
+            supplier_coverage="BOUNDED_SUPPLIER_DETAIL",
+            supplier_references=[
+                {"isbn13": code, "lang": "ja", "medium": "print",
+                 "edition_label": "Pastel", "volume_label": "9"},
+                {"isbn13": code, "lang": "fr", "medium": "ebook",
+                 "edition_label": "Pastel", "volume_label": "9"},
+                {"isbn13": code, "lang": "fr", "medium": "print",
+                 "edition_label": "Deluxe", "volume_label": "1"}])
+        self.assertEqual(result["correlation_counts"], {"ISBN_IN_BOTH_SOURCES": 1})
+
+    def test_blank_edition_never_implies_classic_or_tome(self):
+        code = "9782344067802"
+        result = pipeline.correlate_bnf_scrinis_isbns(
+            [{"isbn13": code, "title_fr": "Dragon Ball",
+              "work_status": "REVIEW_UNNUMBERED",
+              "language_status": "FRENCH_DECLARED"}], {code},
+            supplier_coverage="BOUNDED_SUPPLIER_DETAIL",
+            supplier_references=[{"isbn13": code, "lang": "fr", "medium": "print",
+                                  "edition_label": "", "volume_label": "2024"}])
+        row = result["isbn_correlations"][0]
+        self.assertEqual(row["edition_volume_evidence"],
+                         "EDITION_AND_TOME_UNVERIFIED")
+        self.assertFalse(row["edition_identity_verified"])
+
     def test_unverified_scrinis_work_never_cross_matches(self):
         client = Mock()
         output = pipeline.scrinis_isbn_evidence(None, [], client)
