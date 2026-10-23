@@ -32,6 +32,25 @@ set /p "CHOICE=Ton choix : "
 if /I "%CHOICE%"=="0" exit /b 0
 if /I "%CHOICE%"=="Q" exit /b 0
 if /I "%CHOICE%"=="A" goto :advanced
+
+set "KEY="
+if "%CHOICE%"=="1" set "KEY=install"
+if "%CHOICE%"=="2" set "KEY=start"
+if "%CHOICE%"=="3" set "KEY=update"
+if "%CHOICE%"=="4" set "KEY=backup"
+if "%CHOICE%"=="5" set "KEY=diagnostic"
+if "%CHOICE%"=="6" set "KEY=stop"
+if "%CHOICE%"=="7" set "KEY=github-sync"
+if not defined KEY (
+    echo Choix inconnu. Utilise 0, 1 a 7 ou A.
+    pause
+    goto menu
+)
+call :dispatch "%KEY%"
+call :result
+goto menu
+
+:advanced
 cls
 echo ==========================================================
 echo                ESPACE DE GESTION
@@ -53,7 +72,6 @@ if /I "%CHOICE%"=="S" goto :maintenance
 echo Choix inconnu.
 pause
 goto advanced
-
 :catalogue_menu
 cls
 echo ==========================================================
@@ -140,44 +158,6 @@ if not defined KEY (
 call :dispatch "%KEY%"
 call :result
 goto optional_menu
-
-:maintenance
-
-set "KEY="
-if "%CHOICE%"=="1" set "KEY=catalogue"
-if "%CHOICE%"=="2" set "KEY=recommendations"
-if "%CHOICE%"=="3" set "KEY=import"
-if "%CHOICE%"=="4" set "KEY=benchmark"
-if "%CHOICE%"=="5" set "KEY=mobile"
-if "%CHOICE%"=="6" set "KEY=mobile-stop"
-if "%CHOICE%"=="7" set "KEY=ai"
-if "%CHOICE%"=="8" set "KEY=ai-stop"
-if "%CHOICE%"=="9" set "KEY=logs"
-if "%CHOICE%"=="10" set "KEY=bnf-enrich"
-if "%CHOICE%"=="11" set "KEY=wikidata-enrich"
-if "%CHOICE%"=="12" set "KEY=library-enrich"
-if "%CHOICE%"=="13" set "KEY=multilingual-aliases"
-if "%CHOICE%"=="14" set "KEY=catalogue-extended"
-if "%CHOICE%"=="15" set "KEY=bnf-bulk"
-if "%CHOICE%"=="16" set "KEY=sources-benchmark-v2"
-if "%CHOICE%"=="17" set "KEY=sources-benchmark-v2"
-if "%CHOICE%"=="18" set "KEY=bibliographic-staging"
-if "%CHOICE%"=="19" set "KEY=complete-mal-catalogue"
-if "%CHOICE%"=="20" set "KEY=catalogue-french-scrinis"
-if "%CHOICE%"=="21" set "KEY=catalogue-lifecycle"
-if "%CHOICE%"=="22" set "KEY=search-index"
-if "%CHOICE%"=="23" set "KEY=bibliography-pilot"
-if "%CHOICE%"=="24" set "KEY=bibliography-acceptance"
-if "%CHOICE%"=="25" set "KEY=catalogue-export"
-if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"
-if not defined KEY (
-    echo Choix inconnu.
-    pause
-    goto advanced
-)
-call :dispatch "%KEY%"
-call :result
-goto advanced
 
 :maintenance
 cls
