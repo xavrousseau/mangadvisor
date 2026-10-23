@@ -64,6 +64,32 @@ Aucune action ne déduit d'ISBN, de numéro de tome exact, de lecture ou
 de note. Les tables `manga_fr_edition`, `user_manga_volume` et
 `user_manga_library` ne sont pas modifiées par ce rapprochement.
 
+
+## Diagnostic global des lignes encore en attente (V1)
+
+L'API locale expose `GET /inventory/pending/triage` (sur le port API 8000,
+ou depuis `http://localhost:8000/docs`). Ce diagnostic **ne contacte aucun
+fournisseur externe, ne modifie aucune table et ne confirme aucune œuvre**.
+Il recherche en une opération les titres exactement égaux aux titres du
+catalogue ou à leurs alias connus, ainsi que les anciens identifiants proposés
+lors de l'import. Les 48 lignes en attente peuvent ainsi être examinées dans
+un ordre pratique sans relancer Jikan ni réimporter le CSV.
+
+Les catégories `SINGLE_EXACT_SUGGESTION`,
+`CONFLICTING_SUGGESTIONS`, `AMBIGUOUS_EXACT`,
+`SAVED_SUGGESTIONS_ONLY`, `SEARCH_REQUIRED` et
+`INCOMPLETE_LOOKUP` **sont des priorités de revue**, jamais un résultat
+de rapprochement certifié. Chaque candidat indique si une édition est
+déjà déclarée ou si l'œuvre est marquée `NOT_INTERESTED` ; les deux
+situations nécessitent une vérification humaine. Un même titre peut
+désigner deux œuvres différentes.
+
+La réponse limite à 1 000 les lignes et les œuvres candidates inspectées
+par appel (maximum 12 suggestions affichées par ligne). Si la limite est
+atteinte, `lookup_limited=true` empêche de qualifier une correspondance
+comme unique. Les nombres physiques originaux sont affichés, jamais
+attribués à des tomes ou ISBN. Aucune modification du schéma SQL n'est requise.
+
 ## Validation
 
 Les comportements de création d'une édition distincte et d'archivage
