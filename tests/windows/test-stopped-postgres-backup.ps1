@@ -99,7 +99,7 @@ function docker {
   if ($argv[0] -eq "exec" -and $argv[2] -eq "psql") { "manga"; return }
   if ($argv[0] -eq "exec" -and $argv[1] -eq "-i" -and
       $argv[2] -eq "mangadvisor_postgres" -and $argv[3] -eq "sh") {
-    if ([string]$argv[5] -cne 'PGPASSWORD=$POSTGRES_PASSWORD exec psql -h 127.0.0.1 -X -At -U $POSTGRES_USER -d $POSTGRES_DB') {
+    if ([string]$argv[5] -cne 'PGPASSWORD=$POSTGRES_PASSWORD exec psql -h postgres -X -At -U $POSTGRES_USER -d $POSTGRES_DB') {
       throw "Unsafe or incorrectly quoted TCP authentication probe."
     }
     if ($script:loginFixed) { "1" } else { $global:LASTEXITCODE=1 }
