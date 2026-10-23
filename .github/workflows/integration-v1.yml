@@ -905,6 +905,63 @@ jobs:
           print("Recherche FR / inventaire / ID canonique / aucun rapprochement automatique : OK")
           PY
 
+      - name: Valider PostgreSQL word boundaries et comparer le moteur de rapprochement
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json,urllib.parse,urllib.request
+          from apps.api.app.main import get_connection
+          from apps.api.app.matching_quality import search_patterns
+          expression=search_patterns(["eri"])
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      SELECT title FROM (VALUES ('Sayonara Eri'),
+                        ('Blue Period'),('Bakemonogatari'),
+                        ('Isekaigaeri no Yuusha')) AS names(title)
+                      WHERE title ~* ANY(%s)
+                      ORDER BY title
+                  """,(expression,))
+                  found=[r["title"] for r in cur.fetchall()]
+          assert found==["Sayonara Eri"],(expression,found)
+          # API integration must remain read-only and return a ranked trace.
+          base="http://127.0.0.1:8000"
+          key="ci:matching-quality:adieu-eri"
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      INSERT INTO user_manga_inventory_pending
+                      (user_id,source_key,entry_title,source_reference,
+                       work_declared,edition_declared,format_hint,main_volumes,
+                       duplicate_copies,other_editions_unknown,review_status,
+                       candidate_ids,content_sha256)
+                      VALUES (1,%s,'Adieu Eri',%s,NULL,NULL,NULL,1,
+                              0,0,'REVIEW_MISSING',ARRAY[]::integer[],%s)
+                  """,(key,key,"8"*64))
+              conn.commit()
+          try:
+              url=base+"/inventory/pending/discover?"+urllib.parse.urlencode(
+                  {"source_key":key})
+              with urllib.request.urlopen(url,timeout=60) as response:
+                  result=json.load(response)
+              assert result["ranking_is_calibrated_probability"] is False,result
+              assert result["catalog_evidence"]=="WHOLE_WORD_RANKED_NOT_IDENTITY",result
+              assert result["automatic_association"] is False,result
+              assert result["writes_performed"] is False,result
+              assert result["isbn_ownership_verified"] is False,result
+          finally:
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      cur.execute("""
+                          DELETE FROM user_manga_inventory_pending
+                          WHERE user_id=1 AND source_key=%s
+                      """,(key,))
+                  conn.commit()
+          print("PG regex whole-word, ranking API, zero auto match: OK")
+          PY
+
       - name: Sauvegarder et valider une restauration complete de la mangatheque
         shell: bash
         run: |
