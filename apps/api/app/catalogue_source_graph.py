@@ -260,7 +260,7 @@ def register_non_mal_work(conn: Any, title: str, *,
              (legacy_manga_id,origin_source,origin_id,canonical_title)
            VALUES(NULL,%s,%s,%s)
            ON CONFLICT(origin_source,origin_id) DO UPDATE
-           SET canonical_title=EXCLUDED.canonical_title
+           SET canonical_title=catalogue_work.canonical_title
            RETURNING id
         """,(source,external_id,title.strip()))
         return int(cur.fetchone()["id"])
@@ -307,6 +307,7 @@ def stage_external_facts(conn: Any, mal_id: int, *,
               SET evidence_status='COLLISION_REVIEW'
               WHERE claim.work_id=%s AND claim.source_name=%s
                 AND claim.source_id=%s
+                AND claim.evidence_status NOT IN ('REJECTED','VERIFIED')
                 AND EXISTS (
                   SELECT 1 FROM catalogue_work other
                   WHERE other.id<>claim.work_id AND
