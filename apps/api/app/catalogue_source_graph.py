@@ -283,6 +283,10 @@ def rebuild_legacy_sources(conn: Any) -> None:
     """Idempotent, source-preserving rebuild. Caller chooses commit/rollback."""
     with conn.cursor() as cur:
         cur.execute(BASE_BACKFILL)
+        cur.execute(WIKIDATA_FR_BACKFILL)
+        cur.execute("SELECT to_regclass('public.manga_scrinis_fr_fact') AS present")
+        if cur.fetchone()["present"] is not None:
+            cur.execute(SCRINIS_FR_BACKFILL)
         cur.execute(IDENTITY_COLLISIONS_SQL)
 
 
