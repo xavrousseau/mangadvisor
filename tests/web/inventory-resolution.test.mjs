@@ -109,3 +109,20 @@ test("two separate physical editions remain available for deliberate association
  assert.match(html,/value="CREATE_DECLARATION"/);
  assert.match(html,/value="MARK_DUPLICATE"/);
 });
+
+test("suspect alias and edition mismatch warnings are visible before selecting a work",()=>{
+ const html=inventoryResolverMarkup({
+  ...base,items:[{...manga,id:99,title:"Unrelated manga",
+    matched_alias:"Dragon Ball",suggestion_kind:"EXACT_MULTILINGUAL_ALIAS",
+    reconciliation:{assessment:"CONFLICT_REVIEW",warnings:[
+      "ALIAS_UNVERIFIED_OR_UNTRACED",
+      "JAPANESE_WORK_COUNT_VS_FRENCH_HOLDINGS_DIFFER"
+    ]}}],
+  searched:true
+ },{escape,lang:"fr"});
+ assert.match(html,/Association à vérifier/);
+ assert.match(html,/Alias non corroboré/);
+ assert.match(html,/Quantité de tomes à contrôler/);
+ assert.match(html,/data-action="pending-match-select"/);
+ assert.doesNotMatch(html,/data-action="edition-confirm"/);
+});
