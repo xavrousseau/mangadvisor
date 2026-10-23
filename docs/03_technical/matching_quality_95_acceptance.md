@@ -27,6 +27,26 @@ possible book despite the possibility of another title by the same author.
   optional `GET /inventory/pending/discover?source_key=...&include_bnf=true`.
   No write to manga, editions, user library or ISBNs.
 
+## Optional cross-source identity discovery
+
+For work titles without a local exact match, the read-only discovery endpoint
+can explicitly query the publicly available sources, independently:
+
+- `/inventory/pending/discover?source_key=...&include_mangadex=true`:
+  publicly declared MangaDex `links.mal` records, checked against our
+  existing local MAL IDs. These are *suggestions*; conflicting metadata or
+  wrong third-party IDs remain possible.
+- `/inventory/pending/discover?source_key=...&include_wikidata=true`:
+  exact French/English Wikidata labels or alt-labels with a manga
+  `P4087` identity claim, returning the cited Q ID and existing MAL
+  catalogue ID when available. Several Q IDs are a review case.
+- `include_bnf=true`: book-level edition candidates, not MAL identities.
+
+All external lookups are explicit, bounded and non-mutating; third parties
+can receive the queried title. These options cannot supply a missing
+physical ISBN, identify a possessed edition from its tome count, or prove
+that a work is absent from a particular catalogue.
+
 ## Scope of evidence, not a fabricated 95%
 
 Tests cover adversarial examples from previous diagnostic outputs:
