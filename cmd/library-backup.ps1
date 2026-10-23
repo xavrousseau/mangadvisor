@@ -279,9 +279,44 @@ function Prepare-Existing-Postgres {
   Write-Host "PostgreSQL existant accessible : sauvegarde autorisee."
 }
 function Test-Api-Password {
-  $command='PGPASSWORD="$POSTGRES_PASSWORD" psql -h postgres -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1"'
+  # The actual API health endpoint executes SQL; trust it only if the
+  # managed API container has exactly the persisted .env credentials.
+  # A working application must not trigger a destructive role-secret change.
+  $apiName="mangadvisor_api"
   try {
-    $rows=@(& docker exec $containerName sh -c $command 2>$null)
+    if (Container-Exists $apiName) {
+      Assert-Managed-Container $apiName "api"
+      $same=$true
+      foreach ($key in @("POSTGRES_DB","POSTGRES_USER","POSTGRES_PASSWORD")) {
+        if ((Installed-Setting $apiName $key) -cne (Config-Setting $key)) {
+          $same=$false
+          break
+        }
+      }
+      if ($same -and (Installed-Setting $apiName "POSTGRES_HOST") -ceq "postgres" -and
+          (Installed-Setting $apiName "POSTGRES_PORT") -ceq "5432") {
+        $port=Config-Setting "API_PORT"
+        if ($port -match '^[0-9]{1,5}$' -and [int]$port -gt 0 -and [int]$port -le 65535) {
+          $health=Invoke-RestMethod -Uri ("http://127.0.0.1:"+$port+"/health") -TimeoutSec 5
+          if ($health.status -ceq "ok" -and $health.database -ceq (Config-Setting "POSTGRES_DB")) {
+            Write-Host "Authentification SQL reelle de l'API : OK. Aucun mot de passe modifie."
+            return $true
+          }
+        }
+      }
+    }
+  } catch {
+    # The API may not exist during first install; use a direct TCP check.
+    # Neither of these probes changes databases or secrets.
+  }
+  # Windows PowerShell 5.1 can corrupt nested quotes in native Docker args.
+  # Avoid them entirely. SQL is passed on stdin and the password is expanded
+  # only inside the existing container, not in the host process command line.
+  # IMPORTANT: use the Compose DNS name, NOT 127.0.0.1. PostgreSQL can allow
+  # trusted localhost connections while requiring SCRAM for the API network.
+  $command='PGPASSWORD=$POSTGRES_PASSWORD exec psql -h postgres -X -At -U $POSTGRES_USER -d $POSTGRES_DB'
+  try {
+    $rows=@("SELECT 1" | & docker exec -i $containerName sh -c $command 2>$null)
     return ($LASTEXITCODE -eq 0 -and $rows.Count -eq 1 -and ([string]$rows[0]).Trim() -ceq "1")
   } catch { return $false }
 }
