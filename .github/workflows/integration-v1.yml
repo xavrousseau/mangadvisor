@@ -225,6 +225,47 @@ jobs:
           print("Meilisearch real typo-tolerant search OK, PostgreSQL manga records intact")
           PY
 
+      - name: Vérifier Adieu Eri sur PostgreSQL réel et Meilisearch obsolète
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env -f infra/compose/docker-compose.yml \
+            -f infra/compose/docker-compose.dev.yml exec -T api python - <<'PY'
+          import json,urllib.parse,urllib.request
+          from apps.api.app.main import get_connection
+          samples=[
+              (99999101,"Sayonara Eri"),
+              (99999102,"I Bid You Adieu"),
+              (99999103,"Blue Period"),
+          ]
+          with get_connection() as conn:
+              with conn.cursor() as cur:
+                  cur.executemany("""
+                      INSERT INTO manga (source_mal_id,title,manga_type,popularity,status)
+                      VALUES (%s,%s,'Manga',100000,'Finished')
+                  """,samples)
+              conn.commit()
+          try:
+              url="http://127.0.0.1:8000/mangas?"+urllib.parse.urlencode({
+                  "q":"Adieu Eri","limit":13
+              })
+              with urllib.request.urlopen(url,timeout=45) as response:
+                  actual=json.load(response)
+              titles=[row["title"] for row in actual["items"]]
+              assert titles and titles[0]=="Sayonara Eri",actual
+              assert "I Bid You Adieu" not in titles,actual
+              assert "Blue Period" not in titles,actual
+              assert any(row["source_mal_id"]==99999101
+                         for row in actual["items"]),actual
+          finally:
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      cur.execute("DELETE FROM manga WHERE source_mal_id=ANY(%s)",
+                                  ([mid for mid,_ in samples],))
+                  conn.commit()
+          print("Recherche publique Adieu Eri -> Sayonara Eri: OK sans reindexer Meili")
+          PY
+
       - name: Valider le lot BnF en SQL reel sans associations automatiques
         shell: bash
         run: |

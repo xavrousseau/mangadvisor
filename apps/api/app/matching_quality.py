@@ -94,7 +94,8 @@ def score_candidate(query: str, candidate: dict[str, Any],
 
 def rank_candidates(query: str, candidates: list[dict[str, Any]],
                     physical_count: int | None = None,
-                    *, total_limited: bool = False) -> dict[str, Any]:
+                    *, total_limited: bool = False,
+                    display_limit: int = 20) -> dict[str, Any]:
     ranked = [{**dict(item),
                "ranking":score_candidate(query,item,physical_count)}
               for item in candidates]
@@ -108,9 +109,9 @@ def rank_candidates(query: str, candidates: list[dict[str, Any]],
     usable = (not total_limited and top >= 80 and margin >= 15 and
               not ranked[0]["ranking"]["warnings"])
     return {
-        "candidates": ranked[:20],
+        "candidates": ranked[:max(1, min(100, display_limit))],
         "candidate_count": len(ranked),
-        "candidate_list_truncated": len(ranked) > 20,
+        "candidate_list_truncated": len(ranked) > max(1, min(100, display_limit)),
         "status": ("STRONG_REVIEW_SUGGESTION" if usable else
                    "AMBIGUOUS_OR_INCOMPLETE" if ranked else
                    "NOT_FOUND_IN_LOCAL_CATALOGUE"),
