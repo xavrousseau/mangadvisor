@@ -18,6 +18,9 @@ from apps.api.app.mangadex_discovery import search_verified_mangadex
 from apps.api.app.reconciliation_engine import (
     assess_work_candidate, title_key, discovery_terms, summarize_book_evidence,
 )
+from apps.api.app.matching_quality import (
+    search_patterns, rank_candidates, summarize_bnf_quality,
+)
 from apps.api.app.edition_discovery import search_bnf_by_title, sanitize_title_query
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
@@ -188,13 +191,15 @@ LIMIT 1001
 # per work and the total explicitly. No huge unbounded provider responses.
 TRIAGE_BNF_SQL = """
 WITH source AS (
-  SELECT manga_id,isbn13,title_fr,edition_kind_suggested,source_url,
+  SELECT manga_id,isbn13,title_fr,author_fr,publisher_fr,language_recorded,
+         edition_kind_suggested,source_url,
          COUNT(*) OVER (PARTITION BY manga_id) AS work_isbn_count,
          ROW_NUMBER() OVER (PARTITION BY manga_id ORDER BY isbn13) AS rn
   FROM manga_bnf_candidate WHERE manga_id=ANY(%(manga_ids)s)
 )
-SELECT manga_id,isbn13,title_fr,edition_kind_suggested,source_url,work_isbn_count
-FROM source WHERE rn<=3
+SELECT manga_id,isbn13,title_fr,author_fr,publisher_fr,language_recorded,
+       edition_kind_suggested,source_url,work_isbn_count
+FROM source WHERE rn<=30
 ORDER BY manga_id,isbn13
 """
 TRIAGE_REGISTERED_BOOK_SQL = """
@@ -212,17 +217,28 @@ ORDER BY manga_id,isbn13
 # not a fuzzy entity match: a shared word is only a search suggestion.
 DISCOVERY_SQL = """
 SELECT m.id,m.title,m.title_english,m.title_japanese,m.source_mal_id,
-       m.manga_type,m.volumes
+       m.manga_type,m.volumes,
+       (SELECT f.label_fr FROM manga_wikidata_fact f WHERE f.manga_id=m.id
+        AND f.source_mal_id=m.source_mal_id) AS wikidata_label_fr,
+       COALESCE((
+         SELECT jsonb_agg(jsonb_build_object('alias',a.alias,
+                    'source_name',a.source_name,'source_id',a.source_id))
+         FROM manga_title_alias a
+         WHERE a.manga_id=m.id AND a.alias ~* ANY(%(patterns)s)
+       ),'[]'::jsonb) AS matching_alias_sources
 FROM manga m
-WHERE m.title ILIKE ANY(%(patterns)s)
-   OR COALESCE(m.title_english,'') ILIKE ANY(%(patterns)s)
-   OR COALESCE(m.title_japanese,'') ILIKE ANY(%(patterns)s)
+WHERE m.title ~* ANY(%(patterns)s)
+   OR COALESCE(m.title_english,'') ~* ANY(%(patterns)s)
+   OR COALESCE(m.title_japanese,'') ~* ANY(%(patterns)s)
    OR EXISTS (
       SELECT 1 FROM manga_title_alias a
-      WHERE a.manga_id=m.id AND a.alias ILIKE ANY(%(patterns)s)
+      WHERE a.manga_id=m.id AND a.alias ~* ANY(%(patterns)s)
    )
+   OR EXISTS (SELECT 1 FROM manga_wikidata_fact f WHERE f.manga_id=m.id
+        AND f.label_fr ~* ANY(%(patterns)s)
+        AND f.source_mal_id=m.source_mal_id)
 ORDER BY m.popularity ASC NULLS LAST,m.id
-LIMIT 51
+LIMIT 101
 """
 
 
@@ -258,6 +274,19 @@ def triage_pending_rows(
     items: list[dict[str, Any]] = []
     bnf_rows = bnf_rows or []
     registered_books = registered_books or []
+    bnf_by_id: dict[int, list[dict[str, Any]]] = {}
+    for book in bnf_rows:
+        bnf_by_id.setdefault(int(book["manga_id"]), []).append(book)
+    bnf_quality: dict[int, dict[str, Any]] = {}
+    for manga in catalog_rows:
+        manga_id = int(manga["id"])
+        titles = [str(v) for v in (
+            manga.get("title"), manga.get("title_english"),
+            manga.get("title_japanese"), manga.get("wikidata_label_fr")
+        ) if v]
+        bnf_quality[manga_id] = summarize_bnf_quality(
+            bnf_by_id.get(manga_id, []), titles,
+        )
     canonically_identified: dict[str, set[int]] = {}
     for other in catalog_rows:
         for name in (other.get("title"), other.get("title_english"),
@@ -309,9 +338,12 @@ def triage_pending_rows(
                 "edition_verified": False,
                 "isbn_verified": False,
                 "work_reconciliation": assessment,
-                "bibliography": summarize_book_evidence(
-                    manga_id, bnf_rows, registered_books,
-                ),
+                "bibliography": {
+                    **summarize_book_evidence(
+                        manga_id, bnf_rows, registered_books,
+                    ),
+                    "quality_review": bnf_quality.get(manga_id, {}),
+                },
             }
             (exact if primary_exact or alias_exact else prior).append(record)
         exact.sort(key=lambda x: (x["suggestion_basis"] != "EXACT_CATALOG_TITLE",
@@ -462,14 +494,17 @@ def create_pending_resolution_router(
                 words = discovery_terms(query)
                 items = []
                 truncated = False
+                ranking = rank_candidates(query, [])
                 if words:
-                    patterns = ["%" + (word.replace("%", r"\%")
-                                             .replace("_", r"\_")) + "%"
-                                for word in words]
+                    patterns = search_patterns(words)
                     cur.execute(DISCOVERY_SQL, {"patterns": patterns})
-                    rows = list(cur.fetchall())
-                    truncated = len(rows) > 50
-                    for manga in rows[:50]:
+                    rows = [dict(row) for row in cur.fetchall()]
+                    truncated = len(rows) > 100
+                    ranking = rank_candidates(
+                        query, rows[:100], pending.get("main_volumes"),
+                        total_limited=truncated,
+                    )
+                    for manga in ranking["candidates"]:
                         items.append({
                             "manga_id": int(manga["id"]),
                             "title": manga["title"],
@@ -477,6 +512,7 @@ def create_pending_resolution_router(
                             "manga_type": manga.get("manga_type"),
                             "volume_count_catalog": manga.get("volumes"),
                             "status": "DISCOVERY_TOKEN_ONLY",
+                            "ranking": manga["ranking"],
                             "work_identity_confirmed": False,
                         })
         bnf = {"status": "NOT_REQUESTED", "items": []}
@@ -501,7 +537,11 @@ def create_pending_resolution_router(
             "search_tokens": words,
             "catalog_candidates": items,
             "catalog_truncated": truncated,
-            "catalog_evidence": "WORD_OVERLAP_NOT_IDENTITY",
+            "catalog_evidence": "WHOLE_WORD_RANKED_NOT_IDENTITY",
+            "ranking_status": ranking["status"],
+            "ranking_margin": ranking["ranking_margin"],
+            "ranking_is_calibrated_probability": False,
+            "catalogue_candidates_seen": ranking["candidate_count"],
             "bnf": bnf,
             "mangadex_followup": "/inventory/pending/external-candidates",
             "automatic_association": False,
