@@ -293,6 +293,18 @@ def combine_cross_id_sources(
             bymal.setdefault(mid,[]).append(item["anilist_id"])
     conflicts=[]
     agreements=[]
+    # Two AniList IDs claiming the same MAL manga ID is a contradiction
+    # even if Kitsu is unavailable or has no mapping for this work.
+    for mid, ids in bymal.items():
+        distinct=set(ids)
+        if len(distinct)>1:
+            conflicts.append({
+                "source_mal_id":mid,
+                "kitsu_id":None,
+                "anilist_ids":sorted(distinct),
+                "kitsu_claims":[],
+                "reason":"MULTIPLE_ANILIST_IDS_FOR_MAL_MANGA",
+            })
     for result in kitsu:
         for row in result.get("items",[]):
             mid=row.get("source_mal_id")
