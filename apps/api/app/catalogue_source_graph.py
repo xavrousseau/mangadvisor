@@ -202,6 +202,26 @@ WHERE f.label_fr IS NOT NULL
 ON CONFLICT DO NOTHING;
 """
 
+SCRINIS_FR_BACKFILL = """
+INSERT INTO catalogue_title_claim
+(work_id,source_name,source_id,language_code,title,title_key,
+ claim_kind,evidence_status,evidence_url)
+SELECT w.id,'SCRINIS_FR',f.scrinis_public_n::text,'fr',btrim(f.title_fr),
+       lower(btrim(f.title_fr)),'EXTERNAL_TITLE',
+       CASE WHEN EXISTS (SELECT 1 FROM manga other
+         WHERE other.id<>f.manga_id
+           AND lower(btrim(other.title))=lower(btrim(f.title_fr)))
+       THEN 'COLLISION_REVIEW' ELSE 'SOURCE_LINKED' END,
+       f.source_url
+FROM manga_scrinis_fr_fact f
+JOIN manga m ON m.id=f.manga_id AND m.source_mal_id=f.mal_id
+JOIN catalogue_work w ON w.legacy_manga_id=m.id
+WHERE length(btrim(f.title_fr)) BETWEEN 2 AND 200
+  AND f.french_print_isbn_count>0
+  AND f.work_evidence IN ('SAME_MAL_ID','EXACT_TITLE_AUTHOR')
+ON CONFLICT DO NOTHING;
+"""
+
 ID_CLAIM_SQL = """
 INSERT INTO catalogue_work_identifier
 (work_id,provider,media_type,external_id,source_name,evidence_url,identity_status)
