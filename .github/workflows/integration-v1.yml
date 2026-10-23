@@ -875,7 +875,13 @@ jobs:
           counts_before=snapshot_inventory()
           triage=api("/inventory/pending/triage")
           row=next(x for x in triage["items"] if x["source_key"]==key)
-          assert row["review_category"]=="SINGLE_EXACT_SUGGESTION",row
+          # This CI alias is intentionally unverified: a unique alias is
+          # no longer sufficient evidence to identify an edition or work.
+          assert row["review_category"]=="SUSPICIOUS_ALIAS_REVIEW",row
+          resolution=next(c for c in row["candidates"] if c["manga_id"]==work["id"])
+          assert "ALIAS_UNVERIFIED_OR_UNTRACED" in resolution["work_reconciliation"]["warnings"],resolution
+          assert resolution["work_reconciliation"]["ownership_confirmed"] is False,resolution
+          assert resolution["bibliography"]["ownership_inferred"] is False,resolution
           assert any(c["manga_id"]==work["id"] and
                      c["suggestion_basis"]=="EXACT_ALIAS"
                      for c in row["candidates"]),row
@@ -885,6 +891,12 @@ jobs:
           assert triage["confirmed_editions_written"]==0,triage
           assert triage["inventory_mutations"]==0,triage
           assert snapshot_inventory()==counts_before,("Triage changed owner data",triage)
+          discovered=api("/inventory/pending/discover?"+
+              urllib.parse.urlencode({"source_key":key}))
+          assert discovered["automatic_association"] is False,discovered
+          assert discovered["bnf"]["status"]=="NOT_REQUESTED",discovered
+          assert discovered["writes_performed"] is False,discovered
+          assert snapshot_inventory()==counts_before,("Discovery changed owner data",discovered)
           with get_connection() as conn:
               with conn.cursor() as cur:
                   cur.execute("DELETE FROM user_manga_inventory_pending WHERE user_id=1 AND source_key=%s",(key,))
