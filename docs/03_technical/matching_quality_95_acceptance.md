@@ -73,6 +73,38 @@ this gold set with zero unauthorized inventory writes; publish numerator,
 denominator and all errors. If the gold labels are incomplete or the
 threshold is not reached, the feature remains experimental.
 
+## International cross-ID connectors: AniList and Kitsu
+
+The optional `include_anilist=true` request uses the official AniList GraphQL
+POST endpoint, only `type: MANGA`, retrieving `idMal`, multilingual titles,
+synonyms and format. It returns source-scoped candidates even when no MAL ID
+exists; without an explicit MAL link the catalogue **is not** silently joined.
+The request is one bounded page (12); no automated per-library refresh.
+AniList documents a degraded rate limit of **30 requests/minute** in its
+current API documentation. HTTP 429 and GraphQL errors return a provider
+error, not `NO_MATCH`.
+
+The optional `include_kitsu=true` asks Kitsu JSON:API for up to three MAL
+**manga** IDs, then validates each match using
+`/manga/{id}/mappings`. Only `myanimelist/manga` and `anilist/manga`
+mappings count. Kitsu Cloudflare restrictions can produce an unavailable
+provider response. An anime mapping cannot substitute for manga metadata.
+
+Both can be requested with
+`GET /inventory/pending/discover?source_key=...&include_anilist=true&include_kitsu=true`.
+A joint `CROSS_ID_AGREEMENT_REVIEW` is an inspectable reference alignment,
+**not independently verified work identity**, because providers may
+reuse the same underlying community mapping. A disagreement becomes
+`CONTRADICTION_REVIEW`, requiring investigation; no ownership/ISBN write.
+These providers receive the title/MAL ID as a network request only when
+explicitly enabled. No bulk external fetch is triggered by the dashboard.
+
+Primary technical references:
+https://docs.anilist.co/guide/graphql/
+https://docs.anilist.co/reference/object/media
+https://anilist.gitbook.io/anilist-apiv2-docs/docs/guide/rate-limiting
+https://kitsu.docs.apiary.io/#reference/mappings
+
 ## Unverified vs contradicted aliases
 
 An alias from an upstream source that has not independently corroborated the
