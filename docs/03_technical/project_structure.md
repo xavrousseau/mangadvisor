@@ -75,6 +75,23 @@ Une commande git pull supprime de l'arborescence suivie les fichiers retirés du
 
 Les fichiers data_pipeline_v1.md, data_model_v1.md et mangadvisor_architecture_v1.md portent désormais un avertissement : leurs diagrammes et promesses décrivent le plan initial, pas nécessairement les fonctionnalités branchées.
 
+## Frontière de livraison : V1 fonctionnelle / V2 UX
+
+La **V1** sera considérée prête après validation des parcours réels, et non
+seulement après le succès de la CI : réinstallation/reprise Windows avec
+sauvegarde/restauration, catalogue international complet et actualisation
+incrémentale, recherche/recommandations, enrichissements français avec preuves
+édition/tome/ISBN, mangathèque personnelle et ambiguïtés résolues ou
+explicitement conservées, scanner et conseiller IA facultatifs. La recette
+doit confirmer que les données privées sont intactes et qu'un rollback est
+possible. Le suivi bibliographique détaillé reste dans
+[l'issue #71](https://github.com/xavrousseau/mangadvisor/issues/71).
+
+La **V2 portera exclusivement sur l'expérience utilisateur** : navigation,
+lisibilité, accessibilité, ergonomie des fiches, mobile et performances
+perçues. Elle ne doit pas servir à repousser des bogues fonctionnels V1 ou à
+modifier les contrats et données sans couverture de non-régression.
+
 ## État du nettoyage des pipelines
 
 - Ancien orchestrateur `run_jikan_pipeline.py` retire. Les deux scripts SQL de consolidation sont appeles depuis le centre de pilotage, puis verifies sur une base CI jetable.
