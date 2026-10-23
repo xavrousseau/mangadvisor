@@ -130,6 +130,42 @@ class BibliographicStagingTests(unittest.TestCase):
                             if w["provider"] == "scrinis"))
         self.assertEqual(st.preview_summary(result)["decision"], "REVIEW_REQUIRED")
 
+    def test_edition_family_and_tome_collisions_are_visible_but_not_linked(self):
+        stage = st.convert_report(fixture(), "a"*64)
+        key = (1, "scrinis", "5383")
+        code = "9782811669058"
+        # One ISBN reused as Deluxe and Pastel must not become a confirmed edition.
+        stage["volumes"].append((key, code, "fr", "print", "deluxe", "1", ""))
+        stage["volumes"].append((key, code, "fr", "print", "pastel", "1", ""))
+        report = st.preview_summary(stage)
+        self.assertEqual(report["isbn_conflict_count"], 1)
+        self.assertEqual(report["isbn_conflicts_sample"][0]["reason"],
+                         "CONFLICTING_EDITION_FAMILIES")
+        self.assertFalse(report["isbn_conflicts_sample"][0]["registration_ready"])
+        self.assertEqual(report["ownership_mutations"], 0)
+
+    def test_conflicting_tome_or_competing_works_are_not_silent(self):
+        stage = st.convert_report(fixture(), "b"*64)
+        code = "9782811669058"
+        source = (1, "scrinis", "5383")
+        stage["volumes"].append((source, code, "fr", "print", "standard", "Tome 2", ""))
+        report = st.preview_summary(stage)
+        self.assertEqual(report["isbn_conflicts_sample"][0]["reason"],
+                         "CONFLICTING_TOME_NUMBERS")
+        # An ISBN assigned to different input works is suspicious even when
+        # provider edition strings agree.
+        stage["volumes"].append(((2, "mangaupdates", "999"), code,
+                                 "fr", "print", "standard", "1", ""))
+        report = st.preview_summary(stage)
+        self.assertEqual(report["isbn_conflicts_sample"][0]["reason"],
+                         "COMPETING_INPUT_WORKS")
+
+    def test_no_bare_publication_year_invented_as_tome(self):
+        self.assertIsNone(st._volume_number("2024"))
+        self.assertEqual(st._volume_number("03"), 3)
+        self.assertEqual(st._volume_number("Tome 12"), 12)
+        self.assertIsNone(st._volume_number("3D2Y"))
+
     def test_rejects_invalid_origin_or_market_override(self):
         doc = fixture()
         doc["entries"][0]["market_target"] = "INTERNATIONAL"
