@@ -973,8 +973,8 @@ jobs:
                   with conn.cursor() as cur:
                       cur.execute("SELECT COUNT(*) AS n FROM user_manga_inventory_pending")
                       before=cur.fetchone()["n"]
-              with patch.object(resolution,"search_anilist",return_value=a), \\
-                   patch.object(resolution,"search_kitsu_by_mal",return_value=k):
+              with (patch.object(resolution,"search_anilist",return_value=a),
+                    patch.object(resolution,"search_kitsu_by_mal",return_value=k)):
                   linked=local(source_key=key,include_anilist=True,include_kitsu=True)
               assert linked["international_id_evidence"]["status"]=="CROSS_ID_AGREEMENT_REVIEW",linked
               assert linked["international_id_evidence"]["independent_identity_proven"] is False,linked
