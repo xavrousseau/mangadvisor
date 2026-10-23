@@ -131,10 +131,212 @@ def default_search_term(pending: dict[str, Any]) -> str:
     return title[:100]
 
 
+# Bulk review is strictly documentary: source rows and catalogue records
+# are read in batches, but no work, edition, ISBN or owned book is confirmed.
+MAX_PENDING_TRIAGE = 1000
+MAX_TRIAGE_CANDIDATES = 1000
+
+TRIAGE_PENDING_SQL = """
+SELECT source_key,entry_title,work_declared,edition_declared,review_status,
+       main_volumes,duplicate_copies,other_editions_unknown,candidate_ids
+FROM user_manga_inventory_pending
+WHERE user_id=%(user_id)s
+ORDER BY entry_title,source_key
+LIMIT 1001
+"""
+
+TRIAGE_CATALOG_SQL = """
+WITH work_candidates AS (
+    SELECT id FROM manga
+     WHERE LOWER(BTRIM(title)) = ANY(%(terms)s)
+        OR LOWER(BTRIM(COALESCE(title_english,''))) = ANY(%(terms)s)
+        OR LOWER(BTRIM(COALESCE(title_japanese,''))) = ANY(%(terms)s)
+    UNION
+    SELECT manga_id AS id FROM manga_title_alias
+     WHERE LOWER(BTRIM(alias)) = ANY(%(terms)s)
+    UNION
+    SELECT id FROM manga WHERE id = ANY(%(saved_ids)s)
+)
+SELECT m.id,m.title,m.title_english,m.title_japanese,m.source_mal_id,
+       m.manga_type,m.volumes,
+       ARRAY(SELECT DISTINCT LOWER(BTRIM(a.alias)) FROM manga_title_alias a
+              WHERE a.manga_id=m.id AND LOWER(BTRIM(a.alias)) = ANY(%(terms)s))
+         AS exact_aliases
+FROM manga m
+JOIN work_candidates c ON c.id=m.id
+ORDER BY m.popularity ASC NULLS LAST,m.id
+LIMIT 1001
+"""
+
+
+def _triage_term(pending: dict[str, Any]) -> str:
+    # Unlike the interactive search, NEVER strip edition suffixes or count
+    # markers here: this is evidence for an exact-title suggestion only.
+    title = pending.get("work_declared") or pending.get("entry_title") or ""
+    return str(title).strip().casefold()
+
+
+def _saved_candidate_ids(pending: dict[str, Any]) -> set[int]:
+    # Saved candidates are hints from an older import, not verified mappings.
+    return {x for x in (pending.get("candidate_ids") or [])
+            if type(x) is int and x > 0}
+
+
+def triage_pending_rows(
+    pending_rows: list[dict[str, Any]],
+    catalog_rows: list[dict[str, Any]],
+    declarations: list[dict[str, Any]],
+    rejected_ids: set[int],
+    *, lookup_limited: bool = False,
+) -> dict[str, Any]:
+    """Prepare a read-only owner review queue; never authorize a link."""
+    declared_by_id: dict[int, set[str]] = {}
+    for declaration in declarations:
+        declared_by_id.setdefault(int(declaration["manga_id"]), set()).add(
+            str(declaration["edition_key"])
+        )
+    groups: dict[str, int] = {}
+    items: list[dict[str, Any]] = []
+    for pending in pending_rows:
+        term = _triage_term(pending)
+        saved = _saved_candidate_ids(pending)
+        exact: list[dict[str, Any]] = []
+        prior: list[dict[str, Any]] = []
+        for manga in catalog_rows:
+            names = (manga.get("title"), manga.get("title_english"),
+                     manga.get("title_japanese"))
+            primary_exact = bool(term) and any(
+                isinstance(name, str) and name.strip().casefold() == term
+                for name in names
+            )
+            alias_exact = bool(term) and term in (manga.get("exact_aliases") or [])
+            manga_id = int(manga["id"])
+            if not primary_exact and not alias_exact and manga_id not in saved:
+                continue
+            keys = declared_by_id.get(manga_id, set())
+            record = {
+                "manga_id": manga_id,
+                "title": manga["title"],
+                "source_mal_id": manga.get("source_mal_id"),
+                "manga_type": manga.get("manga_type"),
+                "volume_count_catalog": manga.get("volumes"),
+                "suggestion_basis": ("EXACT_CATALOG_TITLE" if primary_exact else
+                                     "EXACT_ALIAS" if alias_exact else
+                                     "SAVED_IMPORT_SUGGESTION"),
+                "has_existing_declaration": bool(keys),
+                "same_edition_already_declared":
+                    edition_key_for_pending(pending) in keys,
+                "library_not_interested": manga_id in rejected_ids,
+                "work_verified": False,
+                "edition_verified": False,
+                "isbn_verified": False,
+            }
+            (exact if primary_exact or alias_exact else prior).append(record)
+        exact.sort(key=lambda x: (x["suggestion_basis"] != "EXACT_CATALOG_TITLE",
+                                  x["title"].casefold(), x["manga_id"]))
+        prior.sort(key=lambda x: (x["title"].casefold(), x["manga_id"]))
+        conflicting_saved = any(x["manga_id"] not in {m["manga_id"] for m in exact}
+                                for x in prior)
+        if lookup_limited:
+            category = "INCOMPLETE_LOOKUP"
+        elif len(exact) > 1:
+            category = "AMBIGUOUS_EXACT"
+        elif len(exact) == 1 and conflicting_saved:
+            category = "CONFLICTING_SUGGESTIONS"
+        elif len(exact) == 1:
+            category = "SINGLE_EXACT_SUGGESTION"
+        elif prior:
+            category = "SAVED_SUGGESTIONS_ONLY"
+        else:
+            category = "SEARCH_REQUIRED"
+        groups[category] = groups.get(category, 0) + 1
+        proposals = (exact + prior)[:12]
+        items.append({
+            "source_key": pending["source_key"],
+            "entry_title": pending["entry_title"],
+            "work_declared": pending.get("work_declared"),
+            "edition_declared": pending.get("edition_declared"),
+            "review_status": pending["review_status"],
+            "main_volumes": pending["main_volumes"],
+            "duplicate_copies": pending["duplicate_copies"],
+            "other_editions_unknown": pending["other_editions_unknown"],
+            "review_category": category,
+            "exact_suggestion_count": len(exact),
+            "saved_only_suggestion_count": len(prior),
+            "candidate_list_limited": len(exact) + len(prior) > 12,
+            "candidates": proposals,
+            "automatic_association": False,
+            "manual_confirmation_required": True,
+        })
+    priority = {
+        "SINGLE_EXACT_SUGGESTION": 0,
+        "CONFLICTING_SUGGESTIONS": 1,
+        "SAVED_SUGGESTIONS_ONLY": 2,
+        "AMBIGUOUS_EXACT": 3,
+        "SEARCH_REQUIRED": 4,
+        "INCOMPLETE_LOOKUP": 5,
+    }
+    items.sort(key=lambda row: (priority[row["review_category"]],
+                                row["entry_title"].casefold(), row["source_key"]))
+    return {
+        "count": len(items),
+        "review_categories": groups,
+        "items": items,
+        "lookup_limited": lookup_limited,
+        "automatic_association": False,
+        "confirmed_editions_written": 0,
+        "inventory_mutations": 0,
+        "notice": "Tri documentaire : meme un titre exact et un ISBN suggere ne prouvent ni oeuvre ni edition possedee. Confirmer chaque ligne manuellement.",
+    }
+
+
 def create_pending_resolution_router(
     connection_factory: Callable[..., Any], user_id: int = 1
 ) -> APIRouter:
     router = APIRouter(prefix="/inventory",tags=["Inventaire : rapprochement manuel"])
+
+    @router.get("/pending/triage")
+    def pending_triage() -> dict[str, Any]:
+        """Prioritize unresolved claims without any supplier call or SQL write."""
+        with connection_factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute(TRIAGE_PENDING_SQL, {"user_id": user_id})
+                pending = list(cur.fetchall())
+                pending_limited = len(pending) > MAX_PENDING_TRIAGE
+                pending = pending[:MAX_PENDING_TRIAGE]
+                terms = sorted({_triage_term(row) for row in pending
+                                if _triage_term(row)})
+                saved_ids = sorted({manga_id for row in pending
+                                    for manga_id in _saved_candidate_ids(row)})
+                works = []
+                declarations = []
+                rejected_ids: set[int] = set()
+                lookup_limited = pending_limited
+                if terms or saved_ids:
+                    cur.execute(TRIAGE_CATALOG_SQL,
+                                {"terms": terms, "saved_ids": saved_ids})
+                    works = list(cur.fetchall())
+                    lookup_limited |= len(works) > MAX_TRIAGE_CANDIDATES
+                    works = works[:MAX_TRIAGE_CANDIDATES]
+                    manga_ids = [int(row["id"]) for row in works]
+                    if manga_ids:
+                        cur.execute("""
+                            SELECT manga_id,edition_key
+                            FROM user_manga_inventory_declaration
+                            WHERE user_id=%(user_id)s
+                              AND manga_id=ANY(%(manga_ids)s)
+                        """, {"user_id": user_id, "manga_ids": manga_ids})
+                        declarations = list(cur.fetchall())
+                        cur.execute("""
+                            SELECT manga_id FROM user_manga_library
+                            WHERE user_id=%(user_id)s AND library_status='NOT_INTERESTED'
+                              AND manga_id=ANY(%(manga_ids)s)
+                        """, {"user_id": user_id, "manga_ids": manga_ids})
+                        rejected_ids = {int(x["manga_id"]) for x in cur.fetchall()}
+        return triage_pending_rows(
+            pending, works, declarations, rejected_ids,
+            lookup_limited=lookup_limited,
+        )
 
     @router.get("/pending/candidates")
     def find_candidates(

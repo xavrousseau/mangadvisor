@@ -859,6 +859,32 @@ jobs:
           assert candidate["matched_alias"]==title,candidate
           assert candidate["suggestion_kind"]=="EXACT_MULTILINGUAL_ALIAS",candidate
           assert preview["automatic_association"] is False,preview
+          # Real PostgreSQL/HTTP contract of the bulk triage, with a seeded
+          # exact FR alias. No owner inventory / work / ISBN must be modified.
+          def snapshot_inventory():
+              with get_connection() as conn:
+                  with conn.cursor() as cur:
+                      counts=[]
+                      for table in ("user_manga_inventory_pending",
+                                    "user_manga_inventory_declaration",
+                                    "user_manga_library","user_manga_volume",
+                                    "manga_fr_edition"):
+                          cur.execute("SELECT COUNT(*) AS n FROM "+table)
+                          counts.append(cur.fetchone()["n"])
+                      return counts
+          counts_before=snapshot_inventory()
+          triage=api("/inventory/pending/triage")
+          row=next(x for x in triage["items"] if x["source_key"]==key)
+          assert row["review_category"]=="SINGLE_EXACT_SUGGESTION",row
+          assert any(c["manga_id"]==work["id"] and
+                     c["suggestion_basis"]=="EXACT_ALIAS"
+                     for c in row["candidates"]),row
+          assert not row["automatic_association"],row
+          assert row["manual_confirmation_required"],row
+          assert not triage["lookup_limited"],triage
+          assert triage["confirmed_editions_written"]==0,triage
+          assert triage["inventory_mutations"]==0,triage
+          assert snapshot_inventory()==counts_before,("Triage changed owner data",triage)
           with get_connection() as conn:
               with conn.cursor() as cur:
                   cur.execute("DELETE FROM user_manga_inventory_pending WHERE user_id=1 AND source_key=%s",(key,))
