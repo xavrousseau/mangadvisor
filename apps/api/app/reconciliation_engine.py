@@ -128,9 +128,15 @@ def assess_work_candidate(
     if manga.get("source_mal_id"):
         signals.append({"kind": "SOURCE_ID", "source": "JIKAN_MAL",
                         "detail": "CATALOGUE_IDENTIFIER_NOT_INVENTORY_LINK"})
-    risk = ("CONFLICT_REVIEW" if warnings else
-            "IDENTITY_EVIDENCE_REVIEW" if direct or alias_match else
-            "DISCOVERY_ONLY")
+    hard_contradictions = {
+        "ALIAS_CONFLICTS_WITH_OTHER_CANONICAL_TITLE",
+        "ONE_SHOT_VS_MULTIPLE_PHYSICAL_BOOKS",
+        "JAPANESE_WORK_COUNT_VS_FRENCH_HOLDINGS_DIFFER",
+    }
+    risk = ("CONFLICT_REVIEW" if hard_contradictions.intersection(warnings)
+            else "EVIDENCE_INCOMPLETE_REVIEW" if warnings
+            else "IDENTITY_EVIDENCE_REVIEW" if direct or alias_match
+            else "DISCOVERY_ONLY")
     return {
         "assessment": risk,
         "evidence": signals[:20],
