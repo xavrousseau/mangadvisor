@@ -137,7 +137,38 @@ foreach ($table in $selected) {
 }
 $rawCount = @(Run-Psql 'SELECT count(*) FROM public.jikan_manga_source;')
 $rows += @{ table="jikan_manga_source"; rows=[long]$rawCount[0] }
+# Global health indicators computed over the ENTIRE public catalogue.
+# Counts are diagnostic signals, never automatic reasons to merge works.
+$quality = @()
+$probes = @(
+    @{key="canonical_work_without_raw_mal"; needs=@("manga");
+      sql="SELECT count(*) FROM manga m LEFT JOIN jikan_manga_source j ON j.mal_id=m.source_mal_id WHERE j.mal_id IS NULL;"},
+    @{key="raw_jikan_without_canonical_work"; needs=@("manga");
+      sql="SELECT count(*) FROM jikan_manga_source j LEFT JOIN manga m ON m.source_mal_id=j.mal_id WHERE m.id IS NULL;"},
+    @{key="manga_missing_original_title"; needs=@("manga");
+      sql="SELECT count(*) FROM manga WHERE btrim(COALESCE(title,''))='';"},
+    @{key="same_alias_used_for_multiple_works"; needs=@("manga_title_alias");
+      sql="SELECT count(*) FROM (SELECT alias_key FROM manga_title_alias GROUP BY alias_key HAVING count(DISTINCT manga_id)>1) x;"},
+    @{key="works_with_french_alias"; needs=@("manga_title_alias");
+      sql="SELECT count(DISTINCT manga_id) FROM manga_title_alias WHERE language_code='fr';"},
+    @{key="bnf_isbn_suggested_for_multiple_works"; needs=@("manga_bnf_candidate");
+      sql="SELECT count(*) FROM (SELECT isbn13 FROM manga_bnf_candidate GROUP BY isbn13 HAVING count(DISTINCT manga_id)>1) x;"},
+    @{key="bnf_isbn_candidate_count"; needs=@("manga_bnf_candidate");
+      sql="SELECT count(*) FROM manga_bnf_candidate;"},
+    @{key="registered_french_book_count"; needs=@("manga_fr_edition");
+      sql="SELECT count(*) FROM manga_fr_edition;"},
+    @{key="wikidata_mal_identity_mismatch"; needs=@("manga_wikidata_fact");
+      sql="SELECT count(*) FROM manga_wikidata_fact f JOIN manga m ON m.id=f.manga_id WHERE f.source_mal_id<>m.source_mal_id;"}
+)
+foreach ($probe in $probes) {
+    $notPresent=@($probe.needs | Where-Object { $selected -notcontains $_ })
+    if ($notPresent.Count -gt 0) { continue }
+    $result=@(Run-Psql $probe.sql)
+    if ($result.Count -ne 1) { throw "Diagnostic invalide : $($probe.key)" }
+    $quality += @{metric=$probe.key;value=[long]$result[0]}
+}
 $manifest = @{
+    quality_indicators=$quality
     kind="Mangadvisor PUBLIC catalogue forensic export"
     exported_at_utc=[DateTime]::UtcNow.ToString("o")
     catalogue_only=$true
