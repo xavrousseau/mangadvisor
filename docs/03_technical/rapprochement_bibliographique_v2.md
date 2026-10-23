@@ -18,9 +18,9 @@ Aucune de ces tables ne vaut association canonique à une édition possédée.
 
 1. **Identité de l'œuvre** : rejeter les identifiants MAL contradictoires, les œuvres dérivées identifiables et les candidats concurrents non départagés. En cas de titre exact sans identifiant, exiger la concordance des auteurs pour le lien œuvre Scrinis.
 2. **Langue et support** : ne rapprocher que les références explicitement `fr` et `print`; les ebooks et livres japonais ne corroborent pas une édition française papier.
-3. **ISBN** : filtrer les identifiants invalides, croiser uniquement les ISBN publiés avec des références d'œuvre Scrinis vérifiée; l'absence n'est jamais une preuve qu'un livre n'existe pas.
+3. **ISBN** : filtrer les identifiants invalides, croiser uniquement les ISBN publiés avec des références d'œuvre Scrinis vérifiée; l'absence n'est jamais une preuve qu'un livre n'existe pas. Conserver toutes les langues déclarées par la notice BnF (une notice `fre` + `eng` est à revoir, pas une preuve de livre français exclusivement).
 4. **Famille d'édition** : quand les deux notices disent explicitement Deluxe / Pastel / Perfect / intégrale etc., marquer `ISBN_EDITION_CONFLICT_REVIEW` si les familles divergent.
-5. **Tome** : si les numéros explicites se contredisent, marquer `ISBN_VOLUME_CONFLICT_REVIEW`. Si le même ISBN est donné pour plusieurs familles ou tomes distincts côté fournisseur, marquer `ISBN_SUPPLIER_REFERENCE_CONFLICT_REVIEW`.
+5. **Tome** : si les numéros explicites se contredisent, marquer `ISBN_VOLUME_CONFLICT_REVIEW`. Si le même ISBN est donné pour plusieurs familles ou tomes distincts côté fournisseur, marquer `ISBN_SUPPLIER_REFERENCE_CONFLICT_REVIEW`. Ne jamais interpréter une année de publication (1900–2099), un livre dérivé ou une autre œuvre comme un tome de la série.
 6. **Données incomplètes** : conserver `EDITION_AND_TOME_UNVERIFIED` ou une preuve partielle lorsque l'un des champs manque. Même `FAMILY_AND_TOME_CONSISTENT_UNVERIFIED` n'autorise pas l'enregistrement automatique.
 7. **Staging** : signaler les ISBN cités pour plusieurs œuvres d'entrée, familles d'édition ou numéros de tomes distincts dans `isbn_staging_conflicts`, sans supprimer ni fusionner les propositions concurrentes.
 

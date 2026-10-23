@@ -64,6 +64,18 @@ class TestTitleDiscovery(unittest.TestCase):
         self.assertFalse(first["manga_match_verified"])
         self.assertEqual(result["items"][1]["edition_kind_suggested"],"PERFECT")
 
+    def test_multilingual_bnf_notice_preserves_all_declared_languages(self):
+        from apps.api.app.bnf_candidate_quality import classify_candidate
+        raw = SAMPLE.replace(
+            "<dc:language>français</dc:language>".encode("utf-8"),
+            b"<dc:language>fre</dc:language><dc:language>eng</dc:language>",
+        )
+        found = parse_title_search_response(raw)["items"][0]
+        self.assertEqual(found["language_recorded"], "fre; eng")
+        quality = classify_candidate(found, ["Monster"])
+        self.assertEqual(quality["language_status"], "MULTILINGUAL_REVIEW")
+        self.assertFalse(quality["registration_ready"])
+
     def test_reject_unchecked_and_partial_identifiers(self):
         self.assertEqual(extract_valid_isbns(["ISBN 97828712941460","ISBN 978-2-87129-414-6"]),["9782871294146"])
         malformed=SAMPLE.replace(b"ark:/12148/cb12345678x",b"https://attacker.test/ark:/12148/cb12345678x")

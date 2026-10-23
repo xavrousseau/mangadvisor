@@ -144,9 +144,13 @@ def classify_candidate(
     lang = language_status(row.get("language_recorded"))
     edition = edition_status(str(row.get("title_fr") or ""),
                              str(row.get("edition_kind_suggested") or "UNKNOWN"))
-    volume = volume_from_title(str(row.get("title_fr") or ""))
-    if volume is None and work == "REVIEW_VOLUME_CANDIDATE":
-        volume = volume_from_known_title(str(row.get("title_fr") or ""), known_titles)
+    # Numbering on another work or a derivative is not a volume of this manga.
+    # Keep the documentary candidate for review but do not suggest a tome.
+    volume = None
+    if work not in {"REJECT_DIFFERENT_WORK", "REVIEW_DERIVATIVE"}:
+        volume = volume_from_title(str(row.get("title_fr") or ""))
+        if volume is None and work == "REVIEW_VOLUME_CANDIDATE":
+            volume = volume_from_known_title(str(row.get("title_fr") or ""), known_titles)
     eligible = work in {"REVIEW_VOLUME_CANDIDATE", "REVIEW_EDITION_CANDIDATE",
                         "REVIEW_UNNUMBERED"}
     return {

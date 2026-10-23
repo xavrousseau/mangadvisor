@@ -49,6 +49,9 @@ class CandidateQualityTests(unittest.TestCase):
             ("One Piece 2024", None),
             ("One Piece 3D2Y", None),
             ("One Piece (2024)", None),
+            ("One Piece : 2024", None),
+            ("One Piece. 2024 / Eiichiro Oda", None),
+            ("One Piece : 105 / Eiichiro Oda", 105),
         ]
         for title, expected in cases:
             with self.subTest(title=title):
@@ -71,6 +74,15 @@ class CandidateQualityTests(unittest.TestCase):
             classify_candidate(row("One Pieceful Adventure"), ["One Piece"])["work_status"],
             "REJECT_DIFFERENT_WORK",
         )
+        for title, status in (
+            ("One Piece : artbook tome 2", "REVIEW_DERIVATIVE"),
+            ("Berserk of Gluttony. 12", "REJECT_DIFFERENT_WORK"),
+        ):
+            with self.subTest(title=title):
+                candidate = classify_candidate(row(title), ["One Piece", "Berserk"])
+                self.assertEqual(candidate["work_status"], status)
+                self.assertIsNone(candidate["volume_suggested"])
+                self.assertFalse(candidate["needs_manual_review"])
 
     def test_detailed_candidate_preserves_publication_and_provenance(self):
         candidate = row("Solo Leveling. tome 1", language="fre")

@@ -101,6 +101,27 @@ class PipelineTests(unittest.TestCase):
                          "EDITION_AND_TOME_UNVERIFIED")
         self.assertFalse(row["edition_identity_verified"])
 
+    def test_multilingual_bnf_cannot_be_presented_as_french_isbn_match(self):
+        from apps.api.app.bnf_candidate_quality import classify_candidate
+        isbn = "9782344067802"
+        candidate = classify_candidate(
+            {"isbn13": isbn, "title_fr": "Dragon Ball. 1",
+             "language_recorded": "fre; eng"}, ["Dragon Ball"],
+        )
+        evidence = pipeline.correlate_bnf_scrinis_isbns(
+            [candidate], {isbn}, supplier_coverage="BOUNDED_SUPPLIER_DETAIL",
+            supplier_references=[{"isbn13": isbn, "lang": "fr", "medium": "print",
+                                  "volume_label": "1"}],
+        )
+        self.assertEqual(evidence["isbn_correlations"][0]["evidence_status"], "LANGUAGE_REVIEW")
+        self.assertEqual(evidence["confirmed_editions_written"], 0)
+        self.assertEqual(evidence["ownership_mutations"], 0)
+
+    def test_year_tokens_are_not_corroborated_as_tome_numbers(self):
+        self.assertIsNone(pipeline._numbered_tome("Dragon Ball : 2024"))
+        self.assertIsNone(pipeline._numbered_tome("Berserk. 1999"))
+        self.assertEqual(pipeline._numbered_tome("Berserk. 42"), 42)
+
     def test_unverified_scrinis_work_never_cross_matches(self):
         client = Mock()
         output = pipeline.scrinis_isbn_evidence(None, [], client)
