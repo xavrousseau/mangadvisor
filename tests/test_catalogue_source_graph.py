@@ -113,6 +113,17 @@ class SourceGraphTests(unittest.TestCase):
         self.assertIn("target_provider TEXT NOT NULL",SCHEMA)
         self.assertNotIn("UPDATE manga SET",BASE_BACKFILL)
 
+    def test_menu_exposes_public_graph_without_a_private_rebuild(self):
+        from pathlib import Path
+        root=Path(__file__).resolve().parents[1]
+        menu=(root/"mangadvisor.cmd").read_text(encoding="utf-8")
+        self.assertIn("26 - Reconstruire le referentiel public",menu)
+        self.assertIn('if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"',menu)
+        runner=(root/"cmd/rebuild-catalogue-source-graph.ps1").read_text(encoding="utf-8")
+        self.assertIn("rebuild_catalogue_source_graph --apply",runner)
+        self.assertNotIn("down -v",runner)
+        self.assertNotIn("docker volume prune",runner)
+
     def test_title_key_is_stable_for_french_accent(self):
         self.assertEqual(title_key("L'Attaque  des Titans"),
                          "l'attaque des titans")
