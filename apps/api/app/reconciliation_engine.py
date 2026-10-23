@@ -153,20 +153,24 @@ def summarize_book_evidence(
     """BnF staging and confirmed book tables are different evidence levels."""
     bnf = [x for x in bnf_rows if int(x["manga_id"]) == manga_id]
     registered = [x for x in confirmed_rows if int(x["manga_id"]) == manga_id]
+    bnf_count = int(bnf[0].get("work_isbn_count") or len(bnf)) if bnf else 0
+    registered_count = (int(registered[0].get("work_isbn_count") or len(registered))
+                        if registered else 0)
     return {
-        "bnf_candidate_isbn_count": len(bnf),
+        "bnf_candidate_isbn_count": bnf_count,
         "bnf_candidate_isbns_sample": [
             {"isbn13": x["isbn13"], "title_fr": x.get("title_fr"),
              "edition_kind_suggested": x.get("edition_kind_suggested"),
              "source_url": x.get("source_url"), "status": "BNF_CANDIDATE_UNVERIFIED"}
             for x in bnf[:3]
         ],
-        "registered_french_isbn_count": len(registered),
+        "registered_french_isbn_count": registered_count,
         "registered_isbns_sample": [
             {"isbn13": x["isbn13"], "status": "CATALOGUE_BOOK_NOT_OWNERSHIP"}
             for x in registered[:3]
         ],
-        "candidate_source_truncated": False,
+        "candidate_source_truncated": (bnf_count > len(bnf) or
+                                       registered_count > len(registered)),
         "ownership_inferred": False,
         "note": "Une notice BnF ou un ISBN enregistres ne prouvent ni l'oeuvre, ni le tome possede.",
     }
