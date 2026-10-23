@@ -17,6 +17,27 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
     items='<div class="inventory-match-candidates">'+state.items.slice(0,12).map(manga=>{
       const id=Number(manga.id);
       if(!Number.isSafeInteger(id)||id<=0)return "";
+      const riskCodes=manga.reconciliation?.warnings||[];
+      const riskTexts={
+        ALIAS_CONFLICTS_WITH_OTHER_CANONICAL_TITLE: fr?
+          "Alias en conflit avec un titre canonique" : "Alias conflicts with a canonical title",
+        ALIAS_UNVERIFIED_OR_UNTRACED: fr?
+          "Alias non corroboré" : "Uncorroborated alias",
+        JAPANESE_WORK_COUNT_VS_FRENCH_HOLDINGS_DIFFER: fr?
+          "Quantité de tomes à contrôler" : "Volume count requires checking",
+        DERIVATIVE_OR_TEXT_WORK_TYPE_REVIEW: fr?
+          "Œuvre dérivée ou roman possible" : "Possible derivative or novel",
+        ONE_SHOT_VS_MULTIPLE_PHYSICAL_BOOKS: fr?
+          "One-shot et plusieurs livres déclarés" : "One-shot versus several books",
+        NO_CURRENT_TITLE_OR_ALIAS_EVIDENCE: fr?
+          "Titre non corroboré" : "Uncorroborated title",
+      };
+      const warnings=Array.isArray(riskCodes)?riskCodes.slice(0,3)
+        .map(x=>riskTexts[x]||"").filter(Boolean):[];
+      const riskNote=warnings.length?
+        '<p class="collection-caveat" role="note">'+
+        e(fr?"Association à vérifier : ":"Match to review: ")+
+        e(warnings.join(" · "))+'</p>':"";
       return '<article class="inventory-match-candidate">'+
         '<strong>'+e(manga.title)+'</strong>'+
         (manga.title_english&&manga.title_english!==manga.title?
@@ -36,6 +57,7 @@ export function inventoryResolverMarkup(state,{escape,lang="fr"}={}){
         '</p>'+
         (manga.source_name==="MANGADEX" && /^https:\/\/mangadex\.org\/title\/[a-f0-9-]{36}$/i.test(String(manga.source_url||""))?
           '<a href="'+e(manga.source_url)+'" target="_blank" rel="noopener noreferrer">MangaDex ↗</a>':"")+
+        riskNote+
         '<button type="button" class="btn btn-small btn-soft" data-action="pending-match-select" data-id="'+e(id)+'">'+
           (fr?"Examiner cette œuvre":"Review this work")+'</button></article>';
     }).join("")+'</div>';
