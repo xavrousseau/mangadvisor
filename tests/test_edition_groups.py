@@ -74,7 +74,8 @@ class FakeDb:
     def __init__(self, *, manga_exists=True, group_exists=True, book_exists=True,
                  book_already_grouped=False, group_manga_id=1, group_kind="OTHER",
                  book_manga_id=1, book_kind="OTHER", book_isbn="9782871294146",
-                 source_name="BnF", source_url="https://catalogue.bnf.fr/example"):
+                 source_name="BnF",
+                 source_url="https://catalogue.bnf.fr/ark:/12148/cb12345678x"):
         self.manga_exists = manga_exists
         self.group_exists = group_exists
         self.book_exists = book_exists
@@ -173,6 +174,7 @@ class EditionGroupTests(unittest.TestCase):
             {"book_isbn": "9780306406157"},
             {"source_name": None},
             {"source_url": ""},
+            {"source_url": "https://untrusted.example/ark:/12148/cb12345678x"},
         ):
             with self.subTest(overrides=overrides):
                 db = FakeDb(**overrides)

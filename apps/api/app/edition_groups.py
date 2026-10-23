@@ -12,7 +12,7 @@ from typing import Any, Callable, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from apps.api.app.collection import EDITION_KINDS, isbn13_normalize
+from apps.api.app.collection import isbn13_normalize, safe_bnf_ark
 
 
 GROUP_SCHEMA = """
@@ -194,9 +194,10 @@ def create_edition_group_router(connection_factory: Callable[..., Any]) -> APIRo
                     raise HTTPException(
                         status_code=409,
                         detail="Œuvre, famille d'édition ou ISBN incompatible : aucune association.")
-                if not book["source_name"] or not book["source_url"]:
+                if (not book["source_name"] or
+                        not safe_bnf_ark(str(book.get("source_url") or ""))):
                     raise HTTPException(
-                        status_code=409, detail="Livre sans provenance vérifiable.")
+                        status_code=409, detail="Livre sans notice BnF vérifiable.")
                 cur.execute("""
                     INSERT INTO manga_fr_edition_group_book
                       (book_id,group_id,manga_id,edition_kind,isbn13)
