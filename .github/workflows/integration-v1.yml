@@ -1161,9 +1161,32 @@ jobs:
                   """,(first["id"],str(first["source_mal_id"]),second["title"],
                        second["title"].lower().strip(),
                        'https://myanimelist.net/manga/'+str(first["source_mal_id"])))
+              # Existing FR metadata gets reused only when its MAL ID
+              # refers to the exact local work; no title-only association.
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      INSERT INTO manga_wikidata_fact
+                        (manga_id,source_mal_id,wikidata_id,label_fr)
+                      VALUES (%s,%s,'Q987654321','Titre français sourcé CI')
+                      ON CONFLICT(manga_id) DO UPDATE
+                      SET label_fr=EXCLUDED.label_fr,
+                          source_mal_id=EXCLUDED.source_mal_id,
+                          wikidata_id=EXCLUDED.wikidata_id
+                  """,(first["id"],first["source_mal_id"]))
               ensure_schema(conn)
               rebuild_legacy_sources(conn)
               before=public_report(conn)
+              with conn.cursor() as cur:
+                  cur.execute("""
+                      SELECT count(*) n FROM catalogue_title_claim t
+                      JOIN catalogue_work w ON w.id=t.work_id
+                      WHERE w.legacy_manga_id=%s AND t.language_code='fr'
+                        AND t.source_name='WIKIDATA_P4087'
+                        AND t.title='Titre français sourcé CI'
+                        AND t.evidence_status='SOURCE_LINKED'
+                  """,(first["id"],))
+                  assert cur.fetchone()["n"]==1,"Exact-ID French label was lost"
+
               assert before["works"]==legacy,before
               with conn.cursor() as cur:
                   cur.execute("""
