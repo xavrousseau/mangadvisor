@@ -88,9 +88,10 @@ try {
       @($report.records).Count -ne 4) {
     throw "Unexpected number of public archive records"
   }
-  if ((@($report.quality_indicators) | Where-Object {
+  $metrics = @(@($report.quality_indicators) | Where-Object {
     $_.metric -eq "bnf_isbn_candidate_count"
-  }).Count -ne 1) { throw "Catalogue global metrics are absent" }
+  })
+  if ($metrics.Count -ne 1) { throw "Catalogue global metrics are absent" }
   Write-Host "PASS: full public metadata export uses atomic pg_dump --table args on PowerShell 5.1"
 } finally {
   # Only remove the files created by this synthetic test.
