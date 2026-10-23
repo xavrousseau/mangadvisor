@@ -9,6 +9,7 @@ from apps.api.app.localization import SynopsisTranslationRequest, localized_syno
 from apps.api.app.library_xlsx import xlsx_to_library_csv
 from apps.api.app.library_templates import reading_template_csv, reading_template_xlsx_base64
 from apps.api.app.search_index import search_ids as meili_search_ids
+from apps.api.app.catalogue_ranked_search import ranked_catalogue_ids
 from apps.api.app.recommendation_explanations import add_explanations
 from apps.api.app.recommendation_quality import choose_balanced
 from apps.api.app.library_seed_selection import (
@@ -322,8 +323,15 @@ def list_mangas(
     # filters until those facets are indexed and pagination is reconciled.
     search_ranked = None
     if q and not genre and not only_finished and offset + limit <= 500:
-        search_ranked = meili_search_ids(q, limit=500)
-        if search_ranked:
+        # Multiple-word work names are validated against local full-word
+        # titles/alias evidence before Meilisearch's fuzzy suggestions.
+        # "Adieu Eri" must surface "Sayonara Eri", not just "I Bid You Adieu".
+        with get_connection() as connection:
+            with connection.cursor() as cur:
+                search_ranked = ranked_catalogue_ids(cur, q)
+        if search_ranked is None:
+            search_ranked = meili_search_ids(q, limit=500)
+        if search_ranked is not None:
             conditions[-1] = "m.id = ANY(%(search_ids)s::int[])"
             params.pop("q", None)
             params["search_ids"] = search_ranked
