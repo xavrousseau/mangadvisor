@@ -146,7 +146,8 @@ def assess_work_candidate(
         "edition_identity_confirmed": False,
         "ownership_confirmed": False,
         "isbn_assigned_to_ownership": False,
-        "next_action": ("REVIEW_CONTRADICTIONS" if warnings else
+        "next_action": ("REVIEW_CONTRADICTIONS" if risk == "CONFLICT_REVIEW" else
+                        "VERIFY_ALIAS_OR_SOURCE" if risk == "EVIDENCE_INCOMPLETE_REVIEW" else
                         "VERIFY_WORK_AND_EDITION" if direct or alias_match else
                         "DISCOVER_EXTERNAL_WORK_IDS"),
     }
