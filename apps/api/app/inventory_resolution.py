@@ -524,6 +524,9 @@ def create_pending_resolution_router(
                     "status": "BOOK_NOTICES_UNVERIFIED",
                     "items": result["items"][:20],
                     "scope": "ISBN_AND_PRINT_NOT_WORK_IDENTITY",
+                    "quality_review": summarize_bnf_quality(
+                        result["items"][:20], [query],
+                    ),
                 }
             except ValueError:
                 bnf = {"status": "INVALID_BNF_QUERY", "items": []}
