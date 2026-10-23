@@ -11,7 +11,7 @@ class UserMenuTests(unittest.TestCase):
         self.source=(ROOT/"mangadvisor.cmd").read_text(encoding="utf-8")
 
     def test_user_space_has_four_understandable_destinations(self):
-        header=self.source.split(":advanced\n",1)[1].split(":catalogue_menu\n",1)[0]
+        header=self.source.split("\n:advanced\n",1)[1].split("\n:catalogue_menu\n",1)[0]
         for name in (
             "Catalogue general et recherche",
             "Ma bibliotheque et mes imports",
@@ -24,8 +24,8 @@ class UserMenuTests(unittest.TestCase):
         self.assertNotRegex(header,r"echo\s+2[0-6] - ")
 
     def test_only_clear_public_workflows_show_in_submenus(self):
-        catalogue=self.source.split(":catalogue_menu\n",1)[1].split(":library_menu\n",1)[0]
-        personal=self.source.split(":library_menu\n",1)[1].split(":optional_menu\n",1)[0]
+        catalogue=self.source.split("\n:catalogue_menu\n",1)[1].split("\n:library_menu\n",1)[0]
+        personal=self.source.split("\n:library_menu\n",1)[1].split("\n:optional_menu\n",1)[0]
         for label in ("Actualiser les mangas","moteur de recherche",
                       "Exporter la base bibliographique","Lire le bilan"):
             self.assertIn(label,catalogue)
