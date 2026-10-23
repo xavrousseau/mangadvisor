@@ -25,6 +25,29 @@ query MangaTitleCrosswalk($search: String!) {
       id idMal type format
       title { romaji english native }
       synonyms
+      relations {
+        edges {
+          relationType
+          node { id idMal type title { romaji } }
+        }
+      }
+    }
+  }
+}
+"""
+ANILIST_MAL_QUERY = """
+query MangaMalCrosswalk($ids: [Int]) {
+  Page(page: 1, perPage: 12) {
+    media(idMal_in: $ids, type: MANGA, isAdult: false) {
+      id idMal type format
+      title { romaji english native }
+      synonyms
+      relations {
+        edges {
+          relationType
+          node { id idMal type title { romaji } }
+        }
+      }
     }
   }
 }
@@ -91,7 +114,30 @@ def parse_anilist(payload: dict[str,Any]) -> dict[str,Any]:
         for synonym in (item.get("synonyms") or [])[:15]:
             if isinstance(synonym,str) and 2<=len(synonym.strip())<=160:
                 names.append({"language":"unspecified","title":synonym.strip()})
+        relations=[]
+        data=item.get("relations") or {}
+        edges=data.get("edges") if isinstance(data,dict) else []
+        if isinstance(edges,list):
+            for edge in edges[:30]:
+                if not isinstance(edge,dict):
+                    continue
+                relation=str(edge.get("relationType") or "")[:32]
+                node=edge.get("node") or {}
+                if not isinstance(node,dict) or node.get("type") not in ("MANGA","ANIME"):
+                    continue
+                nid=_safe_positive(node.get("id"))
+                if not nid:
+                    continue
+                relations.append({
+                    "relation_type":relation,
+                    "anilist_id":nid,
+                    "mal_id":_safe_positive(node.get("idMal")),
+                    "media_type":node["type"],
+                    "title":str((node.get("title") or {}).get("romaji") or "")[:160],
+                    "evidence_only":True,
+                })
         items.append({
+            "relations":relations,
             "anilist_id":aid,
             "source_mal_id":mal,
             "format":str(item.get("format") or "")[:30],
@@ -116,6 +162,35 @@ def search_anilist(title: str) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(status_code=503,
                             detail="Réponse AniList non exploitable.") from exc
+
+
+def search_anilist_by_mal_ids(mal_ids: list[int]) -> dict[str, Any]:
+    """Batch verify MAL work IDs without relying on title-language similarity."""
+    ids=[]
+    for value in mal_ids:
+        mid=_safe_positive(value)
+        if mid and mid not in ids:
+            ids.append(mid)
+        if len(ids)>=8:
+            break
+    if not ids:
+        return {"status":"NO_VALID_MAL_IDS","items":[],"identity_confirmed":False}
+    raw=json.dumps({"query":ANILIST_MAL_QUERY,
+                    "variables":{"ids":ids}}).encode("utf-8")
+    req=urllib.request.Request(ANILIST_URL,data=raw,headers={
+        "Accept":"application/json","Content-Type":"application/json",
+        "User-Agent":"Mangadvisor/1.0 (https://github.com/xavrousseau/mangadvisor; public metadata)",
+    },method="POST")
+    try:
+        result=parse_anilist(_read_json(req))
+    except ValueError as exc:
+        raise HTTPException(status_code=503,
+                            detail="Réponse AniList ID non exploitable.") from exc
+    result["requested_mal_ids"]=ids
+    result["items"]=[item for item in result["items"]
+                     if item.get("source_mal_id") in ids]
+    result["lookup_basis"]="EXACT_MAL_ID_NOT_TITLE"
+    return result
 
 
 def _kitsu_item_ids(payload: dict[str, Any], mal_id: int) -> list[int]:
@@ -186,6 +261,7 @@ def search_kitsu_by_mal(mal_id: int) -> dict[str,Any]:
         "filter[externalSite]":"myanimelist/manga",
         "filter[externalId]":str(mid),
         "page[limit]":"12",
+        "include":"item",
     })
     request=urllib.request.Request(KITSU_URL+"/mappings?"+params,headers={
         "Accept":"application/vnd.api+json",
