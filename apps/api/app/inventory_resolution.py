@@ -258,6 +258,14 @@ def triage_pending_rows(
     items: list[dict[str, Any]] = []
     bnf_rows = bnf_rows or []
     registered_books = registered_books or []
+    canonically_identified: dict[str, set[int]] = {}
+    for other in catalog_rows:
+        for name in (other.get("title"), other.get("title_english"),
+                     other.get("title_japanese")):
+            if name:
+                canonically_identified.setdefault(title_key(name), set()).add(
+                    int(other["id"])
+                )
     for pending in pending_rows:
         term = _triage_term(pending)
         saved = _saved_candidate_ids(pending)
@@ -280,13 +288,8 @@ def triage_pending_rows(
             keys = declared_by_id.get(manga_id, set())
             assessment = assess_work_candidate(
                 pending, manga,
-                canonically_matched_elsewhere=any(
-                    other["id"] != manga_id and
-                    any(title_key(name) == title_key(term) for name in (
-                        other.get("title"), other.get("title_english"),
-                        other.get("title_japanese"),
-                    ) if name)
-                    for other in catalog_rows
+                canonically_matched_elsewhere=bool(
+                    canonically_identified.get(title_key(term), set()) - {manga_id}
                 ),
             )
             record = {
