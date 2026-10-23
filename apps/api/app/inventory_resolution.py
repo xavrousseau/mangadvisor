@@ -15,6 +15,10 @@ from typing import Any, Callable
 from fastapi import APIRouter, HTTPException, Query
 
 from apps.api.app.mangadex_discovery import search_verified_mangadex
+from apps.api.app.reconciliation_engine import (
+    assess_work_candidate, title_key, discovery_terms, summarize_book_evidence,
+)
+from apps.api.app.edition_discovery import search_bnf_by_title, sanitize_title_query
 from apps.api.app.inventory_import import (
     UNSPECIFIED, PendingResolveConfirm, PendingResolvePreview,
 )
@@ -156,16 +160,69 @@ WITH work_candidates AS (
      WHERE LOWER(BTRIM(alias)) = ANY(%(terms)s)
     UNION
     SELECT id FROM manga WHERE id = ANY(%(saved_ids)s)
+    UNION
+    SELECT manga_id AS id FROM manga_wikidata_fact
+     WHERE LOWER(BTRIM(label_fr)) = ANY(%(terms)s)
 )
 SELECT m.id,m.title,m.title_english,m.title_japanese,m.source_mal_id,
        m.manga_type,m.volumes,
+       (SELECT f.label_fr FROM manga_wikidata_fact f
+        WHERE f.manga_id=m.id AND f.source_mal_id=m.source_mal_id)
+          AS wikidata_label_fr,
        ARRAY(SELECT DISTINCT LOWER(BTRIM(a.alias)) FROM manga_title_alias a
               WHERE a.manga_id=m.id AND LOWER(BTRIM(a.alias)) = ANY(%(terms)s))
-         AS exact_aliases
+          AS exact_aliases,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object(
+            'alias',a.alias,'source_name',a.source_name,'source_id',a.source_id))
+          FROM manga_title_alias a
+          WHERE a.manga_id=m.id AND LOWER(BTRIM(a.alias)) = ANY(%(terms)s)),
+          '[]'::jsonb) AS exact_alias_evidence
 FROM manga m
 JOIN work_candidates c ON c.id=m.id
 ORDER BY m.popularity ASC NULLS LAST,m.id
 LIMIT 1001
+"""
+
+
+# BnF proposals are not a physical ISBN catalogue. Fetch up to 3 records
+# per work and the total explicitly. No huge unbounded provider responses.
+TRIAGE_BNF_SQL = """
+WITH source AS (
+  SELECT manga_id,isbn13,title_fr,edition_kind_suggested,source_url,
+         COUNT(*) OVER (PARTITION BY manga_id) AS work_isbn_count,
+         ROW_NUMBER() OVER (PARTITION BY manga_id ORDER BY isbn13) AS rn
+  FROM manga_bnf_candidate WHERE manga_id=ANY(%(manga_ids)s)
+)
+SELECT manga_id,isbn13,title_fr,edition_kind_suggested,source_url,work_isbn_count
+FROM source WHERE rn<=3
+ORDER BY manga_id,isbn13
+"""
+TRIAGE_REGISTERED_BOOK_SQL = """
+WITH source AS (
+  SELECT manga_id,isbn13,
+         COUNT(*) OVER (PARTITION BY manga_id) AS work_isbn_count,
+         ROW_NUMBER() OVER (PARTITION BY manga_id ORDER BY isbn13) AS rn
+  FROM manga_fr_edition WHERE manga_id=ANY(%(manga_ids)s)
+)
+SELECT manga_id,isbn13,work_isbn_count FROM source WHERE rn<=3
+ORDER BY manga_id,isbn13
+"""
+
+# A query-plan bounded, locally evaluated search for missing titles. This is
+# not a fuzzy entity match: a shared word is only a search suggestion.
+DISCOVERY_SQL = """
+SELECT m.id,m.title,m.title_english,m.title_japanese,m.source_mal_id,
+       m.manga_type,m.volumes
+FROM manga m
+WHERE m.title ILIKE ANY(%(patterns)s)
+   OR COALESCE(m.title_english,'') ILIKE ANY(%(patterns)s)
+   OR COALESCE(m.title_japanese,'') ILIKE ANY(%(patterns)s)
+   OR EXISTS (
+      SELECT 1 FROM manga_title_alias a
+      WHERE a.manga_id=m.id AND a.alias ILIKE ANY(%(patterns)s)
+   )
+ORDER BY m.popularity ASC NULLS LAST,m.id
+LIMIT 51
 """
 
 
@@ -188,8 +245,10 @@ def triage_pending_rows(
     declarations: list[dict[str, Any]],
     rejected_ids: set[int],
     *, lookup_limited: bool = False,
+    bnf_rows: list[dict[str, Any]] | None = None,
+    registered_books: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Prepare a read-only owner review queue; never authorize a link."""
+    """Prepare a read-only, evidence-attributed owner review queue."""
     declared_by_id: dict[int, set[str]] = {}
     for declaration in declarations:
         declared_by_id.setdefault(int(declaration["manga_id"]), set()).add(
@@ -197,6 +256,8 @@ def triage_pending_rows(
         )
     groups: dict[str, int] = {}
     items: list[dict[str, Any]] = []
+    bnf_rows = bnf_rows or []
+    registered_books = registered_books or []
     for pending in pending_rows:
         term = _triage_term(pending)
         saved = _saved_candidate_ids(pending)
@@ -209,11 +270,25 @@ def triage_pending_rows(
                 isinstance(name, str) and name.strip().casefold() == term
                 for name in names
             )
-            alias_exact = bool(term) and term in (manga.get("exact_aliases") or [])
+            alias_exact = bool(term) and (
+                term in (manga.get("exact_aliases") or []) or
+                term == str(manga.get("wikidata_label_fr") or "").strip().casefold()
+            )
             manga_id = int(manga["id"])
             if not primary_exact and not alias_exact and manga_id not in saved:
                 continue
             keys = declared_by_id.get(manga_id, set())
+            assessment = assess_work_candidate(
+                pending, manga,
+                canonically_matched_elsewhere=any(
+                    other["id"] != manga_id and
+                    any(title_key(name) == title_key(term) for name in (
+                        other.get("title"), other.get("title_english"),
+                        other.get("title_japanese"),
+                    ) if name)
+                    for other in catalog_rows
+                ),
+            )
             record = {
                 "manga_id": manga_id,
                 "title": manga["title"],
@@ -230,6 +305,10 @@ def triage_pending_rows(
                 "work_verified": False,
                 "edition_verified": False,
                 "isbn_verified": False,
+                "work_reconciliation": assessment,
+                "bibliography": summarize_book_evidence(
+                    manga_id, bnf_rows, registered_books,
+                ),
             }
             (exact if primary_exact or alias_exact else prior).append(record)
         exact.sort(key=lambda x: (x["suggestion_basis"] != "EXACT_CATALOG_TITLE",
@@ -244,7 +323,12 @@ def triage_pending_rows(
         elif len(exact) == 1 and conflicting_saved:
             category = "CONFLICTING_SUGGESTIONS"
         elif len(exact) == 1:
-            category = "SINGLE_EXACT_SUGGESTION"
+            category = (
+                "SUSPICIOUS_ALIAS_REVIEW"
+                if exact[0]["suggestion_basis"] == "EXACT_ALIAS" and
+                exact[0]["work_reconciliation"]["assessment"] == "CONFLICT_REVIEW"
+                else "SINGLE_EXACT_SUGGESTION"
+            )
         elif prior:
             category = "SAVED_SUGGESTIONS_ONLY"
         else:
@@ -265,16 +349,24 @@ def triage_pending_rows(
             "saved_only_suggestion_count": len(prior),
             "candidate_list_limited": len(exact) + len(prior) > 12,
             "candidates": proposals,
+            "suggested_next_step": (
+                "DISCOVER_ALTERNATE_TITLES_AND_EXTERNAL_IDS"
+                if category == "SEARCH_REQUIRED" else
+                "REVIEW_SUSPECT_ALIAS_PROVENANCE"
+                if category == "SUSPICIOUS_ALIAS_REVIEW" else
+                "COMPARE_SOURCES_AND_CONFIRM_WORK_EDITION"
+            ),
             "automatic_association": False,
             "manual_confirmation_required": True,
         })
     priority = {
         "SINGLE_EXACT_SUGGESTION": 0,
         "CONFLICTING_SUGGESTIONS": 1,
-        "SAVED_SUGGESTIONS_ONLY": 2,
-        "AMBIGUOUS_EXACT": 3,
-        "SEARCH_REQUIRED": 4,
-        "INCOMPLETE_LOOKUP": 5,
+        "SUSPICIOUS_ALIAS_REVIEW": 2,
+        "SAVED_SUGGESTIONS_ONLY": 3,
+        "AMBIGUOUS_EXACT": 4,
+        "SEARCH_REQUIRED": 5,
+        "INCOMPLETE_LOOKUP": 6,
     }
     items.sort(key=lambda row: (priority[row["review_category"]],
                                 row["entry_title"].casefold(), row["source_key"]))
@@ -311,6 +403,8 @@ def create_pending_resolution_router(
                 works = []
                 declarations = []
                 rejected_ids: set[int] = set()
+                bnf_rows: list[dict[str, Any]] = []
+                registered_books: list[dict[str, Any]] = []
                 lookup_limited = pending_limited
                 if terms or saved_ids:
                     cur.execute(TRIAGE_CATALOG_SQL,
@@ -333,10 +427,84 @@ def create_pending_resolution_router(
                               AND manga_id=ANY(%(manga_ids)s)
                         """, {"user_id": user_id, "manga_ids": manga_ids})
                         rejected_ids = {int(x["manga_id"]) for x in cur.fetchall()}
+                        cur.execute(TRIAGE_BNF_SQL, {"manga_ids": manga_ids})
+                        bnf_rows = list(cur.fetchall())
+                        cur.execute(TRIAGE_REGISTERED_BOOK_SQL,
+                                    {"manga_ids": manga_ids})
+                        registered_books = list(cur.fetchall())
         return triage_pending_rows(
             pending, works, declarations, rejected_ids,
             lookup_limited=lookup_limited,
+            bnf_rows=bnf_rows, registered_books=registered_books,
         )
+
+    @router.get("/pending/discover")
+    def discover_pending(
+        source_key: str = Query(..., min_length=1, max_length=120),
+        include_bnf: bool = False,
+    ) -> dict[str, Any]:
+        """Explicit per-row second-pass lookup for zero-exact-title cases.
+
+        Local catalog search is word-based only, never auto-confirmed.
+        Optional live BnF is a BOOK search, never a MAL/work proof.
+        """
+        with connection_factory() as conn:
+            with conn.cursor() as cur:
+                cur.execute(PENDING_SQL, {"user_id": user_id, "source_key": source_key})
+                pending = cur.fetchone()
+                if not pending:
+                    raise HTTPException(status_code=404,
+                                        detail="Ligne en attente introuvable.")
+                query = default_search_term(pending)
+                words = discovery_terms(query)
+                items = []
+                truncated = False
+                if words:
+                    patterns = ["%" + (word.replace("%", r"\%")
+                                             .replace("_", r"\_")) + "%"
+                                for word in words]
+                    cur.execute(DISCOVERY_SQL, {"patterns": patterns})
+                    rows = list(cur.fetchall())
+                    truncated = len(rows) > 50
+                    for manga in rows[:50]:
+                        items.append({
+                            "manga_id": int(manga["id"]),
+                            "title": manga["title"],
+                            "source_mal_id": manga.get("source_mal_id"),
+                            "manga_type": manga.get("manga_type"),
+                            "volume_count_catalog": manga.get("volumes"),
+                            "status": "DISCOVERY_TOKEN_ONLY",
+                            "work_identity_confirmed": False,
+                        })
+        bnf = {"status": "NOT_REQUESTED", "items": []}
+        if include_bnf:
+            try:
+                sanitized = sanitize_title_query(query[:90])
+                result = search_bnf_by_title(sanitized)
+                bnf = {
+                    "status": "BOOK_NOTICES_UNVERIFIED",
+                    "items": result["items"][:20],
+                    "scope": "ISBN_AND_PRINT_NOT_WORK_IDENTITY",
+                }
+            except ValueError:
+                bnf = {"status": "INVALID_BNF_QUERY", "items": []}
+            except HTTPException as error:
+                if error.status_code != 503:
+                    raise
+                bnf = {"status": "BNF_UNAVAILABLE", "items": []}
+        return {
+            "source_key": source_key,
+            "query": query,
+            "search_tokens": words,
+            "catalog_candidates": items,
+            "catalog_truncated": truncated,
+            "catalog_evidence": "WORD_OVERLAP_NOT_IDENTITY",
+            "bnf": bnf,
+            "mangadex_followup": "/inventory/pending/external-candidates",
+            "automatic_association": False,
+            "isbn_ownership_verified": False,
+            "writes_performed": False,
+        }
 
     @router.get("/pending/candidates")
     def find_candidates(
