@@ -68,9 +68,13 @@ MAL counterpart. The owner has not verified all editions/ISBNs.
 hold out at least 20% as evaluation-only; record precision among accepted
 matches, recall over identifiable works, the false-positive count, and the
 abstention rate *separately*. Accuracy for work identity must not be presented
-as edition/ISBN correctness. The bar is precision ≥95% AND recall ≥95% on
-this gold set with zero unauthorized inventory writes; publish numerator,
-denominator and all errors. If the gold labels are incomplete or the
+as edition/ISBN correctness. The bar is **precision ≥95%, recall ≥95% AND
+resolution coverage of all annotated cases ≥95%**, with zero unauthorized
+inventory writes; publish numerator, denominator, abstentions and all errors.
+Correctly declining an unsafe identity is useful, but is not counted as a
+*resolved and identified work*. French originals without MAL identity require
+a separate, source-backed canonical-work implementation before they can
+count toward full coverage. If the gold labels are incomplete or the
 threshold is not reached, the feature remains experimental.
 
 ## International cross-ID connectors: AniList and Kitsu
