@@ -23,7 +23,8 @@ from apps.api.app.matching_quality import (
 )
 from apps.api.app.wikidata_reverse import search_wikidata_mal_titles
 from apps.api.app.international_crosswalk import (
-    search_anilist, search_kitsu_by_mal, combine_cross_id_sources,
+    search_anilist, search_anilist_by_mal_ids,
+    search_kitsu_by_mal, combine_cross_id_sources,
 )
 from apps.api.app.edition_discovery import search_bnf_by_title, sanitize_title_query
 from apps.api.app.inventory_import import (
@@ -540,6 +541,7 @@ def create_pending_resolution_router(
                             "work_identity_confirmed": False,
                         })
         ani = {"status":"NOT_REQUESTED","items":[]}
+        ani_by_mal = {"status":"NOT_REQUESTED","items":[]}
         if include_anilist:
             try:
                 ani = search_anilist(query)
@@ -562,11 +564,28 @@ def create_pending_resolution_router(
                 if exc.status_code != 503:
                     raise
                 ani = {"status":"PROVIDER_UNAVAILABLE","items":[]}
+            # A known catalogue MAL ID is a stronger lookup key than a
+            # translated title. Both queries stay read-only and opt-in.
+            local_mal_ids = list(dict.fromkeys(
+                int(item["source_mal_id"]) for item in items
+                if item.get("source_mal_id")
+            ))[:8]
+            if local_mal_ids:
+                try:
+                    ani_by_mal = search_anilist_by_mal_ids(local_mal_ids)
+                except HTTPException as exc:
+                    if exc.status_code != 503:
+                        raise
+                    ani_by_mal = {"status":"PROVIDER_UNAVAILABLE","items":[]}
+            else:
+                ani_by_mal = {"status":"NO_LOCAL_MAL_IDS","items":[]}
         kitsu = {"status":"NOT_REQUESTED","items":[]}
         kitsu_results = []
         if include_kitsu:
             mids = list(dict.fromkeys(
                 [a["source_mal_id"] for a in ani["items"]
+                 if a.get("source_mal_id")] +
+                [a["source_mal_id"] for a in ani_by_mal["items"]
                  if a.get("source_mal_id")] +
                 [x["source_mal_id"] for x in items
                  if x.get("source_mal_id")]
@@ -587,7 +606,10 @@ def create_pending_resolution_router(
                 kitsu={"status":"CROSSWALK_BATCH",
                        "requested_mal_ids":mids,
                        "results":kitsu_results}
-        international=combine_cross_id_sources(ani,kitsu_results)
+        combined_ani={
+            "items": ani.get("items",[]) + ani_by_mal.get("items",[]),
+        }
+        international=combine_cross_id_sources(combined_ani,kitsu_results)
         wiki = {"status":"NOT_REQUESTED","items":[]}
         if include_wikidata:
             try:
@@ -644,6 +666,7 @@ def create_pending_resolution_router(
             "mangadex": md,
             "wikidata": wiki,
             "anilist": ani,
+            "anilist_by_mal_id": ani_by_mal,
             "kitsu": kitsu,
             "international_id_evidence": international,
             "external_lookup_requested": bool(include_bnf or include_mangadex or
