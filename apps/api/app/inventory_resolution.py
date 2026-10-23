@@ -532,6 +532,17 @@ def create_pending_resolution_router(
                     cur.execute("""
                         SELECT m.id,m.title,m.title_english,m.title_japanese,
                                m.source_mal_id,m.volumes,m.manga_type,
+                               (SELECT f.label_fr FROM manga_wikidata_fact f
+                                WHERE f.manga_id=m.id
+                                  AND f.source_mal_id=m.source_mal_id)
+                                  AS wikidata_label_fr,
+                               COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                                 'alias',ta.alias,'source_name',ta.source_name,
+                                 'source_id',ta.source_id))
+                                FROM manga_title_alias ta
+                                WHERE ta.manga_id=m.id
+                                  AND LOWER(BTRIM(ta.alias))=%(exact)s),
+                                '[]'::jsonb) AS exact_alias_evidence,
                                (SELECT ta.alias FROM manga_title_alias ta
                                 WHERE ta.manga_id=m.id AND ta.alias ILIKE %(pattern)s
                                 ORDER BY (LOWER(ta.alias)=%(exact)s) DESC,
@@ -563,7 +574,20 @@ def create_pending_resolution_router(
                                 m.popularity ASC NULLS LAST,m.id
                         LIMIT 12
                     """, {"exact":exact,"pattern":pattern})
-                    matches = list(cur.fetchall())
+                    matches = [dict(row) for row in cur.fetchall()]
+                    canonical_ids = {
+                        int(manga["id"]) for manga in matches
+                        if any(title_key(manga.get(col)) == title_key(term)
+                               for col in ("title","title_english","title_japanese")
+                               if manga.get(col))
+                    }
+                    for manga in matches:
+                        manga["reconciliation"] = assess_work_candidate(
+                            pending, manga,
+                            canonically_matched_elsewhere=bool(
+                                canonical_ids - {int(manga["id"])}
+                            ),
+                        )
         return {
             "source_key": source_key,
             "entry_title": pending["entry_title"],
