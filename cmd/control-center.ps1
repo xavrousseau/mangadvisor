@@ -8,6 +8,8 @@ param(
 $ErrorActionPreference="Stop"
 Set-StrictMode -Version Latest
 $root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+. (Join-Path $PSScriptRoot "environment-safety.ps1")
+if ($Action -ne "BibliographyAcceptance") { Assert-MangadvisorStableCheckout $root }
 $envFile=Join-Path $root ".env"
 $example=Join-Path $root ".env.example"
 $composeFiles=@("-f",(Join-Path $root "infra\compose\docker-compose.yml"),
@@ -641,6 +643,7 @@ function Run-Bibliography-Acceptance {
     throw "Configuration Compose de bac a sable introuvable."
   }
   $common=@("compose","--env-file",$sandbox,"-f",$base,"-f",$sandboxCompose)
+  Assert-MangadvisorSandboxCompose $common
   $outDir=Join-Path $root "data\logs\bibliography_validation"
   if (!(Test-Path -LiteralPath $outDir)) {
     New-Item -ItemType Directory -Path $outDir -Force | Out-Null

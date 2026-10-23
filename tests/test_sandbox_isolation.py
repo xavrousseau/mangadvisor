@@ -22,20 +22,21 @@ class SandboxIsolationTests(unittest.TestCase):
 
     def test_credentials_are_generated_locally_and_ignored(self):
         script = (ROOT/"cmd/setup-sandbox.ps1").read_text("utf-8")
+        guard = (ROOT/"cmd/environment-safety.ps1").read_text("utf-8")
         ignored = (ROOT/".gitignore").read_text("utf-8")
         self.assertIn(".env.sandbox", ignored)
         self.assertIn("New-Key", script)
         self.assertIn("mangadvisor-test", script)
-        self.assertIn("config", script)
-        self.assertIn('"--profile", "automation", "--profile", "ai"', script)
-        self.assertIn('$config.services.PSObject.Properties[$name]', script)
-        self.assertIn('$null -eq $service', script)
+        self.assertIn("Assert-MangadvisorSandboxCompose", script)
+        self.assertIn('--profile automation --profile ai config --format json', guard)
+        self.assertIn("Assert-MangadvisorSandboxConfig", guard)
         self.assertNotIn('down -v', script)
         self.assertNotIn('docker rm', script)
         self.assertNotIn('docker volume rm', script)
         self.assertNotIn('up -d', script)
-        self.assertIn("mangadvisor_sandbox_mangadvisor_pgdata", script)
-        self.assertIn("mangadvisor_sandbox_mangadvisor_meili", script)
+        self.assertLess(script.index('Assert-MangadvisorSandboxCompose $composeArgs'),
+                        script.index('[IO.File]::Open'))
+        self.assertIn('[IO.FileMode]::CreateNew', script)
 
 if __name__=="__main__":
     unittest.main()

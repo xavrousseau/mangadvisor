@@ -155,6 +155,12 @@ jobs:
             throw "Docker Go-template arguments corrompus par Windows PowerShell 5.1."
           }
 
+      - name: Refuser les cibles de production depuis une sandbox avant toute mutation
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows\test-sandbox-safety.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Echec des barrieres sandbox Windows' }
+
       - name: Refuser la suppression d'une ancienne UI non geree
         shell: powershell
         run: |
