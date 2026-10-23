@@ -140,6 +140,20 @@ class InternationalCrosswalkTests(unittest.TestCase):
         )
         self.assertEqual(bad["status"],"CONTRADICTION_REVIEW")
 
+
+    def test_disagreeing_anilist_links_are_conflict_without_kitsu(self):
+        titles={"items":[
+            {"source_mal_id":145863,"anilist_id":150},
+            {"source_mal_id":145863,"anilist_id":777},
+        ]}
+        summary=combine_cross_id_sources(titles,[])
+        self.assertEqual(summary["status"],"CONTRADICTION_REVIEW")
+        self.assertEqual(
+            summary["contradictions"][0]["reason"],
+            "MULTIPLE_ANILIST_IDS_FOR_MAL_MANGA",
+        )
+        self.assertFalse(summary["independent_identity_proven"])
+
     def test_kitsu_provider_down_never_means_mal_not_found(self):
         with patch("apps.api.app.international_crosswalk._read_json",
                    side_effect=HTTPException(status_code=503)):
