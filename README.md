@@ -31,8 +31,16 @@ Double-cliquer sur **`mangadvisor.cmd`** à la racine du dépôt.
 | **5** | Diagnostiquer la base, les services et l'application |
 | **6** | Arrêter sans supprimer les volumes Docker |
 | **7** | Synchroniser uniquement le code depuis `main` |
-| **A** | Opérations avancées ; entretien, catalogue, enrichissement, scanner |
+| **A** | Espace de gestion : catalogue, bibliothèque, options facultatives, entretien |
 | **0** | Quitter le menu |
+
+Le menu avancé ne présente plus 26 opérations internes. Les
+anciens traitements et outils d'audit restent accessibles en
+commandes expertes `mangadvisor.cmd <commande>`
+(voir `mangadvisor.cmd help`) sans polluer le parcours habituel.
+La stratégie de **reconstruction du catalogue V2**, indépendant de la base
+actuelle et sans fusion par similarité de titres, est décrite dans
+[Décision d'architecture catalogue V2](docs/03_technical/catalogue_v2_reconstruction_decision.md).
 
 Adresse par défaut : **http://localhost:8501**. Les ports réels sont définis
 dans le fichier privé `.env`. La commande **2** réutilise la base et les
@@ -78,8 +86,6 @@ lorsqu'il est activé, reste subordonné aux résultats contrôlés de l'applica
 - **Scrinis** : enrichissement de titres et références françaises imprimées
   après vérification de l'identité de l'œuvre. [Guide Scrinis](docs/04_product/enrichissement_fr_direct_scrinis.md).
 
-Pour investiguer des sources, le menu **A → 17** dispose d'un comparatif
-documenté, et **A → 23** d'un pilote bibliographique.
 **Limite actuelle :** le modèle complet *œuvre → édition → tome → ISBN*
 avec association automatique sûre et exhaustive n'est pas encore validé.
 Les rapprochements non prouvés restent des propositions. Le suivi est
@@ -112,7 +118,7 @@ apps/web/                      Site Web (HTML / CSS / JavaScript)
 apps/api/                      API FastAPI et logique applicative
 pipelines/engine/              Acquisition et enrichissement
 sql/schema/                    Modèle SQL et migrations additives
-infra/compose/                 Docker Compose (stable et sandbox)
+infra/compose/                 Docker Compose (configuration stable)
 infra/docker/                  Images des services
 tests/                         Python, JavaScript et tests navigateur
 .github/workflows/             Contrôles CI GitHub Actions

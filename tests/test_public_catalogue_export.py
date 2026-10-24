@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 class PublicCatalogueExportTests(unittest.TestCase):
     def test_menu_has_one_click_safe_public_export(self):
         source=(ROOT/"mangadvisor.cmd").read_text(encoding="utf-8")
-        self.assertIn("25 - Exporter toute la base manga",source)
-        self.assertIn('if "%CHOICE%"=="25" set "KEY=catalogue-export"',source)
+        self.assertIn("3 - Exporter la base bibliographique publique",source)
+        self.assertIn('if "%CHOICE%"=="3" set "KEY=catalogue-export"',source)
         self.assertIn('if /I "%~1"=="catalogue-export" set "PS_SCRIPT=export-catalogue-public.ps1"',source)
 
     def test_only_whitelisted_bibliographic_tables_can_be_dumped(self):

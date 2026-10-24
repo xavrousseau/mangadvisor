@@ -49,7 +49,7 @@ class StabilisationSafetyTests(unittest.TestCase):
         menu=(ROOT/"mangadvisor.cmd").read_text("utf-8")
         control=(ROOT/"cmd/control-center.ps1").read_text("utf-8")
         source=(ROOT/"apps/api/app/library_enrichment.py").read_text("utf-8")
-        self.assertIn('if "%CHOICE%"=="12" set "KEY=library-enrich"',menu)
+        self.assertIn('if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"',menu)
         self.assertIn('if /I "%~1"=="library-enrich" set "ACTION=LibraryEnrichment"',menu)
         self.assertIn("function Enrich-My-Library",control)
         routine=control.split("function Enrich-My-Library {")[1].split("function Load-Recommendations {")[0]
