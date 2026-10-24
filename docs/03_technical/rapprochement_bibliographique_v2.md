@@ -56,9 +56,8 @@ sans Docker Desktop utilisateur. Les tests offline ciblent les variantes
 Dragon Ball (noms d'éditions distincts), les tomes contradictoires,
 les ISBN répétés et les sources numériques ou étrangères.
 
-Pour valider les **véritables notices du fournisseur et les données de la
-mangathèque**, la sandbox `mangadvisor_realtest` puis la machine Windows
-restent nécessaires. Voir [recette de bout en bout](../04_product/bibliographic_validation_integrated.md).
+La validation de données réelles nécessite une base PostgreSQL isolée.
+L'ancien Compose sandbox du dépôt a été retiré.
 Les étapes non certifiées restent suivies dans
 [l'issue #71](https://github.com/xavrousseau/mangadvisor/issues/71).
 

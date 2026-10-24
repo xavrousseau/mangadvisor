@@ -125,7 +125,6 @@ echo   17 - Comparatif V2 des sources et editions
 echo   18 - Preparer les fiches bibliographiques
 echo   20 - Enrichir les titres FR via Scrinis
 echo   23 - Pilote bibliographique BnF + Scrinis
-echo   24 - Recette bibliographique complete (bac a sable)
 echo.
 echo    0 - Retour aux outils avances
 echo.
@@ -174,7 +173,6 @@ if "%CHOICE%"=="20" set "KEY=catalogue-french-scrinis"
 if "%CHOICE%"=="21" set "KEY=catalogue-lifecycle"
 if "%CHOICE%"=="22" set "KEY=search-index"
 if "%CHOICE%"=="23" set "KEY=bibliography-pilot"
-if "%CHOICE%"=="24" set "KEY=bibliography-acceptance"
 if "%CHOICE%"=="25" set "KEY=catalogue-export"
 if "%CHOICE%"=="26" set "KEY=catalogue-source-graph"
 if not defined KEY (
@@ -264,7 +262,6 @@ if /I "%~1"=="bibliographic-staging" set "ACTION=BibliographicStaging"
 if /I "%~1"=="complete-mal-catalogue" set "ACTION=CompleteMALCatalogue"
 if /I "%~1"=="catalogue-french-scrinis" set "ACTION=CatalogueFrenchScrinis"
 if /I "%~1"=="bibliography-pilot" set "ACTION=BibliographyPilot"
-if /I "%~1"=="bibliography-acceptance" set "ACTION=BibliographyAcceptance"
 if /I "%~1"=="catalogue-export" set "PS_SCRIPT=export-catalogue-public.ps1"
 if /I "%~1"=="catalogue-source-graph" set "PS_SCRIPT=rebuild-catalogue-source-graph.ps1"
 if /I "%~1"=="catalogue-lifecycle" set "ACTION=CatalogueLifecycle"
@@ -332,7 +329,7 @@ echo.
 echo Autres : catalogue, catalogue-extended, recommendations, import, benchmark,
 echo          bnf-enrich, bnf-bulk, sources-benchmark, sources-benchmark-v2,
 echo          bibliographic-staging, complete-mal-catalogue,
-echo          catalogue-french-scrinis, bibliography-pilot, bibliography-acceptance,
+echo          catalogue-french-scrinis, bibliography-pilot,
 echo          catalogue-lifecycle, search-index, catalogue-export, catalogue-source-graph,
 echo          wikidata-enrich, library-enrich, multilingual-aliases,
 echo          mobile, mobile-stop, ai, ai-stop, status, logs,

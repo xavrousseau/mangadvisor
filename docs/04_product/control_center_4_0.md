@@ -81,8 +81,7 @@ Les procédures spécialisées sont conservées ici :
 [import sûr de la mangathèque](safe_inventory_import_3_8.md),
 [correspondances en attente](manual_pending_inventory_reconciliation_4_3.md),
 [alias multilingues](multilingual_aliases_4_4.md),
-[import BnF](bnf_bulk_import_4_8.md) et
-[recette bibliographique](bibliographic_validation_integrated.md).
+[import BnF](bnf_bulk_import_4_8.md).
 
 ## Sauvegardes et récupération
 

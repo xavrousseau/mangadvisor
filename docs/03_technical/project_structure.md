@@ -79,23 +79,10 @@ ou requete applicative. Ce marqueur reste effectif apres renommage du clone.
 La synchronisation Git du code reste disponible. Ne pas retirer le marqueur
 pour contourner ce controle.
 
-`cmd/setup-sandbox.ps1` valide le Compose resolu avant de creer `.env.sandbox` :
-projet, conteneurs, volumes internes, reseau, ports locaux et connexions SQL
-doivent correspondre a la sandbox. Les montages de dossiers du poste sont refuses.
-La recette bibliographique A -> 24 reste disponible et applique le meme controle
-avant de creer ses rapports ou lancer ses conteneurs. Elle conserve sa base
-specifique `mangadvisor_realtest`; elle ne l'initialise pas automatiquement.
-Les commandes Docker lancees manuellement ne passent pas par ces protections.
-
-La sandbox necessite Docker Compose 2.24.4 ou plus recent : `!override`
-remplace le montage du depot du worker `catalog-sync` par ses volumes sandbox
-de donnees brutes et journaux. Il utilise le code de son image ; reconstruire
-cette image apres une mise a jour. Le fonctionnement stable est conserve.
-
-Regression Windows sans Docker reel :
-`powershell.exe -NoProfile -File tests/windows/test-sandbox-safety.ps1`.
-L'option `-ValidateCompose` verifie aussi les deux combinaisons Compose sandbox
-avec des variables synthetiques, sans demarrer de conteneur.
+L'ancien outil `setup-sandbox.ps1`, la configuration Compose `sandbox`
+ainsi que la recette menu 24 ont ete retires du depot. La protection de
+`cmd/environment-safety.ps1` contre une configuration Compose inattendue
+reste active pour les commandes du Mangadvisor principal.
 
 ## Documents de conception V1
 

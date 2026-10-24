@@ -80,11 +80,6 @@ lorsqu'il est activé, reste subordonné aux résultats contrôlés de l'applica
 
 Pour investiguer des sources, le menu **A → 17** dispose d'un comparatif
 documenté, et **A → 23** d'un pilote bibliographique.
-Le menu **A → 24** lance une **recette isolée** BnF/Scrinis sur la
-sandbox `mangadvisor_realtest`, si celle-ci a été initialisée.
-Cette recette ne modifie pas la collection personnelle.
-[Recette BnF/Scrinis](docs/04_product/bibliographic_validation_integrated.md).
-
 **Limite actuelle :** le modèle complet *œuvre → édition → tome → ISBN*
 avec association automatique sûre et exhaustive n'est pas encore validé.
 Les rapprochements non prouvés restent des propositions. Le suivi est
@@ -142,7 +137,7 @@ la dernière doit être vérifiée séparément lorsque le comportement dépend
 de données locales ou des réponses actuelles des fournisseurs.
 
 - [Architecture technique](docs/03_technical/project_structure.md)
-- [Contrôles bibliographiques](docs/04_product/bibliographic_validation_integrated.md)
+- [Principes de rapprochement bibliographique](docs/03_technical/rapprochement_bibliographique_v2.md)
 - [État de GitHub et tâches ouvertes](https://github.com/xavrousseau/mangadvisor/issues/71)
 
 ## Travailler sur le code avec Codex

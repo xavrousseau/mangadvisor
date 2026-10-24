@@ -2,14 +2,14 @@
 # Requires PowerShell 5.1+, Docker Desktop; no Python installation on Windows.
 # All database/catalog/recommendation jobs run in Docker; secrets stay in .env.
 param(
-  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","BibliographyPilot","BibliographyAcceptance","CatalogueLifecycle","Wikidata","LibraryEnrichment","SearchIndex","Aliases")]
+  [ValidateSet("Environment","Database","Catalogue","CatalogueExtended","Recommendations","Network","Diagnostic","Update","Wizard","Start","Stop","Status","Logs","Inventory","BnF","BnFBulk","SourcesBenchmark","SourcesBenchmarkV2","BibliographicStaging","CompleteMALCatalogue","CatalogueFrenchScrinis","BibliographyPilot","CatalogueLifecycle","Wikidata","LibraryEnrichment","SearchIndex","Aliases")]
   [string]$Action="Wizard"
 )
 $ErrorActionPreference="Stop"
 Set-StrictMode -Version Latest
 $root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "environment-safety.ps1")
-if ($Action -ne "BibliographyAcceptance") { Assert-MangadvisorStableCheckout $root }
+Assert-MangadvisorStableCheckout $root
 $envFile=Join-Path $root ".env"
 $example=Join-Path $root ".env.example"
 $composeFiles=@("-f",(Join-Path $root "infra\compose\docker-compose.yml"),
@@ -629,63 +629,6 @@ function Run-Bibliography-Pilot {
   Engine @("-m","pipelines.engine.scripts.bibliography_pipeline","--limit",[string]$limit)
 }
 
-function Run-Bibliography-Acceptance {
-  Say "Recette complete bibliographique : 3 mangas en bac a sable"
-  Check-Docker
-  $sandbox=Join-Path $root ".env.sandbox"
-  if (!(Test-Path -LiteralPath $sandbox -PathType Leaf)) {
-    throw "La configuration .env.sandbox manque. Aucune base standard ne sera utilisee a sa place."
-  }
-  $base=Join-Path $root "infra\compose\docker-compose.yml"
-  $sandboxCompose=Join-Path $root "infra\compose\docker-compose.sandbox.yml"
-  if (!(Test-Path -LiteralPath $base) -or
-      !(Test-Path -LiteralPath $sandboxCompose)) {
-    throw "Configuration Compose de bac a sable introuvable."
-  }
-  $common=@("compose","--env-file",$sandbox,"-f",$base,"-f",$sandboxCompose)
-  Assert-MangadvisorSandboxCompose $common
-  $outDir=Join-Path $root "data\logs\bibliography_validation"
-  if (!(Test-Path -LiteralPath $outDir)) {
-    New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-  }
-  $stamp=Get-Date -Format "yyyyMMdd_HHmmss"
-  $summary=Join-Path $outDir ("bnf_candidates_" + $stamp + ".json")
-  $live=Join-Path $outDir ("scrinis_probe_" + $stamp + ".json")
-  $selected="49271,11,51119"
-  Write-Host "Cibles : Chainsaw Man, One Piece, Solo Leveling (IDs locaux $selected)."
-  Write-Host "1) Relire tous les ISBN BnF deja collectes ; aucun appel BnF."
-  Write-Host "2) Interroger Scrinis une fois, sans ecriture en base ni contournement permanent des cooldowns."
-  Write-Host "Seul le cache de reponses publiques peut etre actualise."
-  Write-Host "Aucune edition ou possession ne sera attribuee automatiquement."
-  if (!(Confirm "Lancer ces deux diagnostics dans la sandbox uniquement ?" $false)) {
-    Write-Host "Recette annulee ; aucune interrogation lancee."
-    return
-  }
-  & docker @common up -d postgres meilisearch
-  Assert-Exit "Demarrage de la sandbox impossible"
-  # The sandbox does not bind-mount pipeline sources. Rebuild the ephemeral
-  # engine image so GitHub updates cannot silently use stale Python code.
-  & docker @common build engine
-  Assert-Exit "Construction du moteur actualise impossible"
-  $python=@("run","--rm","-T","-e","POSTGRES_DB=mangadvisor_realtest",
-            "engine","python","-m","pipelines.engine.scripts.bibliography_pipeline",
-            "--manga-ids",$selected,"--details")
-  $offline=@($common)+@($python)+@("--report-only")
-  Say "Rapport detaille BnF, sans appel externe"
-  $output=@(& docker @offline)
-  Assert-Exit "Lecture bibliographique BnF en sandbox"
-  $utf8=New-Object Text.UTF8Encoding($false)
-  [IO.File]::WriteAllText($summary,($output -join [Environment]::NewLine)+[Environment]::NewLine,$utf8)
-  Write-Host ("Rapport BnF : " + $summary)
-  $probe=@($common)+@($python)+@("--probe-scrinis")
-  Say "Sonde Scrinis reelle, sans ecriture SQL"
-  $output=@(& docker @probe)
-  Assert-Exit "Sonde Scrinis en sandbox"
-  [IO.File]::WriteAllText($live,($output -join [Environment]::NewLine)+[Environment]::NewLine,$utf8)
-  Write-Host ("Rapport Scrinis : " + $live)
-  Write-Host "Recette terminee. Transmets ces deux JSON pour examen des correspondances."
-}
-
 function Enrich-BnF {
   Say "Enrichissement progressif depuis le catalogue BnF"
   Ensure-Environment
@@ -1028,7 +971,6 @@ try {
     "CompleteMALCatalogue" { Load-Complete-MAL-Catalogue }
     "CatalogueFrenchScrinis" { Enrich-Catalogue-French-Scrinis }
     "BibliographyPilot" { Run-Bibliography-Pilot }
-    "BibliographyAcceptance" { Run-Bibliography-Acceptance }
     "CatalogueLifecycle" { Manage-Catalogue-Lifecycle }
     "Recommendations" { Load-Recommendations }
     "SearchIndex"     { Reindex-Manga-Search }
