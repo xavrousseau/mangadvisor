@@ -53,44 +53,103 @@ goto menu
 :advanced
 cls
 echo ==========================================================
-echo                  OUTILS AVANCES
+echo                     OUTILS AVANCES
 echo ==========================================================
+echo.
+echo    A - Catalogue et recherche
+echo    B - Mangatheque, scanner et conseiller
+echo    C - Informations francaises et bibliographie
+echo    D - Diagnostics et outils techniques
+echo.
+echo    S - Entretien, configuration et restauration
+echo    0 - Retour au menu principal
+echo.
+echo ==========================================================
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if /I "%CHOICE%"=="0" goto menu
+if /I "%CHOICE%"=="A" goto :advanced_catalogue
+if /I "%CHOICE%"=="B" goto :advanced_library
+if /I "%CHOICE%"=="C" goto :advanced_bibliography
+if /I "%CHOICE%"=="D" goto :advanced_technical
+if /I "%CHOICE%"=="S" goto :maintenance
+rem Compatibilite : les anciens raccourcis A puis 1 a 26 restent valides.
+goto :advanced_dispatch
+
+:advanced_catalogue
+cls
+echo ================= CATALOGUE ET RECHERCHE ==================
 echo.
 echo    1 - Actualiser le catalogue de mangas
 echo    2 - Actualiser les recommandations communautaires
+echo   14 - Etendre le catalogue Tenrai
+echo   19 - Charger tout le catalogue MAL/Jikan via Tenrai
+echo   21 - Catalogue vivant : nouveautes et veille
+echo   22 - Actualiser la recherche Meilisearch
+echo.
+echo    0 - Retour aux outils avances
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if "%CHOICE%"=="0" goto :advanced
+goto :advanced_dispatch
+
+:advanced_library
+cls
+echo =============== MA MANGATHEQUE ET MES OUTILS ==============
+echo.
 echo    3 - Importer ma mangatheque depuis le CSV
-echo    4 - Tester ma mangatheque sans la modifier
+echo    4 - Tester ma mangatheque sans modification
 echo    5 - Activer le scanner mobile HTTPS
 echo    6 - Arreter le scanner mobile HTTPS
 echo    7 - Activer le conseiller IA local
 echo    8 - Arreter le conseiller IA local
-echo    9 - Consulter les journaux Docker
-echo   10 - Enrichir les fiches via la BnF (candidats a verifier)
-echo   11 - Completer les informations depuis Wikidata (titres FR, genres)
-echo   12 - Enrichir ma mangatheque automatiquement (Wikidata et BnF)
-echo   13 - Recuperer les titres alternatifs FR, EN et JA
-echo   14 - Etendre le catalogue Tenrai (mangas et one-shots)
-echo   15 - Importer des fichiers bibliographiques BnF (candidats)
-echo   16 - Comparatif sources (ancien raccourci vers V2)
-echo   17 - Comparatif V2 : mangas FR papier et editions, scores distincts
-echo   18 - Preparer les fiches bibliographiques (sans modifier la mangatheque)
-echo   19 - Charger tout le catalogue MAL/Jikan via Tenrai (avec reprise)
-echo   20 - Enrichir les titres FR du catalogue via Scrinis (direct)
-echo   21 - Catalogue vivant : nouveautes et veille automatique
-echo   22 - Actualiser la recherche intelligente Meilisearch
-echo   23 - Pilote bibliographique BnF + Scrinis (5 a 10 mangas)
-echo   24 - Recette bibliographique complete (3 mangas, bac a sable)
-echo   25 - Exporter toute la base manga (sans mes donnees personnelles)
-echo   26 - Reconstruire le referentiel public des oeuvres (sans perdre de donnees)
+echo   12 - Enrichir ma mangatheque : Wikidata et BnF
 echo.
-echo    S - Entretien, configuration et restauration
-echo    0 - Retour
+echo    0 - Retour aux outils avances
 echo.
 set "CHOICE="
 set /p "CHOICE=Ton choix : "
-if /I "%CHOICE%"=="0" goto menu
-if /I "%CHOICE%"=="S" goto :maintenance
+if "%CHOICE%"=="0" goto :advanced
+goto :advanced_dispatch
 
+:advanced_bibliography
+cls
+echo =============== SOURCES FR ET BIBLIOGRAPHIE ===============
+echo.
+echo   10 - BnF : rechercher des fiches candidates
+echo   11 - Wikidata : titres francais et genres
+echo   13 - Titres alternatifs FR, EN et JA
+echo   15 - Importer des fichiers bibliographiques BnF
+echo   17 - Comparatif V2 des sources et editions
+echo   18 - Preparer les fiches bibliographiques
+echo   20 - Enrichir les titres FR via Scrinis
+echo   23 - Pilote bibliographique BnF + Scrinis
+echo   24 - Recette bibliographique complete (bac a sable)
+echo.
+echo    0 - Retour aux outils avances
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if "%CHOICE%"=="0" goto :advanced
+goto :advanced_dispatch
+
+:advanced_technical
+cls
+echo =================== OUTILS TECHNIQUES =====================
+echo.
+echo    9 - Consulter les journaux Docker
+echo   25 - Exporter le catalogue public (sans donnees privees)
+echo   26 - Reconstruire le referentiel public des oeuvres
+echo.
+echo    0 - Retour aux outils avances
+echo.
+set "CHOICE="
+set /p "CHOICE=Ton choix : "
+if "%CHOICE%"=="0" goto :advanced
+goto :advanced_dispatch
+
+:advanced_dispatch
 set "KEY="
 if "%CHOICE%"=="1" set "KEY=catalogue"
 if "%CHOICE%"=="2" set "KEY=recommendations"

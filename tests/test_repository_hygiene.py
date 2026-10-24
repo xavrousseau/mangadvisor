@@ -52,6 +52,8 @@ RETIRED = (
     "pipelines/engine/src/extract/jikan_client.py",
     "docs/reports/recommendation_profile_tests_v0_7_4.md",
     "docs/reports/project_file_audit_v0_8_13.txt",
+    "pipelines/engine/scripts/analyze_jikan_recommendation_edges.py",
+    "pipelines/engine/scripts/run_recommendation_profile_tests.py",
 )
 
 
@@ -138,23 +140,9 @@ class RepositoryHygieneTests(unittest.TestCase):
             self.assertNotIn(required, entries)
             self.assertNotIn(required + "/", entries)
 
-    def test_runtime_diagnostics_never_overwrite_versioned_reports(self):
-        for name in ("analyze_jikan_recommendation_edges.py",
-                     "run_recommendation_profile_tests.py"):
-            with self.subTest(name=name):
-                text = (ROOT / "pipelines/engine/scripts" / name).read_text(
-                    encoding="utf-8"
-                )
-                self.assertIn(' / "data" / "logs" / "diagnostics"', text)
-                self.assertNotIn(' / "docs" / "reports"', text)
+    def test_runtime_logs_are_ignored(self):
         ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("data/logs/*", ignore)
-
-    def test_recommendation_profile_has_only_one_output(self):
-        report = (ROOT / "pipelines/engine/scripts/run_recommendation_profile_tests.py").read_text(encoding="utf-8")
-        self.assertIn('recommendation_profile_tests_latest.md', report)
-        self.assertNotIn('LEGACY_REPORT_PATH', report)
-        self.assertNotIn('recommendation_profile_tests_v0_7_4.md', report)
 
 
 if __name__ == "__main__":
