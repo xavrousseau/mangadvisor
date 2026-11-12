@@ -151,6 +151,8 @@ function toast(text){
  setTimeout(()=>area.classList.add("hidden"),3500);
 }
 async function go(path,replace=false){
+ if(routeInfo().view==="discover")state.catalogScrollY=window.scrollY;
+ if(routeInfo().view==="library")state.libraryScrollY=window.scrollY;
  document.body.classList.remove("axiom-open");
  if(path.startsWith("/")){
    if(replace)history.replaceState({}, "",path);else history.pushState({}, "",path);
