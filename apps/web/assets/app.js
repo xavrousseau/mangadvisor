@@ -27,7 +27,7 @@ const state = {
   appearance: loadAppearance(window.localStorage),
   catalogPage:1,catalogQuery:"",catalogGenre:"",catalogFinished:false,
   catalogHasMore:true,catalogBusy:false,catalogNonce:0,catalogHtmlCache:"",catalogScrollY:0,
-  libraryPage:1,libraryQuery:"",libraryStatus:"",libraryView:"series",libraryDisplay:"covers",libraryPreviousStatus:"",libraryHasMore:true,libraryBusy:false,libraryNonce:0,libraryScrollY:0,
+  libraryPage:1,libraryQuery:"",libraryStatus:"",libraryView:"series",libraryDisplay:"covers",libraryPreviousStatus:"",libraryHasMore:true,libraryBusy:false,libraryNonce:0,libraryScrollY:0,libraryHtmlCache:"",libraryCacheKey:"",
   recMode:"mood",mood:"MYSTERY",moodLength:"ANY",moodFinished:false,moodUseLibrary:true,moodMinScore:6.5,recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   advisorHistory:[],advisorContext:{},advisorSeen:[],advisorResponse:null,advisorBusy:false,
@@ -276,6 +276,7 @@ async function renderHome(token){
  '<div id="home-cards">'+loadingCards(5)+'</div></section>'+
  '';
  if(!mount(markup,token))return;
+ if(state.advisorResponse)void paintAdvisorResults(token);
 
  // Chargement indépendant des trois espaces : un moteur lent n'empêche pas
  // l'utilisateur de parcourir les autres sections.
@@ -535,6 +536,15 @@ async function renderLibrary(token){
  applyLibraryView();
  if(state.bulkResolver)drawBulkResolver();
  void updatePhysicalInventory(token);
+ const cacheKey=[state.libraryView,state.libraryQuery,state.libraryStatus].join("|");
+ if(state.libraryHtmlCache && state.libraryCacheKey===cacheKey){
+  const out=document.querySelector(state.libraryView==="wishlist"?"#library-wishlist-results":"#library-results");
+  if(out){
+   out.innerHTML=state.libraryHtmlCache;
+   requestAnimationFrame(()=>{window.scrollTo(0,state.libraryScrollY);maybeLoadNextLibraryPage();});
+   return;
+  }
+ }
  await updateLibrary(token);
 }
 async function updatePhysicalInventory(token){
@@ -715,7 +725,7 @@ async function updateLibrary(token,append=false){
  if(append&&(!state.libraryHasMore||state.libraryBusy))return;
  const nonce=append?state.libraryNonce:++state.libraryNonce;
  const page=append?state.libraryPage+1:1;
- if(!append){state.libraryPage=1;state.libraryHasMore=true;out.innerHTML=loadingCards(8);}
+ if(!append){state.libraryPage=1;state.libraryHasMore=true;state.libraryHtmlCache="";state.libraryScrollY=0;out.innerHTML=loadingCards(8);}
  state.libraryBusy=true;
  try{
   const params=new URLSearchParams({limit:"25",offset:String((page-1)*24)});
@@ -746,6 +756,8 @@ async function updateLibrary(token,append=false){
     '<div id="library-scroll-sentinel" class="infinite-scroll-status" aria-live="polite">'+
     (state.lang==="fr"?"Les prochaines séries arrivent en descendant…":"Scroll for more series…")+'</div>');
   if(!wishlistMode){out.classList.toggle("library-results-list",state.libraryDisplay==="list");out.classList.toggle("library-results-covers",state.libraryDisplay!=="list");}
+  state.libraryHtmlCache=out.innerHTML;
+  state.libraryCacheKey=[state.libraryView,state.libraryQuery,state.libraryStatus].join("|");
  }catch(err){
   if(token===renderToken&&nonce===state.libraryNonce){
    if(append){
@@ -1650,7 +1662,7 @@ async function saveLibrary(form){
  };
  try{
   const r=await request("/library/items",{method:"POST",data:payload});
-  state.libraryDetail=r.item||payload;state.recResult=null;toast(t(state.lang,"saved"));
+  state.libraryDetail=r.item||payload;state.recResult=null;state.libraryHtmlCache="";toast(t(state.lang,"saved"));
   await renderDetail(++renderToken,Number(manga.id));
  }catch(err){toast(err.message);}
 }
@@ -1658,7 +1670,7 @@ async function removeLibrary(){
  const manga=state.currentDetail;if(!manga||!confirm(t(state.lang,"confirmRemove")))return;
  try{
   await request("/library/items/"+manga.id,{method:"DELETE"});
-  state.libraryDetail=null;state.recResult=null;toast(t(state.lang,"removed"));await render();
+  state.libraryDetail=null;state.recResult=null;state.libraryHtmlCache="";toast(t(state.lang,"removed"));await render();
  }catch(err){toast(err.message);}
 }
 async function similarRecommendations(){
@@ -1701,7 +1713,7 @@ root.addEventListener("click",async event=>{
        owned_volumes:old?.owned_volumes??null,read_volumes:old?.read_volumes??null,
        notes:old?.notes??"",started_at:old?.started_at??null,finished_at:old?.finished_at??null
      }});
-     state.recResult=null;
+     state.recResult=null;state.libraryHtmlCache="";
      button.closest(".quick-add-menu").hidden=true;
      const toggle=button.closest(".manga-card")?.querySelector('[data-action="quick-add-toggle"]');
      if(toggle)toggle.setAttribute("aria-expanded","false");
@@ -1751,6 +1763,7 @@ root.addEventListener("click",async event=>{
    if(!["series","editions","wishlist","manage"].includes(next))return;
    const previous=state.libraryView;
    state.libraryView=next;
+   if(next!==previous)state.libraryHtmlCache="";
    if(next==="wishlist"||previous==="wishlist")state.libraryPage=1;
    applyLibraryView();
    if(next==="wishlist"||previous==="wishlist")await updateLibrary(renderToken);
