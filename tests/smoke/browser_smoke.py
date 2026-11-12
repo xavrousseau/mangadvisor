@@ -49,7 +49,7 @@ def run():
 
                     # Axiom est un chatbot sur l'accueil et non un menu ou un
                     # mode obligatoire de la page de recommandations.
-                    assert page.locator(".nav-link").count() == 4
+                    assert page.locator(".nav-link").count() == 5
                     assert page.locator(".nav-link").filter(
                         has_text="Axiom"
                     ).count() == 0
@@ -119,6 +119,22 @@ def run():
                     page.screenshot(
                         path=str(OUTPUT / f"{device}-mangatheque.png"), full_page=True
                     )
+
+                    # Profil alimenté par l'API réelle de lecture.
+                    page.locator('[data-go="/profile"]').first.click()
+                    expect(page).to_have_url(BASE + "/profile", timeout=30000)
+                    expect(page.locator("#profile-summary .reading-profile")).to_be_visible(timeout=30000)
+                    assert_no_horizontal_overflow(page, device)
+                    page.screenshot(path=str(OUTPUT / f"{device}-profil.png"), full_page=True)
+
+                    # Les formulaires sont des maquettes UI, pas un faux login.
+                    page.locator('[data-go="/login"]').first.click()
+                    expect(page.locator("#auth-ui-form")).to_be_visible()
+                    page.locator('[data-go="/register"]').first.click()
+                    expect(page.locator("#auth-pseudo")).to_be_visible()
+                    expect(page.locator(".auth-note")).to_contain_text("raccordés au backend")
+                    assert_no_horizontal_overflow(page, device)
+                    page.screenshot(path=str(OUTPUT / f"{device}-inscription.png"), full_page=True)
 
                     assert not errors, f"Erreurs JavaScript {device}: {errors}"
                     print(f"MangAxiom UX browser smoke OK : {device}")
