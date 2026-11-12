@@ -345,3 +345,33 @@ body.axiom-open{overflow:hidden}
  .library-view-tab{flex:1 1 0;min-width:0}
  .infinite-scroll-status{padding:15px 8px;min-height:58px}
 }
+
+
+/* Profil et accès au compte : composants de présentation sans API d'authentification. */
+.profile-hero{min-height:265px;padding:clamp(25px,4vw,50px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:13px;border:1px solid rgba(121,82,245,.45);border-radius:24px;background:radial-gradient(circle at 90% 15%,rgba(121,82,245,.30),transparent 45%),linear-gradient(120deg,#0e1635,#23163b)}
+.profile-hero h1{font-size:clamp(32px,4vw,50px);line-height:1.05;margin:0;color:#f1f1fa}
+.profile-hero p{max-width:580px;color:#c9c8dc;font-size:14px;line-height:1.6;margin:0 0 8px}
+.profile-hero .actions{gap:10px}
+#profile-summary .reading-profile{display:block;padding:20px;border:1px solid rgba(121,82,245,.33);border-radius:20px;background:#10172d}
+#profile-summary .reading-profile .stat-grid{gap:14px}
+#profile-summary .reading-profile .stat-card{border:1px solid rgba(0,217,245,.27);border-radius:14px;background:#161b3b}
+.auth-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(310px,445px);min-height:600px;border-radius:25px;overflow:hidden;border:1px solid rgba(121,82,245,.45);background:#101731}
+.auth-art{display:flex;flex-direction:column;justify-content:center;padding:clamp(30px,6vw,70px);background:radial-gradient(circle at 75% 25%,rgba(255,114,109,.3),transparent 34%),radial-gradient(circle at 30% 50%,rgba(121,82,245,.46),transparent 70%),linear-gradient(140deg,#101631,#231348)}
+.auth-art h1{font-size:clamp(30px,4vw,53px);max-width:14ch;line-height:1.08;color:#f1f1fa}
+.auth-panel{padding:clamp(28px,3vw,47px);display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:14px}
+.auth-panel h2{font-size:clamp(26px,2.8vw,36px);margin:0}
+.auth-panel form{display:flex;flex-direction:column;gap:13px}
+.auth-panel label{font-size:13px;font-weight:700;color:#eeeefa}
+.auth-panel .input{height:46px;border:1px solid #514475;background:#10162d;color:#fff}
+.auth-panel form .btn{margin-top:7px;min-height:48px}
+.auth-note{color:#b8b8d1;font-size:12px;line-height:1.55}
+@media(max-width:740px){
+ .sidebar .nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .nav-link{font-size:9px}
+ .auth-layout{grid-template-columns:minmax(0,1fr)}
+ .auth-art{min-height:180px;padding:25px}
+ .auth-art h1{font-size:29px;max-width:22ch}
+ .auth-panel{padding:22px 18px}
+ .profile-hero{border-radius:17px;min-height:250px;padding:25px 19px}
+ #profile-summary .reading-profile{padding:16px}
+}
