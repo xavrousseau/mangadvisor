@@ -785,10 +785,17 @@ async function showLibraryDemo(){
  }
 }
 async function readLibraryItem(manga){
- try{
-  const res=await request("/library?"+new URLSearchParams({q:manga.title,limit:"100"}));
-  return (res.items||[]).find(x=>Number(x.manga_id)===Number(manga.id))||null;
- }catch{return null;}
+ // Parcourir tous les résultats plutôt que de prendre l'absence dans les 100
+ // premiers pour une œuvre jamais enregistrée : l'upsert préserve les données.
+ const limit=500;
+ for(let offset=0;offset<50000;offset+=limit){
+  const res=await request("/library?"+new URLSearchParams({q:manga.title,limit:String(limit),offset:String(offset)}));
+  const items=res.items||[];
+  const entry=items.find(x=>Number(x.manga_id)===Number(manga.id));
+  if(entry)return entry;
+  if(items.length<limit)return null;
+ }
+ throw Error("Bibliothèque trop volumineuse pour confirmer l’absence de cette série");
 }
 async function renderDetail(token,id){
  const html='<div><button class="btn-link" data-action="back">← '+L("back")+'</button></div>'+
@@ -1687,8 +1694,7 @@ root.addEventListener("click",async event=>{
    button.disabled=true;
    try{
      const manga=await request("/mangas/"+id);
-     const found=await request("/library?"+new URLSearchParams({q:manga.title,limit:"100"}));
-     const old=(found.items||[]).find(item=>Number(item.manga_id)===id)||null;
+     const old=await readLibraryItem(manga);
      await request("/library/items",{method:"POST",data:{
        manga_id:id,library_status:status,
        user_score:old?.user_score??null,is_favorite:old?.is_favorite===true,
