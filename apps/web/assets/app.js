@@ -150,6 +150,7 @@ function toast(text){
  setTimeout(()=>area.classList.add("hidden"),3500);
 }
 async function go(path,replace=false){
+ document.body.classList.remove("axiom-open");
  if(path.startsWith("/")){
    if(replace)history.replaceState({}, "",path);else history.pushState({}, "",path);
  }
@@ -246,11 +247,15 @@ function renderAppearance(token){
  );
 }
 async function renderHome(token){
- const markup='<section class="hero hero-featured"><div class="hero-decor" aria-hidden="true"></div><div class="hero-content"><div class="eyebrow">✦ '+e(state.lang==="fr"?"TON PROCHAIN COUP DE CŒUR":"YOUR NEXT FAVORITE")+'</div>'+
+ const markup='<div class="home-hero-layout"><section class="hero hero-featured"><div class="hero-decor" aria-hidden="true"></div><div class="hero-content"><div class="eyebrow">✦ '+e(state.lang==="fr"?"TON PROCHAIN COUP DE CŒUR":"YOUR NEXT FAVORITE")+'</div>'+
  '<h1>'+ (state.lang==="fr"?'Chaque grande histoire commence par une <em>découverte.</em>':'Every great story begins with <em>discovery.</em>')+'</h1>'+
  '<p>'+L("heroText")+'</p><div class="hero-actions"><button class="btn btn-primary" data-go="/discover">⌕ '+L("startExplore")+' →</button>'+
  '<button class="btn btn-ghost" data-go="/for-you">✧ '+L("getRecs")+'</button></div></div>'+
- '<div class="feature-cover-stack" id="home-featured-covers" aria-hidden="true"></div></section><div class="section-header home-action-heading"><div><h2 class="section-title">'+L("whatNext")+'</h2></div></div>'+
+ '<div class="feature-cover-stack" id="home-featured-covers" aria-hidden="true"></div></section>'+
+ '<aside class="home-axiom-card"><span class="eyebrow">✦ AXIOM · CONSEILLER MANGA</span><h2>Besoin d’une idée de lecture ?</h2><p>Dis-moi ce que tu recherches, Axiom t’aide à découvrir ton prochain manga.</p><button type="button" class="btn btn-primary" data-action="axiom-open" aria-haspopup="dialog">Discuter avec Axiom</button></aside></div>'+
+ '<div class="axiom-overlay" id="axiom-overlay" hidden><section class="axiom-dialog" role="dialog" aria-modal="true" aria-label="Conversation avec Axiom"><header class="axiom-dialog-heading"><strong>Axiom · Conseiller manga</strong><button type="button" class="btn btn-small" data-action="axiom-close" aria-label="Fermer le chatbot">✕</button></header>'+
+ '<div id="advisor-main">'+advisorChatMarkup({history:state.advisorHistory,busy:state.advisorBusy,lang:state.lang,aiMode:state.advisorAiMode},L,e)+'</div><div id="advisor-results"></div></section></div>'+
+ '<div class="section-header home-action-heading"><div><h2 class="section-title">'+L("whatNext")+'</h2></div></div>'+
  '<div class="home-shortcuts"><button class="shortcut-chip" data-go="/discover">⌕ '+L("discover")+' ↗</button><button class="shortcut-chip" data-go="/for-you">✧ '+L("forYou")+' ↗</button><button class="shortcut-chip" data-go="/library">▤ '+L("library")+' ↗</button></div>'+
  '<section aria-labelledby="home-continue-title"><div class="section-header"><div><h2 class="section-title" id="home-continue-title">'+L("homeContinue")+'</h2>'+
  '<p class="section-caption">'+L("homeContinueDesc")+'</p></div><button class="btn-link" data-go="/library">'+L("homeContinueAction")+' →</button></div>'+
@@ -892,7 +897,7 @@ async function paintAdvisorResults(token){
  const target=document.querySelector("#advisor-results"),response=state.advisorResponse;
  if(!target||!response?.recommendations?.length)return;
  const urls=await covers(response.recommendations);
- if(token!==renderToken||state.recMode!=="advisor")return;
+ if(token!==renderToken||!document.querySelector("#advisor-main"))return;
  target.innerHTML=advisorResultsMarkup(response,{L,e,tr,
   poster:m=>poster(m,urls),rating:m=>stars(m),
   published:status=>e(publication(state.lang,status))});
@@ -903,7 +908,7 @@ async function sendAdvisorMessage(raw){
  state.advisorBusy=true;state.advisorHistory.push({role:"user",text:value});
  state.advisorHistory=state.advisorHistory.slice(-18);
  const currentToken=renderToken;
- if(state.recMode==="advisor"){
+ if(document.querySelector("#advisor-main")){
   const main=document.querySelector("#advisor-main");
   if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:true,lang:state.lang,aiMode:state.advisorAiMode},L,e);
  }
@@ -924,7 +929,7 @@ async function sendAdvisorMessage(raw){
  }finally{
   state.advisorHistory=state.advisorHistory.slice(-18);
   state.advisorBusy=false;
-  if(state.recMode==="advisor"&&currentToken===renderToken){
+  if(currentToken===renderToken&&document.querySelector("#advisor-main")){
    const main=document.querySelector("#advisor-main");
    if(main)main.innerHTML=advisorChatMarkup({history:state.advisorHistory,busy:false,lang:state.lang,aiMode:state.advisorAiMode},L,e);
    const target=document.querySelector("#advisor-results");
@@ -1570,6 +1575,16 @@ root.addEventListener("click",async event=>{
   event.preventDefault();await go(button.dataset.go);return;
  }
  const action=button.dataset.action;
+ if(action==="axiom-open"){
+  const overlay=document.querySelector("#axiom-overlay");
+  if(overlay){overlay.hidden=false;document.body.classList.add("axiom-open");overlay.querySelector("#advisor-message")?.focus();}
+  return;
+ }
+ if(action==="axiom-close"){
+  const overlay=document.querySelector("#axiom-overlay");
+  if(overlay){overlay.hidden=true;document.body.classList.remove("axiom-open");}
+  document.querySelector('[data-action="axiom-open"]')?.focus();return;
+ }
  if(action==="refresh")return render();
  if(action==="library-demo")return showLibraryDemo();
  if(action==="library-demo-close")return updateLibrary(renderToken);
@@ -1675,7 +1690,12 @@ root.addEventListener("click",async event=>{
  if(action==="advisor-reset"){
   if(state.advisorBusy)return;
   state.advisorHistory=[];state.advisorContext={};state.advisorSeen=[];state.advisorResponse=null;
-  await render();return;
+  const panel=document.querySelector("#advisor-main");
+  if(panel){
+   panel.innerHTML=advisorChatMarkup({history:[],busy:false,lang:state.lang,aiMode:state.advisorAiMode},L,e);
+   const results=document.querySelector("#advisor-results");if(results)results.innerHTML="";
+  }else await render();
+  return;
  }
  if(action==="advisor-prompt"){
   const prompt=ADVISOR_PROMPTS[state.lang]?.[Number(button.dataset.index)];
@@ -1828,6 +1848,13 @@ root.addEventListener("keydown",event=>{
      tabs[next].click();
    }
    return;
+ }
+ if(event.key==="Escape"){
+  const overlay=document.querySelector("#axiom-overlay");
+  if(overlay && !overlay.hidden){
+    event.preventDefault();overlay.hidden=true;document.body.classList.remove("axiom-open");
+    document.querySelector('[data-action="axiom-open"]')?.focus();return;
+  }
  }
  if(event.key==="Escape"&&isbnScanner.isOpen()){event.preventDefault();isbnScanner.close();return;}
  if(event.key==="Enter"&&event.target.id==="manual-search"){event.preventDefault();manualSearch();}
