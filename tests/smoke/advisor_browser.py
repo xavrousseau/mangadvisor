@@ -12,8 +12,9 @@ def chat(page,message):
     expect(page.locator("#advisor-form button[type=submit]")).to_be_enabled(timeout=25000)
 
 def run(page,device):
-    page.goto(BASE+"/for-you",wait_until="domcontentloaded",timeout=60000)
-    page.locator('[data-action="rec-mode"][data-value="advisor"]:visible').first.click()
+    page.goto(BASE+"/",wait_until="domcontentloaded",timeout=60000)
+    page.locator('[data-action="axiom-open"]').click()
+    expect(page.locator("#axiom-overlay")).to_be_visible()
     expect(page.locator(".advisor-studio")).to_be_visible(timeout=20000)
     expect(page.locator(".advisor-suggestion")).to_have_count(4)
     # From zero history, the example prompt uses actual positive-library tags.
@@ -71,13 +72,14 @@ def run(page,device):
     page.locator('[data-action="advisor-reset"]').click()
     expect(page.locator(".advisor-suggestion")).to_have_count(4)
     expect(page.locator(".advisor-card")).to_have_count(0)
-    # Previous recommendation modes remain accessible.
-    page.locator('[data-action="rec-mode"][data-value="mood"]:visible').first.click()
-    # The UX now intentionally keeps advanced mood filters collapsed.
-    # Expand the native details widget before asserting its controls.
+    # Axiom n'est plus un mode de Pour moi : sa seule entrée est l'accueil.
+    page.locator('[data-action="axiom-close"]').click()
+    expect(page.locator("#axiom-overlay")).to_be_hidden()
+    page.goto(BASE+"/for-you",wait_until="domcontentloaded")
     page.locator(".mood-advanced > summary").click()
     expect(page.locator("#mood-length")).to_be_visible()
-    page.locator('[data-action="rec-mode"][data-value="advisor"]:visible').first.click()
+    page.goto(BASE+"/",wait_until="domcontentloaded")
+    page.locator('[data-action="axiom-open"]').click()
     expect(page.locator("#advisor-message")).to_be_visible()
 
 if __name__=="__main__":

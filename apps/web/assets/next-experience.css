@@ -257,3 +257,121 @@ body{background:var(--bg)}
  .hero-has-feature .feature-cover-stack{width:100%;opacity:.72}
  .featured-genre{font-size:10px;min-height:25px}
 }
+
+
+/* MangAxiom — identité validée, intégration UX sur le frontend existant.
+   Étendre la feuille chargée en dernier évite une cinquième couche CSS.
+   Les données métiers et les composants de l'API restent inchangés. */
+:root[data-theme][data-accent] {
+  --bg: #080f20;
+  --sidebar: #0a0e23;
+  --surface: #111733;
+  --surface2: #181d3f;
+  --border: #45416e;
+  --text: #f1f1fa;
+  --muted: #b8b8d1;
+  --soft: #9394b4;
+  --accent: #00d9f5;
+  --accent-hover: #6beafa;
+  --accent-tint: rgba(0, 217, 245, .13);
+  --radius: 17px;
+  color-scheme: dark;
+}
+body{background:radial-gradient(ellipse 60% 42% at 85% 0%,rgba(121,82,245,.13),transparent),#080f20}
+body,button,input,select,textarea{font-family:'Inter','DM Sans',system-ui,sans-serif}
+h1,h2,h3,h4,.logo-word{font-family:'Poppins','Outfit',sans-serif}
+.sidebar{background:linear-gradient(180deg,#0b1028,#0a0d1f 76%,#1c1235);border-right:1px solid #39305c}
+.brand .logo-mark{color:#fff;background:linear-gradient(130deg,#00d9f5 10%,#7952f5 49%,#ff7a00 91%);box-shadow:0 0 20px rgba(121,82,245,.34);border-radius:14px}
+.brand .logo-word{color:#f1f1fa;letter-spacing:-.055em}
+.brand .logo-word span{color:#00d9f5}
+.nav-link{color:#c2c4dd}
+.nav-link.active{color:#00d9f5;background:rgba(0,217,245,.09);box-shadow:inset 3px 0 0 #00d9f5,0 0 13px rgba(0,217,245,.08)}
+.topbar{background:rgba(8,15,32,.91);border-color:rgba(140,113,207,.22)}
+.main-content{max-width:1710px}
+.eyebrow{color:#00d9f5}
+.btn-primary{background:linear-gradient(110deg,#7952f5,#d83ecf 58%,#ff7a00);color:white;border:1px solid #b775f0;box-shadow:0 0 16px rgba(121,82,245,.26)}
+.btn-primary:hover:not(:disabled){background:linear-gradient(110deg,#9168fa,#e45cdb 55%,#ff963d);border-color:#f4a2fd}
+.btn-soft,.btn-ghost{border-color:#615094}
+.manga-card,.filters,.option-panel,.rec-card{border-color:rgba(141,103,224,.25)}
+.manga-card:hover{border-color:#7952f5;box-shadow:0 13px 29px rgba(76,39,153,.22)}
+.hero-featured,.discover-intro,.reco-stage,.collection-stage{border-color:rgba(151,95,234,.42)}
+.home-hero-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,330px);gap:17px;align-items:stretch}
+.home-hero-layout .hero-featured{min-width:0;margin:0}
+.home-axiom-card{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:11px;min-width:0;padding:clamp(22px,2.8vw,35px);border-radius:25px;border:1px solid rgba(0,217,245,.4);background:radial-gradient(circle at 75% 10%,rgba(0,217,245,.13),transparent 52%),linear-gradient(145deg,#14183a,#0b1230);box-shadow:inset 0 1px rgba(255,255,255,.06)}
+.home-axiom-card h2{font-size:clamp(21px,2vw,28px);line-height:1.14;margin:0;color:#f1f1fa}
+.home-axiom-card p{font-size:13px;line-height:1.65;color:#c5c6de;margin:0 0 7px}
+.home-axiom-card .btn{width:100%}
+.axiom-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(3,5,18,.83);backdrop-filter:blur(9px)}
+.axiom-overlay[hidden]{display:none!important}
+.axiom-dialog{display:flex;flex-direction:column;gap:0;width:min(930px,100%);max-height:min(90dvh,920px);overflow:auto;border:1px solid #7952f5;border-radius:23px;background:linear-gradient(130deg,#101630,#151236);box-shadow:0 25px 80px rgba(0,0,0,.5),0 0 30px rgba(121,82,245,.2)}
+.axiom-dialog-heading{display:flex;align-items:center;justify-content:space-between;padding:14px 19px;border-bottom:1px solid #403869;gap:10px}
+.axiom-dialog-heading strong{font-family:'Poppins',sans-serif;font-size:16px;color:#f1f1fa}
+.axiom-dialog #advisor-main{min-width:0;padding:10px 17px 0;overflow-y:auto}
+.axiom-dialog #advisor-results{padding:0 17px 18px}
+body.axiom-open{overflow:hidden}
+@media(max-width:1140px){
+ .home-hero-layout{grid-template-columns:minmax(0,1fr) minmax(220px,285px)}
+ .home-axiom-card{padding:20px}
+}
+@media(max-width:740px){
+ .home-hero-layout{grid-template-columns:1fr;gap:11px}
+ .home-hero-layout .hero-featured{min-height:340px}
+ .home-axiom-card{border-radius:18px;padding:19px 20px;gap:7px}
+ .home-axiom-card h2{font-size:21px}
+ .sidebar .nav{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .nav-link.active{box-shadow:inset 0 2px #00d9f5}
+ .axiom-overlay{padding:0}
+ .axiom-dialog{width:100%;height:100dvh;max-height:100dvh;border-radius:0;border:0}
+ .axiom-dialog-heading{padding:12px 15px}
+ .axiom-dialog #advisor-main{padding:9px 12px 0}
+ .axiom-dialog #advisor-results{padding:0 12px 17px}
+}
+@media(prefers-reduced-motion:reduce){.axiom-dialog,.home-axiom-card{transition:none!important}}
+
+
+/* MangAxiom V1 — sélection directe des œuvres et navigation sans pagination. */
+.card-actions{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.card-actions .card-open{flex:1;text-align:left}
+.quick-add-menu{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px;padding:10px;border:1px solid rgba(0,217,245,.36);border-radius:12px;background:#121936}
+.quick-add-menu[hidden]{display:none!important}
+.quick-add-menu .btn{font-size:11px;min-height:35px;padding:6px 9px}
+.infinite-scroll-status{min-height:65px;padding:20px 12px;display:flex;align-items:center;justify-content:center;gap:12px;color:#aeb8d7;font-size:12px;text-align:center;grid-column:1/-1}
+#library-editions-panel,#library-manage-panel,#collection-book-panel,.physical-inventory-detail{display:none!important}
+.library-view-tabs{display:flex;flex-wrap:wrap}
+.library-view-tab{flex:0 1 auto;min-width:min(180px,45%)}
+@media(max-width:740px){
+ .quick-add-menu{flex-direction:column;align-items:stretch}
+ .quick-add-menu .btn{width:100%}
+ .library-view-tab{flex:1 1 0;min-width:0}
+ .infinite-scroll-status{padding:15px 8px;min-height:58px}
+}
+
+
+/* Profil et accès au compte : composants de présentation sans API d'authentification. */
+.profile-hero{min-height:265px;padding:clamp(25px,4vw,50px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:13px;border:1px solid rgba(121,82,245,.45);border-radius:24px;background:radial-gradient(circle at 90% 15%,rgba(121,82,245,.30),transparent 45%),linear-gradient(120deg,#0e1635,#23163b)}
+.profile-hero h1{font-size:clamp(32px,4vw,50px);line-height:1.05;margin:0;color:#f1f1fa}
+.profile-hero p{max-width:580px;color:#c9c8dc;font-size:14px;line-height:1.6;margin:0 0 8px}
+.profile-hero .actions{gap:10px}
+#profile-summary .reading-profile{display:block;padding:20px;border:1px solid rgba(121,82,245,.33);border-radius:20px;background:#10172d}
+#profile-summary .reading-profile .stat-grid{gap:14px}
+#profile-summary .reading-profile .stat-card{border:1px solid rgba(0,217,245,.27);border-radius:14px;background:#161b3b}
+.auth-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(310px,445px);min-height:600px;border-radius:25px;overflow:hidden;border:1px solid rgba(121,82,245,.45);background:#101731}
+.auth-art{display:flex;flex-direction:column;justify-content:center;padding:clamp(30px,6vw,70px);background:radial-gradient(circle at 75% 25%,rgba(255,114,109,.3),transparent 34%),radial-gradient(circle at 30% 50%,rgba(121,82,245,.46),transparent 70%),linear-gradient(140deg,#101631,#231348)}
+.auth-art h1{font-size:clamp(30px,4vw,53px);max-width:14ch;line-height:1.08;color:#f1f1fa}
+.auth-panel{padding:clamp(28px,3vw,47px);display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:14px}
+.auth-panel h2{font-size:clamp(26px,2.8vw,36px);margin:0}
+.auth-panel form{display:flex;flex-direction:column;gap:13px}
+.auth-panel label{font-size:13px;font-weight:700;color:#eeeefa}
+.auth-panel .input{height:46px;border:1px solid #514475;background:#10162d;color:#fff}
+.auth-panel form .btn{margin-top:7px;min-height:48px}
+.auth-note{color:#b8b8d1;font-size:12px;line-height:1.55}
+@media(max-width:740px){
+ .sidebar .nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .nav-link{font-size:9px}
+ .auth-layout{grid-template-columns:minmax(0,1fr)}
+ .auth-art{min-height:180px;padding:25px}
+ .auth-art h1{font-size:29px;max-width:22ch}
+ .auth-panel{padding:22px 18px}
+ .profile-hero{border-radius:17px;min-height:250px;padding:25px 19px}
+ #profile-summary .reading-profile{padding:16px}
+}

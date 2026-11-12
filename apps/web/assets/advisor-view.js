@@ -41,7 +41,7 @@ export function advisorChatMarkup({history=[],busy=false,lang="fr",aiMode="guide
   '<button class="advisor-suggestion" data-action="advisor-prompt" data-index="'+i+'" type="button">'+e(s)+' <span>↗</span></button>').join("")+'</div>';
  const messages=history.map(m=>
   '<div class="advisor-message '+(m.role==="user"?"is-user":"is-assistant")+'">'+
-  '<div class="advisor-message-persona">'+(m.role==="user"?L("advisorYou"):"Mangadvisor")+'</div>'+
+  '<div class="advisor-message-persona">'+(m.role==="user"?L("advisorYou"):"Axiom")+'</div>'+
   '<p>'+e(m.text)+'</p></div>').join("");
  return '<section class="advisor-studio" aria-label="'+L("advisorTitle")+'">'+
   '<div class="advisor-studio-head"><div><div class="eyebrow">MANGADVISOR · ADVISOR</div>'+
