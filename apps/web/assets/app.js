@@ -27,7 +27,7 @@ const state = {
   appearance: loadAppearance(window.localStorage),
   catalogPage:1,catalogQuery:"",catalogGenre:"",catalogFinished:false,
   catalogHasMore:true,catalogBusy:false,catalogNonce:0,catalogHtmlCache:"",catalogScrollY:0,
-  libraryPage:1,libraryQuery:"",libraryStatus:"",libraryView:"series",libraryDisplay:"covers",libraryPreviousStatus:"",
+  libraryPage:1,libraryQuery:"",libraryStatus:"",libraryView:"series",libraryDisplay:"covers",libraryPreviousStatus:"",libraryHasMore:true,libraryBusy:false,libraryNonce:0,libraryScrollY:0,
   recMode:"mood",mood:"MYSTERY",moodLength:"ANY",moodFinished:false,moodUseLibrary:true,moodMinScore:6.5,recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
   advisorHistory:[],advisorContext:{},advisorSeen:[],advisorResponse:null,advisorBusy:false,
@@ -441,6 +441,13 @@ async function updateCatalog(token,append=false){
   }
  }
 }
+function maybeLoadNextLibraryPage(){
+ if(routeInfo().view!=="library"||state.libraryBusy||!state.libraryHasMore)return;
+ const id=state.libraryView==="wishlist"?"#library-wishlist-results":"#library-results";
+ const sentinel=document.querySelector(id+" #library-scroll-sentinel");
+ if(sentinel&&sentinel.getBoundingClientRect().top<window.innerHeight+450)
+   void updateLibrary(renderToken,true);
+}
 function maybeLoadNextCatalogPage(){
  if(routeInfo().view!=="discover"||state.catalogBusy||!state.catalogHasMore)return;
  const sentinel=document.querySelector("#catalog-scroll-sentinel");
@@ -698,12 +705,16 @@ async function confirmPendingManga(button){
   renderPendingMatcher();
  }
 }
-async function updateLibrary(token){
+async function updateLibrary(token,append=false){
  const wishlistMode=state.libraryView==="wishlist";
  const out=document.querySelector(wishlistMode?"#library-wishlist-results":"#library-results");if(!out||renderToken!==token)return;
- out.innerHTML=loadingCards(8);
+ if(append&&(!state.libraryHasMore||state.libraryBusy))return;
+ const nonce=append?state.libraryNonce:++state.libraryNonce;
+ const page=append?state.libraryPage+1:1;
+ if(!append){state.libraryPage=1;state.libraryHasMore=true;out.innerHTML=loadingCards(8);}
+ state.libraryBusy=true;
  try{
-  const params=new URLSearchParams({limit:"25",offset:String((state.libraryPage-1)*24)});
+  const params=new URLSearchParams({limit:"25",offset:String((page-1)*24)});
   if(!wishlistMode && state.libraryQuery)params.set("q",state.libraryQuery);
   if(wishlistMode)params.set("status","WANT_TO_READ");
  else if(state.libraryStatus)params.set("status",state.libraryStatus);
@@ -714,15 +725,38 @@ async function updateLibrary(token){
   const items=(res.items||[]).slice(0,24),hasNext=(res.items||[]).length>24;
   const declared=declaredCountsByManga(physical);
   const urls=await covers(items);
-  if(renderToken!==token)return;
-  const html=items.length?'<div class="list-head"><span>'+L("page")+' '+state.libraryPage+' · '+items.length+' '+L("showing")+'</span></div>'+
-   '<div class="manga-grid">'+items.map(m=>'<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(preferredMangaTitle(m,state.lang))+'</h3>'+
+  if(renderToken!==token||nonce!==state.libraryNonce)return;
+  const html=items.length?'<div class="manga-grid">'+items.map(m=>'<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(preferredMangaTitle(m,state.lang))+'</h3>'+
    '<p class="manga-card-meta">'+e(libraryCardMeta({...m,library_status:libraryStatus(state.lang,m.library_status)},declared,state.lang))+
    (m.is_favorite?' ♥':'')+'</p><button class="card-open" data-go="/manga/'+m.manga_id+'">'+L("details")+' →</button></div></article>').join("")+'</div>':
    (wishlistMode?emptyBox("♡",e(state.lang==="fr"?"Pas encore de mangas dans tes envies":"Your wishlist is empty"),e(state.lang==="fr"?"Explore le catalogue et ajoute les séries que tu souhaites lire.":"Explore the catalogue and save manga you want to read."),L("startExplore"),"/discover"):'<section class="collection-onboarding"><div class="collection-onboarding-art" aria-hidden="true">✧</div><span class="eyebrow">'+e(state.lang==="fr"?"LA PREMIÈRE PAGE":"CHAPTER ONE")+'</span><h2>'+e(state.lang==="fr"?"Ta mangathèque commence ici.":"Your manga collection starts here.")+'</h2><p>'+e(state.lang==="fr"?"Sélectionne une série dans Explorer, puis ajoute-la à ta mangathèque.":"Choose a series in Explore and add it to your library.")+'</p><div class="collection-onboarding-actions"><button class="btn btn-primary" data-go="/discover">⌕ '+L("startExplore")+'</button></div><button class="collection-demo-trigger" data-action="library-demo">✧ '+e(state.lang==="fr"?"Voir un aperçu avec de vrais mangas du catalogue":"Preview with real catalogue manga")+' →</button></section>');
-  out.innerHTML=html+paginate(state.libraryPage,hasNext,"library");
- if(!wishlistMode){out.classList.toggle("library-results-list",state.libraryDisplay==="list");out.classList.toggle("library-results-covers",state.libraryDisplay!=="list");}
- }catch(err){if(token===renderToken)out.innerHTML=errorBox(err);}
+  if(append&&items.length){
+    const temp=document.createElement("div");temp.innerHTML=html;
+    const grid=out.querySelector(".manga-grid");
+    if(grid)grid.insertAdjacentHTML("beforeend",temp.querySelector(".manga-grid")?.innerHTML||"");
+  }else if(!append)out.innerHTML=html;
+  state.libraryPage=page;
+  state.libraryHasMore=hasNext;
+  out.querySelector("#library-scroll-sentinel")?.remove();
+  if(hasNext)out.insertAdjacentHTML("beforeend",
+    '<div id="library-scroll-sentinel" class="infinite-scroll-status" aria-live="polite">'+
+    (state.lang==="fr"?"Les prochaines séries arrivent en descendant…":"Scroll for more series…")+'</div>');
+  if(!wishlistMode){out.classList.toggle("library-results-list",state.libraryDisplay==="list");out.classList.toggle("library-results-covers",state.libraryDisplay!=="list");}
+ }catch(err){
+  if(token===renderToken&&nonce===state.libraryNonce){
+   if(append){
+    out.querySelector("#library-scroll-sentinel")?.remove();
+    out.insertAdjacentHTML("beforeend",'<div class="infinite-scroll-status" role="alert">'+
+      e(err.message||"Chargement impossible")+
+      ' <button class="btn btn-small" data-action="library-retry">'+L("retry")+'</button></div>');
+   }else out.innerHTML=errorBox(err);
+  }
+ }finally{
+  if(nonce===state.libraryNonce){
+   state.libraryBusy=false;
+   requestAnimationFrame(maybeLoadNextLibraryPage);
+  }
+ }
 }
 async function showLibraryDemo(){
  const token=renderToken;
@@ -1716,6 +1750,11 @@ root.addEventListener("click",async event=>{
  if(action==="enrich-more")return discoverFrenchEnrichment(button,true);
  if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
+ if(action==="library-retry"){
+  document.querySelector(".infinite-scroll-status[role=alert]")?.remove();
+  state.libraryBusy=false;state.libraryHasMore=true;
+  await updateLibrary(renderToken,true);return;
+ }
  if(action==="catalog-retry"){
   document.querySelector(".infinite-scroll-status[role=alert]")?.remove();
   state.catalogBusy=false;state.catalogHasMore=true;
@@ -1913,5 +1952,7 @@ root.addEventListener("keydown",event=>{
 });
 window.addEventListener("scroll",maybeLoadNextCatalogPage,{passive:true});
 window.addEventListener("resize",maybeLoadNextCatalogPage,{passive:true});
+window.addEventListener("scroll",maybeLoadNextLibraryPage,{passive:true});
+window.addEventListener("resize",maybeLoadNextLibraryPage,{passive:true});
 window.addEventListener("popstate",()=>render());
 render();
