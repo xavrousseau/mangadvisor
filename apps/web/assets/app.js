@@ -25,7 +25,8 @@ const SCREENS = ["home","discover","recommendations","library","releases","appea
 const state = {
   lang: ["fr","en"].includes(localStorage.getItem("ma-language")) ? localStorage.getItem("ma-language") : "fr",
   appearance: loadAppearance(window.localStorage),
-  catalogPage:1, catalogQuery:"",catalogGenre:"",catalogFinished:false,
+  catalogPage:1,catalogQuery:"",catalogGenre:"",catalogFinished:false,
+  catalogHasMore:true,catalogBusy:false,catalogNonce:0,catalogHtmlCache:"",catalogScrollY:0,
   libraryPage:1,libraryQuery:"",libraryStatus:"",libraryView:"series",libraryDisplay:"covers",libraryPreviousStatus:"",
   recMode:"mood",mood:"MYSTERY",moodLength:"ANY",moodFinished:false,moodUseLibrary:true,moodMinScore:6.5,recGoal:"SIMILAR_SAFE",recBalance:"BALANCED",recMinScore:6.8,recFinished:false,recExclude:false,
   selected:[],manualQuery:"",manualMatches:[],recResult:null,
@@ -376,26 +377,73 @@ async function renderDiscover(token){
  '<div class="discover-genre-section"><span class="eyebrow">'+e(state.lang==="fr"?"L'ENVIE DU MOMENT":"WHAT ARE YOU IN THE MOOD FOR")+'</span><div class="discover-genre-chips">'+GENRES.filter(([value])=>["Action","Adventure","Fantasy","Mystery","Romance","Psychological","Slice of Life"].includes(value)).map(([value,label])=>'<button type="button" class="discover-genre-chip'+(state.catalogGenre===value?' active':'')+'" data-action="discover-genre" data-value="'+e(value)+'" aria-pressed="'+(state.catalogGenre===value)+'">'+tr(value)+'</button>').join("")+'</div></div>'+
  '<div class="discover-collection-head"><h2>'+e(state.lang==="fr"?"À explorer":"Explore the collection")+'</h2><p>'+e(state.lang==="fr"?"Des mangas à découvrir, à ton rythme.":"Find a new read from the catalogue.")+'</p></div><div id="catalog-results">'+loadingCards(10)+'</div>';
  if(!mount(layout,token))return;
- await updateCatalog(token);
+ if(state.catalogHtmlCache){
+  const out=document.querySelector("#catalog-results");
+  if(out)out.innerHTML=state.catalogHtmlCache;
+  requestAnimationFrame(()=>{window.scrollTo(0,state.catalogScrollY);maybeLoadNextCatalogPage();});
+ }else await updateCatalog(token);
 }
-async function updateCatalog(token){
- const out=document.querySelector("#catalog-results");if(!out||token!==renderToken)return;
- out.innerHTML=loadingCards(10);
+async function updateCatalog(token,append=false){
+ const out=document.querySelector("#catalog-results");
+ if(!out||token!==renderToken)return;
+ if(append&&(!state.catalogHasMore||state.catalogBusy))return;
+ const nonce=append?state.catalogNonce:++state.catalogNonce;
+ const page=append?state.catalogPage+1:1;
+ if(!append){
+  state.catalogPage=1;state.catalogHasMore=true;state.catalogHtmlCache="";
+  state.catalogScrollY=0;out.innerHTML=loadingCards(10);
+ }
+ state.catalogBusy=true;
  try{
-  const res=await request("/mangas?"+new URLSearchParams({
-   limit:"13",offset:String((state.catalogPage-1)*12),
+  const params=new URLSearchParams({
+   limit:"13",offset:String((page-1)*12),
    ...(state.catalogQuery?{q:state.catalogQuery}:{}),
    ...(state.catalogGenre?{genre:state.catalogGenre}:{}),
    ...(state.catalogFinished?{only_finished:"true"}:{})
-  }));
-  const items=(res.items||[]).slice(0,12),hasNext=(res.items||[]).length>12;
+  });
+  const res=await request("/mangas?"+params);
+  const entries=res.items||[],items=entries.slice(0,12);
   const urls=await covers(items);
-  if(renderToken!==token)return;
-  out.innerHTML='<div class="list-head"><span>'+L("page")+' '+state.catalogPage+' · '+items.length+' '+L("showing")+'</span></div>'+
-   (items.length?'<div class="manga-grid">'+items.map(m=>card(m,urls)).join("")+'</div>':
-    emptyBox("⌕",L("noResults"),L("noResultsHelp")))+
-   paginate(state.catalogPage,hasNext,"catalog");
- }catch(err){if(renderToken===token)out.innerHTML=errorBox(err);}
+  if(renderToken!==token||nonce!==state.catalogNonce)return;
+  const cards=items.map(m=>card(m,urls)).join("");
+  if(append){
+   const grid=out.querySelector(".manga-grid");
+   if(grid)grid.insertAdjacentHTML("beforeend",cards);
+  }else{
+   out.innerHTML=items.length?'<div class="manga-grid">'+cards+'</div>':
+    emptyBox("⌕",L("noResults"),L("noResultsHelp"));
+  }
+  state.catalogPage=page;
+  state.catalogHasMore=entries.length>12;
+  out.querySelector("#catalog-scroll-sentinel")?.remove();
+  if(state.catalogHasMore){
+   out.insertAdjacentHTML("beforeend",
+    '<div id="catalog-scroll-sentinel" class="infinite-scroll-status" aria-live="polite">'+
+    (state.lang==="fr"?"Descends pour découvrir d’autres mangas…":"Scroll to discover more manga…")+'</div>');
+  }
+  state.catalogHtmlCache=out.innerHTML;
+ }catch(err){
+  if(renderToken===token&&nonce===state.catalogNonce){
+   const sentinel=out.querySelector("#catalog-scroll-sentinel");
+   const retry='<div class="infinite-scroll-status" role="alert">'+e(err.message||"Chargement impossible")+
+    ' <button class="btn btn-small" type="button" data-action="catalog-retry">'+L("retry")+'</button></div>';
+   if(append){
+    if(sentinel)sentinel.outerHTML=retry;else out.insertAdjacentHTML("beforeend",retry);
+   }else out.innerHTML=errorBox(err);
+  }
+ }finally{
+  if(nonce===state.catalogNonce){
+   state.catalogBusy=false;
+   state.catalogHtmlCache=out.innerHTML;
+   requestAnimationFrame(maybeLoadNextCatalogPage);
+  }
+ }
+}
+function maybeLoadNextCatalogPage(){
+ if(routeInfo().view!=="discover"||state.catalogBusy||!state.catalogHasMore)return;
+ const sentinel=document.querySelector("#catalog-scroll-sentinel");
+ if(sentinel&&sentinel.getBoundingClientRect().top<window.innerHeight+450)
+   void updateCatalog(renderToken,true);
 }
 function applyLibraryView(){
  const active=["series","editions","wishlist","manage"].includes(state.libraryView)?state.libraryView:"series";
@@ -1666,9 +1714,10 @@ root.addEventListener("click",async event=>{
  if(action==="enrich-more")return discoverFrenchEnrichment(button,true);
  if(action==="volume-owned"||action==="volume-read")return updateFrenchVolume(button);
  if(action==="back"){if(history.length>1)history.back();else await go("/discover");return;}
- if(action==="catalog-prev"||action==="catalog-next"){
-  state.catalogPage=Math.max(1,state.catalogPage+(action.endsWith("next")?1:-1));
-  await updateCatalog(renderToken);window.scrollTo({top:0,behavior:"smooth"});return;
+ if(action==="catalog-retry"){
+  document.querySelector(".infinite-scroll-status[role=alert]")?.remove();
+  state.catalogBusy=false;state.catalogHasMore=true;
+  await updateCatalog(renderToken,true);return;
  }
  if(action==="library-prev"||action==="library-next"){
   state.libraryPage=Math.max(1,state.libraryPage+(action.endsWith("next")?1:-1));
@@ -1860,5 +1909,7 @@ root.addEventListener("keydown",event=>{
  if(event.key==="Escape"&&isbnScanner.isOpen()){event.preventDefault();isbnScanner.close();return;}
  if(event.key==="Enter"&&event.target.id==="manual-search"){event.preventDefault();manualSearch();}
 });
+window.addEventListener("scroll",maybeLoadNextCatalogPage,{passive:true});
+window.addEventListener("resize",maybeLoadNextCatalogPage,{passive:true});
 window.addEventListener("popstate",()=>render());
 render();
