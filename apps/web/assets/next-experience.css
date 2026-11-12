@@ -327,3 +327,21 @@ body.axiom-open{overflow:hidden}
  .axiom-dialog #advisor-results{padding:0 12px 17px}
 }
 @media(prefers-reduced-motion:reduce){.axiom-dialog,.home-axiom-card{transition:none!important}}
+
+
+/* MangAxiom V1 — sélection directe des œuvres et navigation sans pagination. */
+.card-actions{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.card-actions .card-open{flex:1;text-align:left}
+.quick-add-menu{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px;padding:10px;border:1px solid rgba(0,217,245,.36);border-radius:12px;background:#121936}
+.quick-add-menu[hidden]{display:none!important}
+.quick-add-menu .btn{font-size:11px;min-height:35px;padding:6px 9px}
+.infinite-scroll-status{min-height:65px;padding:20px 12px;display:flex;align-items:center;justify-content:center;gap:12px;color:#aeb8d7;font-size:12px;text-align:center;grid-column:1/-1}
+#library-editions-panel,#library-manage-panel,#collection-book-panel,.physical-inventory-detail{display:none!important}
+.library-view-tabs{display:flex;flex-wrap:wrap}
+.library-view-tab{flex:0 1 auto;min-width:min(180px,45%)}
+@media(max-width:740px){
+ .quick-add-menu{flex-direction:column;align-items:stretch}
+ .quick-add-menu .btn{width:100%}
+ .library-view-tab{flex:1 1 0;min-width:0}
+ .infinite-scroll-status{padding:15px 8px;min-height:58px}
+}
