@@ -126,14 +126,14 @@ function routeInfo(){
 function shell(){
   const active=routeInfo().view;
   document.documentElement.lang=state.lang;
-  document.title="Mangadvisor — "+(active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active));
+  document.title="MangAxiom — "+(active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active));
   const navItems=[
-    ["home","/","◈","home"],["discover","/discover","⌕","discover"],
-    ["recommendations","/for-you","✧","forYou"],["library","/library","▤","library"],["releases","/releases","◷","releases"]
+    ["home","/","⌂","home"],["discover","/discover","⌕","discover"],
+    ["recommendations","/for-you","✧","forYou"],["library","/library","▤","library"]
   ];
   return '<div class="layout"><aside class="sidebar" aria-label="Navigation principale"><a href="/" class="brand" data-go="/">'+
-  '<div class="logo-mark">M</div><div class="logo-word">mangadvisor<span>.</span><small>YOUR MANGA UNIVERSE</small></div></a>'+
-  '<div class="sidebar-caption">Mangadvisor</div><nav class="nav">'+navItems.map(([view,url,icon,key])=>
+  '<div class="logo-mark">M</div><div class="logo-word">Mang<span>Axiom</span><small>YOUR MANGA UNIVERSE</small></div></a>'+
+  '<div class="sidebar-caption">MangAxiom</div><nav class="nav">'+navItems.map(([view,url,icon,key])=>
     '<button class="nav-link '+(active===view?'active':'')+'" data-go="'+url+'"'+(active===view?' aria-current="page"':'')+
     '><span class="nav-ico" aria-hidden="true">'+icon+'</span><span>'+(key==="releases"?e(state.lang==="fr"?"Sorties":"Releases"):L(key))+'</span></button>').join("")+
   '</nav><div class="sidebar-bottom"><p>'+L("footer")+'</p></div></aside>'+
@@ -165,7 +165,7 @@ async function render(){
  // Keep the navigation and top bar mounted between routes: only the page changes.
  if(content && root.dataset.shellLang===state.lang && root.querySelector(".layout")){
    document.documentElement.lang=state.lang;
-   document.title="Mangadvisor — "+(active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active));
+   document.title="MangAxiom — "+(active==="releases"?(state.lang==="fr"?"Sorties":"Releases"):t(state.lang,active==="detail"?"mangaDetails":active==="recommendations"?"forYou":active==="appearance"?"appearance":active==="not-found"?"discover":active));
    root.querySelectorAll(".nav-link[data-go]").forEach(link=>{
      const selected=link.dataset.go===({home:"/",discover:"/discover",recommendations:"/for-you",library:"/library",releases:"/releases"}[active]||"");
      link.classList.toggle("active",selected);
@@ -260,7 +260,7 @@ async function renderHome(token){
  '<section aria-labelledby="home-continue-title"><div class="section-header"><div><h2 class="section-title" id="home-continue-title">'+L("homeContinue")+'</h2>'+
  '<p class="section-caption">'+L("homeContinueDesc")+'</p></div><button class="btn-link" data-go="/library">'+L("homeContinueAction")+' →</button></div>'+
  '<div id="home-continue">'+loadingCards(4)+'</div></section>'+
- '<section aria-labelledby="home-personal-title"><div class="section-header"><div><div class="eyebrow">✦ MANGADVISOR MATCH</div>'+
+ '<section aria-labelledby="home-personal-title"><div class="section-header"><div><div class="eyebrow">✦ MANGAXIOM MATCH</div>'+
  '<h2 class="section-title" id="home-personal-title">'+L("homePersonalTitle")+'</h2><p class="section-caption">'+L("homePersonalDesc")+'</p></div>'+
  '<button class="btn-link" data-go="/for-you">'+L("homePersonalAction")+' →</button></div>'+
  '<div id="home-personal"><div class="info">'+L("homePersonalLoading")+'</div>'+loadingCards(2)+'</div></section>'+
@@ -367,7 +367,7 @@ async function renderDiscover(token){
  const opts=GENRES.map(([value,label])=>'<option value="'+e(value)+'"'+(state.catalogGenre===value?' selected':'')+'>'+
  (label==="allGenres"?L("allGenres"):tr(value))+'</option>').join("");
  const layout='<section class="discover-intro" aria-labelledby="discover-page-title"><div class="discover-intro-content"><span class="eyebrow">✦ '+e(state.lang==="fr"?"EXPLORE TON PROCHAIN UNIVERS":"EXPLORE YOUR NEXT WORLD")+'</span><h1 id="discover-page-title">'+e(state.lang==="fr"?"Et si ton prochain manga préféré était ici ?":"Your next favorite manga is here.")+'</h1><p>'+e(state.lang==="fr"?"Des dizaines de milliers d’œuvres à explorer. Commence par une envie, un titre ou un genre.":"Browse thousands of stories by title, mood or genre.")+'</p><button type="button" class="btn btn-primary" data-go="/for-you">✦ '+e(state.lang==="fr"?"Trouver mon prochain coup de cœur":"Find my next favorite")+' →</button></div><div class="discover-intro-decoration" aria-hidden="true">M<span>.</span></div></section>'+
- '<div class="headline-row discover-heading"><div><div class="eyebrow">✦ MANGADVISOR · DISCOVERY</div><h1 class="page-title">'+L("startExplore")+'</h1>'+
+ '<div class="headline-row discover-heading"><div><div class="eyebrow">✦ MANGAXIOM · DISCOVERY</div><h1 class="page-title">'+L("startExplore")+'</h1>'+
  '<p class="page-desc">'+L("browseHelp")+'</p></div></div>'+
  '<div class="discover-search-shell"><div class="filters"><div class="field grow"><label for="catalog-query">'+L("search")+'</label>'+
  '<input type="search" class="input" id="catalog-query" autocomplete="off" value="'+e(state.catalogQuery)+'" placeholder="'+L("searchPlaceholder")+'"></div>'+
@@ -941,12 +941,12 @@ async function sendAdvisorMessage(raw){
  }
 }
 async function renderMoodRecommendations(token){
- const html='<section class="reco-stage"><div class="eyebrow">✧ '+e(state.lang==="fr"?"TON PROCHAIN COUP DE CŒUR":"YOUR NEXT FAVORITE")+'</div><h1>'+e(state.lang==="fr"?"Quel univers t’attire aujourd’hui ?":"Which world calls to you today?")+'</h1><p>'+e(state.lang==="fr"?"Une envie, une humeur, une découverte. Mangadvisor trouve des histoires qui te correspondent, en s’appuyant sur de vraies données.":"A feeling, a mood, a new discovery. Manga suggestions grounded in real data.")+'</p><div class="reco-stage-actions"><button type="button" class="btn btn-primary" data-action="rec-mode" data-value="advisor">✧ '+e(state.lang==="fr"?"Parler au conseiller":"Talk to advisor")+'</button><button type="button" class="btn btn-soft" data-action="rec-mode" data-value="library">▤ '+e(state.lang==="fr"?"Selon ma collection":"From my library")+'</button></div><div class="reco-stage-art" aria-hidden="true">✧</div></section>'+
+ const html='<section class="reco-stage"><div class="eyebrow">✧ '+e(state.lang==="fr"?"TON PROCHAIN COUP DE CŒUR":"YOUR NEXT FAVORITE")+'</div><h1>'+e(state.lang==="fr"?"Quel univers t’attire aujourd’hui ?":"Which world calls to you today?")+'</h1><p>'+e(state.lang==="fr"?"Une envie, une humeur, une découverte. MangAxiom trouve des histoires qui te correspondent, en s’appuyant sur de vraies données.":"A feeling, a mood, a new discovery. Manga suggestions grounded in real data.")+'</p><div class="reco-stage-actions"><button type="button" class="btn btn-primary" data-action="go-home-axiom">✧ '+e(state.lang==="fr"?"Parler au conseiller":"Talk to advisor")+'</button><button type="button" class="btn btn-soft" data-action="rec-mode" data-value="library">▤ '+e(state.lang==="fr"?"Selon ma collection":"From my library")+'</button></div><div class="reco-stage-art" aria-hidden="true">✧</div></section>'+
  '<div class="headline-row"><div><div class="eyebrow">✧ MANGADVISOR · GUIDED DISCOVERY</div>'+
   '<h1 class="page-title">'+L("moodPageTitle")+'</h1><p class="page-desc">'+L("moodPageIntro")+'</p></div></div>'+
   '<div class="toggle-tabs rec-mode-tabs" role="group" aria-label="'+L("forYou")+'">'+
   '<button class="selected" data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button>'+
-  '<button data-action="rec-mode" data-value="advisor">'+L("advisorMode")+'</button>'+
+  ''+
   '<button data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
   '<button data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button></div>'+
   moodFormMarkup({mood:state.mood,length:state.moodLength,onlyFinished:state.moodFinished,
@@ -1009,7 +1009,7 @@ async function renderRecommendations(token){
  '<button class="'+(libraryMode?'selected':'')+'" data-action="rec-mode" data-value="library">'+L("libraryMode")+'</button>'+
  '<button class="'+(!libraryMode?'selected':'')+'" data-action="rec-mode" data-value="manual">'+L("manualMode")+'</button>'+
  '<button data-action="rec-mode" data-value="mood">'+L("moodMode")+'</button>'+
- '<button data-action="rec-mode" data-value="advisor">'+L("advisorMode")+'</button></div>'+
+ '</div>'+
  '<div class="option-panel"><h2>'+L(libraryMode?"libraryMode":"manualMode")+'</h2>'+
  '<p>'+L(libraryMode?"libraryModeText":"manualModeText")+'</p>'+
  (libraryMode?'<div class="field medium"><label for="rec-goal">'+L("goal")+'</label>'+
@@ -1575,6 +1575,9 @@ root.addEventListener("click",async event=>{
   event.preventDefault();await go(button.dataset.go);return;
  }
  const action=button.dataset.action;
+ if(action==="go-home-axiom"){
+  await go("/");document.querySelector('[data-action="axiom-open"]')?.click();return;
+ }
  if(action==="axiom-open"){
   const overlay=document.querySelector("#axiom-overlay");
   if(overlay){overlay.hidden=false;document.body.classList.add("axiom-open");overlay.querySelector("#advisor-message")?.focus();}
