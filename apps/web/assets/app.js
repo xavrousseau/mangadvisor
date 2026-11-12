@@ -98,7 +98,11 @@ function badges(list,limit=4){return (list||[]).slice(0,limit).map(x=>'<span cla
 function card(m,urls){
  const status=publication(state.lang,m.status);
  return '<article class="manga-card">'+poster(m,urls)+'<div class="manga-card-body"><h3 class="manga-card-title">'+e(preferredMangaTitle(m,state.lang))+'</h3>'+
- '<p class="manga-card-meta">'+stars(m)+' · '+e(status)+'</p><button class="card-open" data-go="/manga/'+e(m.manga_id||m.id)+'">'+L("details")+' &rarr;</button></div></article>';
+ '<p class="manga-card-meta">'+stars(m)+' · '+e(status)+'</p><div class="card-actions"><button class="card-open" data-go="/manga/'+e(m.manga_id||m.id)+'">'+L("details")+' &rarr;</button>'+
+ '<button class="btn btn-small btn-soft" type="button" data-action="quick-add-toggle" aria-expanded="false" aria-label="Ajouter à ma mangathèque">＋</button></div>'+
+ '<div class="quick-add-menu" hidden role="group" aria-label="Choisir un statut de lecture">'+[
+ ["WANT_TO_READ","À lire"],["READING","En cours"],["READ","Terminé"]
+ ].map(([key,label])=>'<button class="btn btn-small" type="button" data-action="quick-add-save" data-manga-id="'+e(m.manga_id||m.id)+'" data-status="'+key+'">'+label+'</button>').join("")+'</div></div></article>';
 }
 function loadingCards(n=8){return '<div class="manga-grid" aria-busy="true">'+Array.from({length:n},()=>'<div class="skeleton"></div>').join("")+'</div>';}
 function errorBox(error,action="refresh"){
@@ -829,7 +833,7 @@ async function renderDetail(token,id){
        e(manga.title_fr_source==="SCRINIS_FR_PRINT"?"Scrinis · édition FR papier référencée":manga.title_fr_source==="TENRAI_MAL_TYPED"?"MyAnimeList / Tenrai":"Wikidata / MAL")+'</p>':'')+
    '<div class="actions"><button class="btn btn-primary" data-action="scroll-save">＋ '+L(libraryItem?"inLibrary":"addLibrary")+'</button>'+
     '<button class="btn btn-soft" data-action="similar">✧ '+L("similar")+'</button>'+
- '<button class="btn btn-soft" data-action="open-scanner">▣ '+e(state.lang==="fr"?"Scanner un tome":"Scan a volume")+'</button></div></div></section>'+
+ '</div></div></section>'+
    '<div class="detail-stats">'+[
     ["communityRating",stars(manga)],["volumes",manga.volumes??"—"],["chapters",manga.chapters??"—"],["popularity",manga.popularity??"—"]
    ].map(([label,value])=>'<div class="stat"><small>'+L(label)+'</small><strong>'+e(value)+'</strong></div>').join("")+'</div>'+
@@ -846,7 +850,9 @@ async function renderDetail(token,id){
     STATUS.map(value=>'<option value="'+value+'"'+(libraryItem?.library_status===value?' selected':'')+'>'+e(libraryStatus(state.lang,value))+'</option>').join("")+'</select></div>'+
     '<div class="field"><label for="edit-rating">'+L("myRating")+'</label>'+
     '<input type="number" class="input" min="0" max="10" step="0.5" id="edit-rating" name="rating" value="'+e(libraryItem?.user_score??"")+'"></div></div>'+
-    '<div class="field"><label for="edit-notes">'+L("notes")+'</label><textarea class="textarea" id="edit-notes" name="notes" placeholder="'+L("notePlaceholder")+'">'+e(libraryItem?.notes??"")+'</textarea></div>'+
+    '<div class="form-grid"><div class="field"><label for="edit-owned-volumes">'+e(state.lang==="fr"?"Tomes possédés":"Owned volumes")+'</label><input type="number" id="edit-owned-volumes" class="input" name="owned_volumes" min="0" max="9999" step="1" value="'+e(libraryItem?.owned_volumes??"")+'"></div>'+
+ '<div class="field"><label for="edit-read-volumes">'+e(state.lang==="fr"?"Tomes lus":"Read volumes")+'</label><input type="number" id="edit-read-volumes" class="input" name="read_volumes" min="0" max="9999" step="1" value="'+e(libraryItem?.read_volumes??"")+'"></div></div>'+
+ '<div class="field"><label for="edit-notes">'+L("notes")+'</label><textarea class="textarea" id="edit-notes" name="notes" placeholder="'+L("notePlaceholder")+'">'+e(libraryItem?.notes??"")+'</textarea></div>'+
     '<div class="form-action-row"><label class="check"><input type="checkbox" name="favorite"'+(libraryItem?.is_favorite?' checked':'')+'>'+L("favorite")+'</label>'+
     '<div class="actions">'+(libraryItem?'<button type="button" data-action="remove-library" class="btn btn-small">'+L("removeLibrary")+'</button>':'')+
     '<button class="btn btn-primary" type="submit">'+L(libraryItem?"updateLibrary":"addLibrary")+'</button></div></div></form>'+
@@ -1619,11 +1625,19 @@ async function saveLibrary(form){
  const value=String(fd.get("rating")??"").trim();
  const rating=value===""?null:Number(value);
  if(rating!==null&&(!Number.isFinite(rating)||rating<0||rating>10)){toast(t(state.lang,"error"));return;}
+ const parseVolume=name=>{
+  const raw=String(fd.get(name)??"").trim();
+  if(raw==="")return null;
+  const n=Number(raw);
+  return Number.isInteger(n)&&n>=0&&n<=9999?n:NaN;
+ };
+ const ownedCount=parseVolume("owned_volumes"),readCount=parseVolume("read_volumes");
+ if(Number.isNaN(ownedCount)||Number.isNaN(readCount)){toast("Nombre de tomes invalide");return;}
  const old=state.libraryDetail;
  const payload={
   manga_id:Number(manga.id),library_status:fd.get("status")||"READ",
   user_score:rating,is_favorite:fd.has("favorite"),
-  owned_volumes:old?.owned_volumes??null,read_volumes:old?.read_volumes??null,
+  owned_volumes:ownedCount,read_volumes:readCount,
   notes:String(fd.get("notes")||""),
   started_at:old?.started_at??null,finished_at:old?.finished_at??null,
  };
@@ -1657,6 +1671,39 @@ root.addEventListener("click",async event=>{
   event.preventDefault();await go(button.dataset.go);return;
  }
  const action=button.dataset.action;
+ if(action==="quick-add-toggle"){
+   const card=button.closest(".manga-card"),menu=card?.querySelector(".quick-add-menu");
+   if(!menu)return;
+   const opening=menu.hidden;
+   document.querySelectorAll(".quick-add-menu:not([hidden])").forEach(other=>other.hidden=true);
+   document.querySelectorAll('[data-action="quick-add-toggle"]').forEach(other=>other.setAttribute("aria-expanded","false"));
+   menu.hidden=!opening;
+   button.setAttribute("aria-expanded",String(opening));
+   return;
+ }
+ if(action==="quick-add-save"){
+   const id=idNumber(button.dataset.mangaId),status=button.dataset.status;
+   if(!id||!["WANT_TO_READ","READING","READ"].includes(status))return;
+   button.disabled=true;
+   try{
+     const manga=await request("/mangas/"+id);
+     const found=await request("/library?"+new URLSearchParams({q:manga.title,limit:"100"}));
+     const old=(found.items||[]).find(item=>Number(item.manga_id)===id)||null;
+     await request("/library/items",{method:"POST",data:{
+       manga_id:id,library_status:status,
+       user_score:old?.user_score??null,is_favorite:old?.is_favorite===true,
+       owned_volumes:old?.owned_volumes??null,read_volumes:old?.read_volumes??null,
+       notes:old?.notes??"",started_at:old?.started_at??null,finished_at:old?.finished_at??null
+     }});
+     state.recResult=null;
+     button.closest(".quick-add-menu").hidden=true;
+     const toggle=button.closest(".manga-card")?.querySelector('[data-action="quick-add-toggle"]');
+     if(toggle)toggle.setAttribute("aria-expanded","false");
+     toast("✓ Manga ajouté à ta mangathèque");
+   }catch(err){toast(err?.message||t(state.lang,"error"));}
+   finally{button.disabled=false;}
+   return;
+ }
  if(action==="go-home-axiom"){
   await go("/");document.querySelector('[data-action="axiom-open"]')?.click();return;
  }
